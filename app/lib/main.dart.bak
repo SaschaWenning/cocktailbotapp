@@ -4,7 +4,6 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
 import 'package:qr_flutter/qr_flutter.dart';
@@ -50,43 +49,18 @@ class _CocktailMachineAppState extends State<CocktailMachineApp> {
     _keyboardDebounce?.cancel();
 
     if (editable != null && editable.mounted && !editable.widget.readOnly) {
-      // Wenn das Popup dieses Feld bereits bearbeitet, darf ein erneutes
-      // Browser-Fokusereignis unseren lokalen Puffer NICHT neu laden. Genau
-      // dieses Nachladen hat nach einer kurzen Tipp-Pause die alte Web-
-      // Selektion wiederhergestellt und den nächsten Tastendruck ersetzt.
-      if (_virtualKeyboardVisible && identical(editable, _activeEditable)) {
-        return;
-      }
-
+      _activeEditable = editable;
       _keyboardDebounce = Timer(const Duration(milliseconds: 60), () {
         if (!mounted) return;
         final current = _editableStateForFocus(FocusManager.instance.primaryFocus);
         if (current == null || !current.mounted || current.widget.readOnly) return;
-
         setState(() {
           _activeEditable = current;
           _virtualKeyboardValue = current.textEditingValue;
           _virtualKeyboardObscure = current.widget.obscureText;
           _virtualKeyboardVisible = true;
         });
-
-        // Nach dem Erfassen des Felds übernimmt die CocktailBot-Tastatur die
-        // Eingabe vollständig. Das echte HTML/Flutter-Eingabefeld wird
-        // absichtlich ent-fokussiert, damit Chromium auch nach längerer Pause
-        // keine Select-All-Selektion mehr zurück in den Controller schreiben
-        // kann. Der Text selbst wird weiterhin direkt im Controller geändert.
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (!mounted || !identical(_activeEditable, current)) return;
-          current.widget.focusNode.unfocus();
-        });
       });
-      return;
-    }
-
-    // Solange die Popup-Tastatur aktiv ist, ist ein fehlender primärer Fokus
-    // beabsichtigt. Das Popup bleibt offen, bis "Fertig"/"Schließen" gedrückt
-    // oder ein anderes Eingabefeld angetippt wird.
-    if (_virtualKeyboardVisible && _activeEditable != null) {
       return;
     }
 
@@ -120,12 +94,9 @@ class _CocktailMachineAppState extends State<CocktailMachineApp> {
     final editable = _activeEditable;
     if (editable == null || !editable.mounted || editable.widget.readOnly) return;
 
-    final controller = editable.widget.controller;
-    final oldValue = controller.value;
-
-    // Cursor/Selektion gehören während des Popups ausschließlich unserem
-    // lokalen Puffer. InputFormatter werden trotzdem angewendet, damit Zahlen-
-    // und sonstige Feldregeln genauso gelten wie bei normaler Tastatureingabe.
+    // Die Popup-Tastatur verwaltet ihre Cursorposition selbst. Damit bleibt
+    // nach dem ersten Tastendruck nicht der komplette Inhalt markiert und
+    // weitere Zeichen werden angehängt statt den vorherigen Wert zu ersetzen.
     final requestedOffset = value.selection.isValid
         ? value.selection.extentOffset.clamp(0, value.text.length).toInt()
         : value.text.length;
@@ -134,51 +105,42 @@ class _CocktailMachineAppState extends State<CocktailMachineApp> {
       composing: TextRange.empty,
     );
 
-    for (final formatter
-        in editable.widget.inputFormatters ?? const <TextInputFormatter>[]) {
-      normalized = formatter.formatEditUpdate(oldValue, normalized);
-    }
-
-    final finalOffset = (normalized.selection.isValid
-            ? normalized.selection.extentOffset
-            : normalized.text.length)
-        .clamp(0, normalized.text.length)
-        .toInt();
-    normalized = normalized.copyWith(
-      selection: TextSelection.collapsed(offset: finalOffset),
-      composing: TextRange.empty,
+    _virtualKeyboardValue = normalized;
+    editable.userUpdateTextEditingValue(
+      normalized,
+      SelectionChangedCause.keyboard,
     );
 
-    // Kein userUpdateTextEditingValue() und kein requestFocus() mehr: Beides
-    // koppelt die virtuelle Tastatur wieder an Chromiums verstecktes Web-
-    // Eingabefeld. Bei einer Tipp-Pause konnte Chromium dadurch die komplette
-    // Auswahl erneut markieren. Direkte Controller-Updates sind hier bewusst
-    // deterministisch; onChanged wird wie bei Benutzereingabe manuell ausgelöst.
+    // InputFormatter dürfen den Text verändern. Danach übernehmen wir den
+    // tatsächlich akzeptierten Text, erzwingen aber wieder einen
+    // zusammengeklappten Cursor. So kann die Browser-Selektion nicht bei
+    // jedem virtuellen Tastendruck erneut den ganzen Inhalt markieren.
+    final formatted = editable.textEditingValue;
+    final formattedOffset = requestedOffset
+        .clamp(0, formatted.text.length)
+        .toInt();
+    normalized = formatted.copyWith(
+      selection: TextSelection.collapsed(offset: formattedOffset),
+      composing: TextRange.empty,
+    );
     _virtualKeyboardValue = normalized;
-    controller.value = normalized;
-    if (oldValue.text != normalized.text) {
-      editable.widget.onChanged?.call(normalized.text);
-    }
 
-    // Falls ein onChanged-Handler den Controller bewusst korrigiert, übernehmen
-    // wir dessen Ergebnis wieder in die Vorschau, ohne den Browser zu fokussieren.
-    if (editable.mounted) {
-      final accepted = controller.value;
-      final acceptedOffset = (accepted.selection.isValid
-              ? accepted.selection.extentOffset
-              : accepted.text.length)
-          .clamp(0, accepted.text.length)
-          .toInt();
-      _virtualKeyboardValue = accepted.copyWith(
-        selection: TextSelection.collapsed(offset: acceptedOffset),
-        composing: TextRange.empty,
+    if (formatted.selection != normalized.selection ||
+        formatted.composing != TextRange.empty) {
+      editable.userUpdateTextEditingValue(
+        normalized,
+        SelectionChangedCause.keyboard,
       );
-      if (controller.value.selection != _virtualKeyboardValue.selection ||
-          controller.value.composing != TextRange.empty) {
-        controller.value = _virtualKeyboardValue;
-      }
     }
 
+    // Zusätzlich die Controller-Selektion explizit zusammenklappen. Das ist
+    // besonders im Flutter-Web-Kiosk wichtig, weil Chromium sonst die zuletzt
+    // markierte Auswahl optisch beibehalten kann.
+    if (editable.widget.controller.selection != normalized.selection) {
+      editable.widget.controller.selection = normalized.selection;
+    }
+
+    editable.widget.focusNode.requestFocus();
     if (mounted) setState(() {});
   }
 
