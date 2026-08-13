@@ -17,7 +17,9 @@ from __future__ import annotations
 
 import argparse
 import atexit
+import base64
 import glob
+import hashlib
 import json
 import os
 import signal
@@ -33,6 +35,10 @@ from pathlib import Path
 from typing import Any
 
 import requests
+
+from cryptography.exceptions import InvalidSignature
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 
 from flask import Flask, jsonify, request, send_from_directory
 
@@ -80,6 +86,19 @@ PAYPAL_TIMEOUT_SECONDS = float(os.getenv("COCKTAILBOT_PAYPAL_TIMEOUT_SECONDS", "
 KIOSK_STOP_FILE = Path(
     os.getenv("COCKTAILBOT_KIOSK_STOP_FILE", "/var/lib/cocktailbot/kiosk.stop")
 )
+LICENSE_FILE = Path(
+    os.getenv("COCKTAILBOT_LICENSE_FILE", "/var/lib/cocktailbot/license.json")
+)
+LICENSE_PUBLIC_KEY_FILE = Path(
+    os.getenv(
+        "COCKTAILBOT_LICENSE_PUBLIC_KEY",
+        "/etc/cocktailbot/license_public_key.pem",
+    )
+)
+LICENSE_PREFIX = "CBL1-"
+LICENSE_TYPE = "COMMERCIAL"
+LICENSE_PROTOCOL_VERSION = 1
+
 
 
 def desktop_environment() -> dict[str, str]:
@@ -852,6 +871,177 @@ class PicoLedController:
             self._close_locked()
 
 
+
+def _read_device_tree_text(path: Path) -> str:
+    try:
+        raw = path.read_bytes().replace(b"\x00", b"").strip()
+        return raw.decode("ascii", errors="ignore").strip()
+    except OSError:
+        return ""
+
+
+def hardware_identity_source() -> tuple[str, str]:
+    """Return a stable Raspberry hardware identity and the source used.
+
+    rpi-machine-id is preferred because Raspberry Pi documents it as a stable
+    128-bit machine identifier. Older firmware may not expose it, so the
+    hardware serial is the fallback. /etc/machine-id is only a final fallback
+    for non-standard/test systems and is not expected on production Pi images.
+    """
+    candidates = (
+        (Path("/proc/device-tree/chosen/rpi-machine-id"), "rpi-machine-id"),
+        (Path("/sys/firmware/devicetree/base/chosen/rpi-machine-id"), "rpi-machine-id"),
+        (Path("/proc/device-tree/serial-number"), "serial-number"),
+        (Path("/sys/firmware/devicetree/base/serial-number"), "serial-number"),
+    )
+    for path, source in candidates:
+        value = _read_device_tree_text(path)
+        if value:
+            return value.lower(), source
+
+    try:
+        value = Path("/etc/machine-id").read_text(encoding="ascii").strip()
+        if value:
+            return value.lower(), "os-machine-id-fallback"
+    except OSError:
+        pass
+    return "unknown-cocktailbot-device", "unavailable"
+
+
+def cocktailbot_device_id() -> tuple[str, str]:
+    raw, source = hardware_identity_source()
+    digest = hashlib.sha256(raw.encode("utf-8")).hexdigest().upper()[:16]
+    grouped = "-".join(digest[i : i + 4] for i in range(0, 16, 4))
+    return f"CB-{grouped}", source
+
+
+def license_signing_message(device_id: str) -> bytes:
+    return (
+        f"COCKTAILBOT-LICENSE|{LICENSE_PROTOCOL_VERSION}|{LICENSE_TYPE}|{device_id}"
+    ).encode("ascii")
+
+
+class LicenseManager:
+    """Offline, device-bound CocktailBot commercial license verifier."""
+
+    def __init__(self) -> None:
+        self.device_id, self.device_source = cocktailbot_device_id()
+        self.public_key: Ed25519PublicKey | None = None
+        self.public_key_error = ""
+        self._load_public_key()
+
+    def _load_public_key(self) -> None:
+        try:
+            loaded = serialization.load_pem_public_key(
+                LICENSE_PUBLIC_KEY_FILE.read_bytes()
+            )
+            if not isinstance(loaded, Ed25519PublicKey):
+                raise TypeError("Lizenzschlüssel ist kein Ed25519 Public Key")
+            self.public_key = loaded
+        except Exception as exc:  # configuration problem; status stays available
+            self.public_key = None
+            self.public_key_error = str(exc)
+
+    @staticmethod
+    def _decode_signature(code: str) -> bytes:
+        normalized = "".join(code.strip().split())
+        if not normalized.startswith(LICENSE_PREFIX):
+            raise ValueError("Lizenzcode hat ein ungültiges Format")
+        encoded = normalized[len(LICENSE_PREFIX) :]
+        if not encoded:
+            raise ValueError("Lizenzcode ist leer")
+        padding = "=" * ((4 - len(encoded) % 4) % 4)
+        try:
+            signature = base64.urlsafe_b64decode((encoded + padding).encode("ascii"))
+        except Exception as exc:
+            raise ValueError("Lizenzcode kann nicht gelesen werden") from exc
+        if len(signature) != 64:
+            raise ValueError("Lizenzcode hat eine ungültige Länge")
+        return signature
+
+    def verify_code(self, code: str) -> tuple[bool, str]:
+        if self.public_key is None:
+            return False, "Öffentlicher Lizenzschlüssel ist nicht installiert"
+        try:
+            signature = self._decode_signature(code)
+            self.public_key.verify(signature, license_signing_message(self.device_id))
+            return True, "Lizenz gültig"
+        except (InvalidSignature, ValueError):
+            return False, "Lizenzcode ist für dieses Gerät ungültig"
+        except Exception as exc:
+            return False, f"Lizenzprüfung fehlgeschlagen: {exc}"
+
+    def _read_local_license(self) -> dict[str, Any] | None:
+        try:
+            data = json.loads(LICENSE_FILE.read_text(encoding="utf-8"))
+            return data if isinstance(data, dict) else None
+        except (OSError, json.JSONDecodeError):
+            return None
+
+    def status(self) -> dict[str, Any]:
+        stored = self._read_local_license()
+        active = False
+        message = "Privatmodus"
+        activated_at: str | None = None
+
+        if stored:
+            stored_device = str(stored.get("deviceId", ""))
+            code = str(stored.get("code", ""))
+            activated_at = str(stored.get("activatedAt", "")) or None
+            if stored_device != self.device_id:
+                message = "Gespeicherte Lizenz gehört zu einem anderen Gerät"
+            else:
+                active, message = self.verify_code(code)
+
+        return {
+            "ok": True,
+            "active": active,
+            "mode": "commercial" if active else "private",
+            "licenseType": LICENSE_TYPE if active else "PRIVATE",
+            "deviceId": self.device_id,
+            "deviceSource": self.device_source,
+            "activatedAt": activated_at if active else None,
+            "message": message,
+            "publicKeyInstalled": self.public_key is not None,
+            "publicKeyError": self.public_key_error if self.public_key is None else None,
+        }
+
+    def activate(self, code: str) -> dict[str, Any]:
+        normalized = "".join(code.strip().split())
+        valid, message = self.verify_code(normalized)
+        if not valid:
+            raise ValidationError(message)
+
+        LICENSE_FILE.parent.mkdir(parents=True, exist_ok=True)
+        payload = {
+            "version": LICENSE_PROTOCOL_VERSION,
+            "licenseType": LICENSE_TYPE,
+            "deviceId": self.device_id,
+            "code": normalized,
+            "activatedAt": datetime.now(timezone.utc).isoformat(),
+        }
+        temp = LICENSE_FILE.with_suffix(".tmp")
+        temp.write_text(
+            json.dumps(payload, ensure_ascii=False, separators=(",", ":")),
+            encoding="utf-8",
+        )
+        os.chmod(temp, 0o600)
+        temp.replace(LICENSE_FILE)
+        os.chmod(LICENSE_FILE, 0o600)
+        result = self.status()
+        result["message"] = "Gewerbelizenz wurde aktiviert"
+        return result
+
+    def deactivate(self) -> dict[str, Any]:
+        try:
+            LICENSE_FILE.unlink(missing_ok=True)
+        except OSError as exc:
+            raise ValidationError(f"Lizenzdatei konnte nicht entfernt werden: {exc}") from exc
+        result = self.status()
+        result["message"] = "Gewerbelizenz wurde deaktiviert"
+        return result
+
+
 class PumpController:
     def __init__(self) -> None:
         self._lock = threading.RLock()
@@ -1170,6 +1360,17 @@ def build_recipe_job(payload: dict[str, Any]) -> PumpJob:
 def create_app(controller: PumpController, web_root: Path) -> Flask:
     app = Flask(__name__, static_folder=None)
     payment = PaypalPaymentBackend()
+    licensing = LicenseManager()
+
+    def require_commercial_license():
+        status = licensing.status()
+        if not status.get("active"):
+            return jsonify(
+                ok=False,
+                error="Aktive CocktailBot Gewerbelizenz erforderlich",
+                license=status,
+            ), 403
+        return None
 
     @app.after_request
     def add_cors_headers(response):  # type: ignore[no-untyped-def]
@@ -1185,6 +1386,32 @@ def create_app(controller: PumpController, web_root: Path) -> Flask:
     @app.get("/api/status")
     def api_status():
         return jsonify(controller.status())
+
+    @app.get("/api/license/status")
+    def api_license_status():
+        return jsonify(licensing.status())
+
+    @app.route("/api/license/activate", methods=["POST", "OPTIONS"])
+    def api_license_activate():
+        if request.method == "OPTIONS":
+            return ("", 204)
+        payload = request.get_json(silent=True)
+        if not isinstance(payload, dict):
+            return jsonify(ok=False, error="Ungültiges JSON"), 400
+        try:
+            code = str(payload.get("code", ""))
+            return jsonify(licensing.activate(code))
+        except ValidationError as exc:
+            return jsonify(ok=False, error=str(exc), **licensing.status()), 400
+
+    @app.route("/api/license/deactivate", methods=["POST", "OPTIONS"])
+    def api_license_deactivate():
+        if request.method == "OPTIONS":
+            return ("", 204)
+        try:
+            return jsonify(licensing.deactivate())
+        except ValidationError as exc:
+            return jsonify(ok=False, error=str(exc)), 400
 
     @app.route("/api/keyboard/show", methods=["POST", "OPTIONS"])
     def api_keyboard_show():
@@ -1318,6 +1545,9 @@ def create_app(controller: PumpController, web_root: Path) -> Flask:
     def api_payment_test():
         if request.method == "OPTIONS":
             return ("", 204)
+        blocked = require_commercial_license()
+        if blocked is not None:
+            return blocked
         try:
             return jsonify(payment.test_connection())
         except PaymentError as exc:
@@ -1327,6 +1557,9 @@ def create_app(controller: PumpController, web_root: Path) -> Flask:
     def api_payment_config():
         if request.method == "OPTIONS":
             return ("", 204)
+        blocked = require_commercial_license()
+        if blocked is not None:
+            return blocked
         payload = request.get_json(silent=True)
         if not isinstance(payload, dict):
             return jsonify(ok=False, error="Ungültiges JSON"), 400
@@ -1341,6 +1574,9 @@ def create_app(controller: PumpController, web_root: Path) -> Flask:
     def api_payment_create_order():
         if request.method == "OPTIONS":
             return ("", 204)
+        blocked = require_commercial_license()
+        if blocked is not None:
+            return blocked
         payload = request.get_json(silent=True)
         if not isinstance(payload, dict):
             return jsonify(ok=False, error="Ungültiges JSON"), 400
@@ -1364,6 +1600,9 @@ def create_app(controller: PumpController, web_root: Path) -> Flask:
     def api_payment_mark_used():
         if request.method == "OPTIONS":
             return ("", 204)
+        blocked = require_commercial_license()
+        if blocked is not None:
+            return blocked
         payload = request.get_json(silent=True)
         if not isinstance(payload, dict):
             return jsonify(ok=False, error="Ungültiges JSON"), 400
@@ -1406,6 +1645,7 @@ def create_app(controller: PumpController, web_root: Path) -> Flask:
             statusEndpoint="/api/status",
             commandEndpoint="/api/command",
             paymentEndpoint="/api/payment/status",
+            licenseEndpoint="/api/license/status",
             message="Flutter-Web-Build fehlt im konfigurierten web-root",
         )
 
@@ -1444,6 +1684,8 @@ def main() -> None:
     print("Pumpen:", ", ".join(f"{i}=GPIO{pin}" for i, pin in enumerate(PUMP_PINS, 1)))
     print(f"Web/API: http://{args.host}:{args.port}")
     print(f"PayPal: mode={PAYPAL_MODE} | configured={bool(PAYPAL_CLIENT_ID and PAYPAL_CLIENT_SECRET)}")
+    device_id, device_source = cocktailbot_device_id()
+    print(f"Lizenz-Geräte-ID: {device_id} | Quelle={device_source}")
 
     app = create_app(controller, args.web_root.resolve())
     app.run(host=args.host, port=args.port, threaded=True, use_reloader=False)

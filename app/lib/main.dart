@@ -1997,6 +1997,10 @@ class MachineStore extends ChangeNotifier {
   bool commercialLicenseActive = false;
   String commercialLicenseCode = '';
   String commercialLicensedMachineId = '';
+  String commercialDeviceId = '';
+  String commercialLicenseMessage = 'Privatmodus';
+  String commercialLicenseType = 'PRIVATE';
+  bool commercialPublicKeyInstalled = false;
   DateTime? commercialLicenseActivatedAt;
   String commercialBusinessName = 'CocktailBot';
   String commercialBusinessSubtitle = 'Gewerbliche Nutzung erlaubt';
@@ -2194,13 +2198,16 @@ class MachineStore extends ChangeNotifier {
             j['alcoholStrengthSliderEnabled'] == true;
         settingsLockEnabled = j['settingsLockEnabled'] == true;
         settingsPassword = j['settingsPassword']?.toString() ?? '';
-        commercialLicenseActive = j['commercialLicenseActive'] == true;
-        commercialLicenseCode = j['commercialLicenseCode']?.toString() ?? '';
-        commercialLicensedMachineId =
-            j['commercialLicensedMachineId']?.toString() ?? '';
-        commercialLicenseActivatedAt = DateTime.tryParse(
-          j['commercialLicenseActivatedAt']?.toString() ?? '',
-        );
+        // Gewerbelizenz wird nicht mehr aus SharedPreferences vertraut.
+        // Autoritativ ist ausschließlich die signierte Lizenzdatei auf dem Raspberry.
+        commercialLicenseActive = false;
+        commercialLicenseCode = '';
+        commercialLicensedMachineId = '';
+        commercialDeviceId = '';
+        commercialLicenseMessage = 'Lizenzstatus wird geprüft …';
+        commercialLicenseType = 'PRIVATE';
+        commercialPublicKeyInstalled = false;
+        commercialLicenseActivatedAt = null;
         commercialBusinessName =
             j['commercialBusinessName']?.toString() ?? 'CocktailBot';
         commercialBusinessSubtitle =
@@ -3157,6 +3164,46 @@ class MachineStore extends ChangeNotifier {
     notifyListeners();
   }
 
+  int ingredientRecipeReferenceCount(String ingredientId) {
+    var count = recipes.where(
+      (recipe) => recipe.parts.any((part) => part.ingredientId == ingredientId),
+    ).length;
+
+    for (final list in cocktailLists) {
+      count += list.recipes.where(
+        (recipe) => recipe.parts.any((part) => part.ingredientId == ingredientId),
+      ).length;
+    }
+
+    return count;
+  }
+
+  int ingredientPumpReferenceCount(String ingredientId) => pumps
+      .where((pump) => pump.ingredientId == ingredientId)
+      .length;
+
+  Future<String?> deleteIngredient(String ingredientId) async {
+    final recipeReferences = ingredientRecipeReferenceCount(ingredientId);
+    if (recipeReferences > 0) {
+      return 'Diese Zutat wird noch in $recipeReferences Rezept(en) verwendet. '
+          'Entferne sie zuerst aus den betroffenen Rezepten.';
+    }
+
+    for (final pump in pumps) {
+      if (pump.ingredientId == ingredientId) {
+        pump.ingredientId = null;
+        pump.mlPerSecond = 0;
+      }
+    }
+
+    ingredients.removeWhere((ingredient) => ingredient.id == ingredientId);
+    ingredientUsageMl.remove(ingredientId);
+
+    await save();
+    notifyListeners();
+    return null;
+  }
+
   Future<void> reorderRecipeWithinCategory(
     DrinkCategory category,
     int fromIndex,
@@ -3202,49 +3249,117 @@ class MachineStore extends ChangeNotifier {
       ? 'Gewerbelizenz aktiv'
       : 'Privatmodus';
 
-  bool get hasCommercialMachineMatch {
-    if (!commercialLicenseActive) return false;
-    if (commercialLicensedMachineId.trim().isEmpty) return true;
-    return commercialLicensedMachineId.trim().toUpperCase() ==
-        paymentMachineId.trim().toUpperCase();
+  bool get hasCommercialMachineMatch =>
+      commercialLicenseActive &&
+      commercialDeviceId.isNotEmpty &&
+      commercialLicensedMachineId == commercialDeviceId;
+
+  void _applyCommercialLicenseStatus(Map<String, dynamic> data) {
+    final deviceId = data['deviceId']?.toString().trim() ?? '';
+    commercialDeviceId = deviceId;
+    commercialLicenseActive = data['active'] == true;
+    commercialLicenseType = data['licenseType']?.toString() ??
+        (commercialLicenseActive ? 'COMMERCIAL' : 'PRIVATE');
+    commercialLicenseMessage = data['message']?.toString() ??
+        (commercialLicenseActive ? 'Lizenz gültig' : 'Privatmodus');
+    commercialPublicKeyInstalled = data['publicKeyInstalled'] == true;
+    commercialLicensedMachineId = commercialLicenseActive ? deviceId : '';
+    commercialLicenseActivatedAt = DateTime.tryParse(
+      data['activatedAt']?.toString() ?? '',
+    );
+
+    // Für den lokalen PayPal-Kassenmodus wird dieselbe echte Geräte-ID benutzt.
+    if (deviceId.isNotEmpty) {
+      paymentMachineId = deviceId;
+    }
+    if (!commercialLicenseActive) {
+      paypalPaymentEnabled = false;
+    }
   }
 
-  String _normalLicenseCode(String value) =>
-      value.trim().toUpperCase().replaceAll(' ', '');
-
-  bool isValidCommercialLicenseCode(String code) {
-    final normalized = _normalLicenseCode(code);
-    final machine = paymentMachineId.trim().toUpperCase();
-    if (normalized == 'CB-COMMERCIAL-DEMO') return true;
-    if (machine.isNotEmpty &&
-        normalized == _normalLicenseCode('CB-COM-$machine')) {
+  Future<bool> refreshCommercialLicenseStatus() async {
+    try {
+      final response = await http
+          .get(_apiUri('/api/license/status'))
+          .timeout(const Duration(seconds: 5));
+      final decoded = jsonDecode(response.body);
+      if (decoded is! Map) {
+        throw Exception('Ungültige Lizenzantwort');
+      }
+      final data = Map<String, dynamic>.from(decoded);
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        throw Exception(data['error']?.toString() ?? 'Lizenzstatus nicht verfügbar');
+      }
+      _applyCommercialLicenseStatus(data);
+      await save();
+      notifyListeners();
       return true;
+    } catch (error) {
+      commercialLicenseActive = false;
+      commercialLicensedMachineId = '';
+      paypalPaymentEnabled = false;
+      commercialLicenseMessage = 'Lizenzprüfung nicht verfügbar: $error';
+      notifyListeners();
+      return false;
     }
-    return false;
   }
 
   Future<bool> activateCommercialLicense(String code) async {
-    if (!isValidCommercialLicenseCode(code)) {
+    final normalized = code.trim();
+    if (normalized.isEmpty) {
+      commercialLicenseMessage = 'Bitte Lizenzcode eingeben';
+      notifyListeners();
       return false;
     }
 
-    commercialLicenseActive = true;
-    commercialLicenseCode = code.trim();
-    commercialLicensedMachineId = paymentMachineId.trim().isEmpty
-        ? 'CB-DEMO'
-        : paymentMachineId.trim();
-    commercialLicenseActivatedAt = DateTime.now();
-
-    await save();
-    notifyListeners();
-    return true;
+    try {
+      final response = await http
+          .post(
+            _apiUri('/api/license/activate'),
+            headers: const {'Content-Type': 'application/json'},
+            body: jsonEncode({'code': normalized}),
+          )
+          .timeout(const Duration(seconds: 8));
+      final decoded = jsonDecode(response.body);
+      if (decoded is! Map) throw Exception('Ungültige Lizenzantwort');
+      final data = Map<String, dynamic>.from(decoded);
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        commercialLicenseActive = false;
+        commercialLicenseMessage = data['error']?.toString() ??
+            data['message']?.toString() ??
+            'Lizenzcode ist ungültig';
+        notifyListeners();
+        return false;
+      }
+      _applyCommercialLicenseStatus(data);
+      commercialLicenseCode = normalized;
+      await save();
+      notifyListeners();
+      return commercialLicenseActive;
+    } catch (error) {
+      commercialLicenseActive = false;
+      commercialLicenseMessage = 'Aktivierung fehlgeschlagen: $error';
+      notifyListeners();
+      return false;
+    }
   }
 
   Future<void> deactivateCommercialLicense() async {
-    commercialLicenseActive = false;
+    try {
+      final response = await http
+          .post(_apiUri('/api/license/deactivate'))
+          .timeout(const Duration(seconds: 5));
+      final decoded = jsonDecode(response.body);
+      if (decoded is Map) {
+        _applyCommercialLicenseStatus(Map<String, dynamic>.from(decoded));
+      } else {
+        commercialLicenseActive = false;
+        commercialLicensedMachineId = '';
+      }
+    } catch (error) {
+      commercialLicenseMessage = 'Deaktivierung fehlgeschlagen: $error';
+    }
     commercialLicenseCode = '';
-    commercialLicensedMachineId = '';
-    commercialLicenseActivatedAt = null;
     paypalPaymentEnabled = false;
     await save();
     notifyListeners();
@@ -3348,7 +3463,9 @@ class MachineStore extends ChangeNotifier {
     required double shotPrice,
   }) async {
     paypalPaymentEnabled = enabled && commercialLicenseActive;
-    paymentMachineId = machineId.trim().isEmpty ? 'CB-DEMO' : machineId.trim();
+    paymentMachineId = commercialDeviceId.isNotEmpty
+        ? commercialDeviceId
+        : (machineId.trim().isEmpty ? 'CB-DEMO' : machineId.trim());
     cocktailPriceEur = cocktailPrice.clamp(0, 9999).toDouble();
     mocktailPriceEur = mocktailPrice.clamp(0, 9999).toDouble();
     shotPriceEur = shotPrice.clamp(0, 9999).toDouble();
@@ -4307,6 +4424,7 @@ class MachineStore extends ChangeNotifier {
       } catch (_) {
         // LED-Befehle dürfen eine funktionierende Pumpenverbindung nicht trennen.
       }
+      await refreshCommercialLicenseStatus();
       await loadMachineStateFromController();
       if (commercialLicenseActive) {
         try {
@@ -9741,6 +9859,82 @@ class _IngredientPageState extends State<IngredientPage> {
     if (mounted) setState(() {});
   }
 
+  Future<void> _deleteIngredient(Ingredient ingredient) async {
+    final recipeReferences =
+        widget.store.ingredientRecipeReferenceCount(ingredient.id);
+    final pumpReferences =
+        widget.store.ingredientPumpReferenceCount(ingredient.id);
+
+    if (recipeReferences > 0) {
+      if (!mounted) return;
+      await showDialog<void>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Zutat kann nicht gelöscht werden'),
+          content: Text(
+            '${widget.store.displayIngredientName(ingredient)} wird noch in '
+            '$recipeReferences Rezept(en) verwendet. Entferne die Zutat zuerst '
+            'aus den betroffenen Rezepten.',
+          ),
+          actions: [
+            FilledButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('OK'),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+
+    final confirmed = await showDialog<bool>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Zutat löschen?'),
+            content: Text(
+              pumpReferences > 0
+                  ? '${widget.store.displayIngredientName(ingredient)} ist noch '
+                      '$pumpReferences Pumpe(n) zugeordnet. Beim Löschen wird die '
+                      'Zuordnung entfernt und die Pumpenkalibrierung zurückgesetzt.'
+                  : '${widget.store.displayIngredientName(ingredient)} wirklich löschen?',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Abbrechen'),
+              ),
+              FilledButton.icon(
+                onPressed: () => Navigator.pop(context, true),
+                icon: const Icon(Icons.delete_outline),
+                label: const Text('Löschen'),
+              ),
+            ],
+          ),
+        ) ??
+        false;
+
+    if (!confirmed) return;
+
+    final error = await widget.store.deleteIngredient(ingredient.id);
+    if (!mounted) return;
+
+    if (error != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error)),
+      );
+      return;
+    }
+
+    setState(() {});
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          '${widget.store.displayIngredientName(ingredient)} wurde gelöscht.',
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return PageFrame(title: tr('Neue Zutaten'),
@@ -9913,6 +10107,12 @@ class _IngredientPageState extends State<IngredientPage> {
                               fontWeight: FontWeight.w800,
                             ),
                           ),
+                        const SizedBox(width: 8),
+                        IconButton(
+                          tooltip: 'Zutat löschen',
+                          onPressed: () => _deleteIngredient(ingredient),
+                          icon: const Icon(Icons.delete_outline),
+                        ),
                       ],
                     ),
                     if (widget.store.commercialLicenseActive) ...[
@@ -10085,65 +10285,96 @@ class CommercialLicensePage extends StatefulWidget {
 }
 
 class _CommercialLicensePageState extends State<CommercialLicensePage> {
-  late final codeController =
-      TextEditingController(text: widget.store.commercialLicenseCode);
-  late final machineController =
-      TextEditingController(text: widget.store.paymentMachineId);
+  final codeController = TextEditingController();
+  bool busy = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      await widget.store.refreshCommercialLicenseStatus();
+      if (mounted) setState(() {});
+    });
+  }
 
   @override
   void dispose() {
     codeController.dispose();
-    machineController.dispose();
     super.dispose();
   }
 
-  Future<void> _saveMachineId() async {
-    await widget.store.savePaymentSettings(
-      enabled: widget.store.paypalPaymentEnabled,
-      machineId: machineController.text,
-      cocktailPrice: widget.store.cocktailPriceEur,
-      mocktailPrice: widget.store.mocktailPriceEur,
-      shotPrice: widget.store.shotPriceEur,
-    );
-    if (mounted) setState(() {});
-  }
-
   Future<void> _activate() async {
-    await _saveMachineId();
-    final ok = await widget.store.activateCommercialLicense(
-      codeController.text,
-    );
-
+    if (busy) return;
+    setState(() => busy = true);
+    final ok = await widget.store.activateCommercialLicense(codeController.text);
     if (!mounted) return;
-    setState(() {});
-
+    setState(() => busy = false);
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
           ok
               ? tr('Gewerbelizenz wurde aktiviert')
-              : tr('Lizenzcode ist ungültig'),
+              : widget.store.commercialLicenseMessage,
         ),
       ),
     );
   }
 
   Future<void> _deactivate() async {
+    if (busy) return;
+    setState(() => busy = true);
     await widget.store.deactivateCommercialLicense();
     if (!mounted) return;
-    setState(() {});
+    codeController.clear();
+    setState(() => busy = false);
+  }
+
+  Future<void> _refresh() async {
+    if (busy) return;
+    setState(() => busy = true);
+    await widget.store.refreshCommercialLicenseStatus();
+    if (mounted) setState(() => busy = false);
+  }
+
+  Future<void> _copyDeviceId() async {
+    final id = widget.store.commercialDeviceId;
+    if (id.isEmpty) return;
+    await Clipboard.setData(ClipboardData(text: id));
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('${tr('Geräte-ID kopiert')}: $id')),
+    );
+  }
+
+  Future<void> _pasteLicenseCode() async {
+    final data = await Clipboard.getData(Clipboard.kTextPlain);
+    final value = data?.text?.trim() ?? '';
+    if (value.isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(tr('Zwischenablage enthält keinen Lizenzcode'))),
+      );
+      return;
+    }
+    codeController.text = value;
+    codeController.selection = TextSelection.collapsed(offset: value.length);
+    if (mounted) setState(() {});
   }
 
   String _date(DateTime? value) {
     if (value == null) return '–';
-    final day = value.day.toString().padLeft(2, '0');
-    final month = value.month.toString().padLeft(2, '0');
-    return '$day.$month.${value.year}';
+    final local = value.toLocal();
+    final day = local.day.toString().padLeft(2, '0');
+    final month = local.month.toString().padLeft(2, '0');
+    return '$day.$month.${local.year}';
   }
 
   @override
   Widget build(BuildContext context) {
     final active = widget.store.commercialLicenseActive;
+    final deviceId = widget.store.commercialDeviceId.isEmpty
+        ? tr('Wird ermittelt …')
+        : widget.store.commercialDeviceId;
 
     return PageFrame(
       title: tr('Gewerbelizenz'),
@@ -10156,9 +10387,7 @@ class _CommercialLicensePageState extends State<CommercialLicensePage> {
               child: Row(
                 children: [
                   Icon(
-                    active
-                        ? Icons.verified_user
-                        : Icons.lock_outline,
+                    active ? Icons.verified_user : Icons.lock_outline,
                     color: active
                         ? widget.store.appColors.successColor
                         : widget.store.appColors.warningColor,
@@ -10180,9 +10409,7 @@ class _CommercialLicensePageState extends State<CommercialLicensePage> {
                         ),
                         const SizedBox(height: 6),
                         Text(
-                          active
-                              ? tr('Gewerbliche Funktionen sind für diese Maschine freigeschaltet.')
-                              : tr('Statistik, Einkaufsliste, Partyplaner, Kassenmodus, Export und Branding sind gesperrt.'),
+                          widget.store.commercialLicenseMessage,
                           style: TextStyle(
                             color: widget.store.appColors.textSecondaryColor,
                             height: 1.35,
@@ -10190,6 +10417,17 @@ class _CommercialLicensePageState extends State<CommercialLicensePage> {
                         ),
                       ],
                     ),
+                  ),
+                  IconButton(
+                    tooltip: tr('Lizenzstatus aktualisieren'),
+                    onPressed: busy ? null : _refresh,
+                    icon: busy
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.refresh),
                   ),
                 ],
               ),
@@ -10203,60 +10441,109 @@ class _CommercialLicensePageState extends State<CommercialLicensePage> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    tr('Lizenzdaten'),
+                    tr('Gerätegebundene Offline-Lizenz'),
                     style: const TextStyle(
                       fontWeight: FontWeight.w900,
                       fontSize: 18,
                     ),
                   ),
-                  const SizedBox(height: 14),
-                  TextField(
-                    controller: machineController,
-                    decoration: InputDecoration(
-                      labelText: tr('Maschinen-ID'),
-                      helperText: tr('Die Gewerbelizenz gilt pro Maschine.'),
-                    ),
-                    onSubmitted: (_) => _saveMachineId(),
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: codeController,
-                    decoration: InputDecoration(
-                      labelText: tr('Lizenzcode'),
-                      helperText: tr('Für den Test: CB-COMMERCIAL-DEMO oder CB-COM-<Maschinen-ID>.'),
+                  const SizedBox(height: 8),
+                  Text(
+                    tr('Sende diese Geräte-ID an deinen CocktailBot-Anbieter. Du erhältst einen Lizenzcode, der ausschließlich auf diesem Raspberry funktioniert. Eine Internetverbindung ist für die Aktivierung nicht erforderlich.'),
+                    style: TextStyle(
+                      color: widget.store.appColors.textSecondaryColor,
+                      height: 1.4,
                     ),
                   ),
                   const SizedBox(height: 14),
-                  if (active) ...[
-                    Text('${tr('Lizenzierte Maschine')}: ${widget.store.commercialLicensedMachineId}'),
-                    const SizedBox(height: 6),
-                    Text('${tr('Aktiviert am')}: ${_date(widget.store.commercialLicenseActivatedAt)}'),
-                    const SizedBox(height: 14),
-                  ],
-                  Row(
-                    children: [
-                      Expanded(
-                        child: FilledButton.icon(
-                          onPressed: _activate,
-                          icon: const Icon(Icons.verified_user_outlined),
-                          label: Text(
-                            active
-                                ? tr('Lizenz erneut prüfen')
-                                : tr('Gewerbelizenz aktivieren'),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(12),
+                      color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.memory),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                tr('Geräte-ID'),
+                                style: TextStyle(
+                                  color: widget.store.appColors.textSecondaryColor,
+                                  fontSize: 12,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              SelectableText(
+                                deviceId,
+                                style: const TextStyle(
+                                  fontFamily: 'monospace',
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: 0.6,
+                                ),
+                              ),
+                            ],
                           ),
+                        ),
+                        OutlinedButton.icon(
+                          onPressed: widget.store.commercialDeviceId.isEmpty
+                              ? null
+                              : _copyDeviceId,
+                          icon: const Icon(Icons.copy, size: 18),
+                          label: Text(tr('Kopieren')),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  if (!active) ...[
+                    TextField(
+                      controller: codeController,
+                      autocorrect: false,
+                      enableSuggestions: false,
+                      keyboardType: TextInputType.text,
+                      decoration: InputDecoration(
+                        labelText: tr('Lizenzcode'),
+                        helperText: tr('Code beginnt mit CBL1-. Groß-/Kleinschreibung beibehalten.'),
+                        suffixIcon: IconButton(
+                          tooltip: tr('Aus Zwischenablage einfügen'),
+                          onPressed: _pasteLicenseCode,
+                          icon: const Icon(Icons.content_paste),
                         ),
                       ),
-                      const SizedBox(width: 10),
-                      if (active)
+                    ),
+                    const SizedBox(height: 14),
+                    SizedBox(
+                      width: double.infinity,
+                      child: FilledButton.icon(
+                        onPressed: busy ? null : _activate,
+                        icon: const Icon(Icons.verified_user_outlined),
+                        label: Text(tr('Gewerbelizenz aktivieren')),
+                      ),
+                    ),
+                  ] else ...[
+                    Row(
+                      children: [
                         Expanded(
-                          child: OutlinedButton.icon(
-                            onPressed: _deactivate,
-                            icon: const Icon(Icons.lock_reset),
-                            label: Text(tr('Deaktivieren')),
+                          child: Text(
+                            '${tr('Lizenzierte Maschine')}: ${widget.store.commercialLicensedMachineId}\n'
+                            '${tr('Aktiviert am')}: ${_date(widget.store.commercialLicenseActivatedAt)}',
                           ),
                         ),
-                    ],
-                  ),
+                        OutlinedButton.icon(
+                          onPressed: busy ? null : _deactivate,
+                          icon: const Icon(Icons.lock_reset),
+                          label: Text(tr('Deaktivieren')),
+                        ),
+                      ],
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -10878,9 +11165,11 @@ class _PaymentSettingsPageState extends State<PaymentSettingsPage> {
                   const SizedBox(height: 12),
                   TextField(
                     controller: machineIdController,
+                    readOnly: true,
                     decoration: InputDecoration(
-                      labelText: tr('Maschinen-ID für Zahlungen'),
-                      helperText: tr('Wird zusammen mit jeder lokalen Bestellung gespeichert.'),
+                      labelText: tr('Geräte-ID für Zahlungen'),
+                      helperText: tr('Wird automatisch aus der hardwaregebundenen CocktailBot Geräte-ID übernommen.'),
+                      suffixIcon: const Icon(Icons.lock_outline),
                     ),
                   ),
                   const SizedBox(height: 18),

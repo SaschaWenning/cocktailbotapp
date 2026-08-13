@@ -235,3 +235,9 @@ install.sh                                Komplettinstallation
 - Der CocktailBot-Webserver bleibt standardmäßig auf `127.0.0.1` gebunden.
 - Die SQLite-Datenbank verhindert die erneute Verwendung einer bereits verwendeten Order.
 - Vor dem Anschluss von Flüssigkeiten jede Pumpe einzeln prüfen.
+
+## Offline-Gewerbelizenz
+
+CocktailBot unterstützt eine gerätegebundene Offline-Gewerbelizenz ohne Lizenzserver. Unter **Einstellungen → Gewerbelizenz** zeigt der Raspberry eine hardwarebasierte Geräte-ID an. Diese ID wird an den Lizenzgeber gesendet. Der separate CocktailBot-Lizenzgenerator signiert genau diese Geräte-ID und erzeugt einen `CBL1-...` Lizenzcode. Der Raspberry prüft die Signatur lokal mit dem öffentlichen Ed25519-Schlüssel.
+
+Der private Signierschlüssel gehört ausschließlich in den Lizenzgenerator und darf niemals in dieses Repository übernommen werden.

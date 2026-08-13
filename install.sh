@@ -107,7 +107,7 @@ install_packages() {
   apt-get update
   apt-get install -y \
     ca-certificates curl git rsync unzip xz-utils zip libglu1-mesa \
-    python3 python3-venv python3-pip python3-gpiozero python3-serial \
+    python3 python3-venv python3-pip python3-gpiozero python3-serial python3-cryptography \
     x11-xserver-utils unclutter util-linux onboard dbus-x11 dconf-cli
 
   if apt-cache show python3-lgpio >/dev/null 2>&1; then
@@ -215,6 +215,7 @@ install_runtime() {
   install -m 0755 "$SOURCE_DIR/raspberry/start-kiosk.sh" "$RUNTIME_DIR/start-kiosk.sh"
   install -m 0755 "$SOURCE_DIR/raspberry/start-onboard.sh" "$RUNTIME_DIR/start-onboard.sh"
   install -m 0644 "$SOURCE_DIR/raspberry/requirements.txt" "$RUNTIME_DIR/requirements.txt"
+  [[ -f "$SOURCE_DIR/raspberry/license_public_key.pem" ]] || die "Lizenz-Public-Key fehlt im Repository."
 
   if [[ ! -x "$VENV_DIR/bin/python" ]]; then
     rm -rf "$VENV_DIR"
@@ -223,11 +224,16 @@ install_runtime() {
   "$VENV_DIR/bin/pip" install --disable-pip-version-check -r "$RUNTIME_DIR/requirements.txt"
 
   install -d -m 0755 /etc/cocktailbot
+  install -o root -g root -m 0644 \
+    "$SOURCE_DIR/raspberry/license_public_key.pem" \
+    /etc/cocktailbot/license_public_key.pem
   cat > /etc/cocktailbot/cocktailbot.env <<ENV
 COCKTAILBOT_ACTIVE_HIGH=$ACTIVE_HIGH
 COCKTAILBOT_STATE_FILE=/var/lib/cocktailbot/machine_state.json
 COCKTAILBOT_PICO_PORT=$PICO_PORT
 COCKTAILBOT_PICO_BAUD=$PICO_BAUD
+COCKTAILBOT_LICENSE_FILE=/var/lib/cocktailbot/license.json
+COCKTAILBOT_LICENSE_PUBLIC_KEY=/etc/cocktailbot/license_public_key.pem
 ENV
   chmod 0644 /etc/cocktailbot/cocktailbot.env
 
