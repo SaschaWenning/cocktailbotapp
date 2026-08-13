@@ -1413,6 +1413,90 @@ String appText(AppLanguage language, String key) {
     'Aktiv': {AppLanguage.de: 'Aktiv', AppLanguage.en: 'Active', AppLanguage.es: 'Activa', AppLanguage.it: 'Attiva', AppLanguage.nl: 'Actief', AppLanguage.fr: 'Active', AppLanguage.pt: 'Ativa', AppLanguage.pl: 'Aktywna', AppLanguage.tr: 'Aktif', AppLanguage.ru: 'Активно'},
   };
   final settingsSupplementalTexts = <String, Map<AppLanguage, String>>{
+    'Weniger': {
+      AppLanguage.de: 'Weniger',
+      AppLanguage.en: 'Less',
+      AppLanguage.es: 'Menos',
+      AppLanguage.it: 'Meno',
+      AppLanguage.nl: 'Minder',
+      AppLanguage.fr: 'Moins',
+      AppLanguage.pt: 'Menos',
+      AppLanguage.pl: 'Mniej',
+      AppLanguage.tr: 'Daha az',
+      AppLanguage.ru: 'Меньше',
+    },
+    'Mehr': {
+      AppLanguage.de: 'Mehr',
+      AppLanguage.en: 'More',
+      AppLanguage.es: 'Más',
+      AppLanguage.it: 'Più',
+      AppLanguage.nl: 'Meer',
+      AppLanguage.fr: 'Plus',
+      AppLanguage.pt: 'Mais',
+      AppLanguage.pl: 'Więcej',
+      AppLanguage.tr: 'Daha fazla',
+      AppLanguage.ru: 'Больше',
+    },
+    'Warnschwellen': {
+      AppLanguage.de: 'Warnschwellen',
+      AppLanguage.en: 'Warning thresholds',
+      AppLanguage.es: 'Umbrales de aviso',
+      AppLanguage.it: 'Soglie di avviso',
+      AppLanguage.nl: 'Waarschuwingsdrempels',
+      AppLanguage.fr: 'Seuils d’alerte',
+      AppLanguage.pt: 'Limites de aviso',
+      AppLanguage.pl: 'Progi ostrzegawcze',
+      AppLanguage.tr: 'Uyarı eşikleri',
+      AppLanguage.ru: 'Пороги предупреждений',
+    },
+    'Cocktailkarte orange ab': {
+      AppLanguage.de: 'Cocktailkarte orange ab',
+      AppLanguage.en: 'Cocktail card orange at',
+      AppLanguage.es: 'Tarjeta naranja a partir de',
+      AppLanguage.it: 'Scheda cocktail arancione da',
+      AppLanguage.nl: 'Cocktailkaart oranje vanaf',
+      AppLanguage.fr: 'Carte cocktail orange à partir de',
+      AppLanguage.pt: 'Cartão do coquetel laranja a partir de',
+      AppLanguage.pl: 'Pomarańczowa karta koktajlu od',
+      AppLanguage.tr: 'Kokteyl kartı turuncu eşiği',
+      AppLanguage.ru: 'Оранжевая карточка коктейля при',
+    },
+    'Restcocktails': {
+      AppLanguage.de: 'Restcocktails',
+      AppLanguage.en: 'cocktails remaining',
+      AppLanguage.es: 'cócteles restantes',
+      AppLanguage.it: 'cocktail rimanenti',
+      AppLanguage.nl: 'cocktails resterend',
+      AppLanguage.fr: 'cocktails restants',
+      AppLanguage.pt: 'coquetéis restantes',
+      AppLanguage.pl: 'pozostałych koktajlach',
+      AppLanguage.tr: 'kalan kokteyl',
+      AppLanguage.ru: 'оставшихся коктейлях',
+    },
+    'Füllstandsseite orange unter': {
+      AppLanguage.de: 'Füllstandsseite orange unter',
+      AppLanguage.en: 'Fill-level page orange below',
+      AppLanguage.es: 'Página de niveles naranja por debajo de',
+      AppLanguage.it: 'Pagina livelli arancione sotto',
+      AppLanguage.nl: 'Vulniveaupagina oranje onder',
+      AppLanguage.fr: 'Page des niveaux orange sous',
+      AppLanguage.pt: 'Página de níveis laranja abaixo de',
+      AppLanguage.pl: 'Strona poziomów pomarańczowa poniżej',
+      AppLanguage.tr: 'Doluluk sayfası turuncu alt sınırı',
+      AppLanguage.ru: 'Страница уровней оранжевая ниже',
+    },
+    'Diese Werte bestimmen nur die Warnanzeige. Die tatsächliche Verfügbarkeit wird weiterhin aus der benötigten Rezeptmenge berechnet.': {
+      AppLanguage.de: 'Diese Werte bestimmen nur die Warnanzeige. Die tatsächliche Verfügbarkeit wird weiterhin aus der benötigten Rezeptmenge berechnet.',
+      AppLanguage.en: 'These values only control the warning display. Actual availability is still calculated from the recipe amount required.',
+      AppLanguage.es: 'Estos valores solo controlan el aviso. La disponibilidad real se sigue calculando según la cantidad necesaria de la receta.',
+      AppLanguage.it: 'Questi valori controllano solo l’avviso. La disponibilità reale continua a essere calcolata dalla quantità richiesta dalla ricetta.',
+      AppLanguage.nl: 'Deze waarden bepalen alleen de waarschuwing. De werkelijke beschikbaarheid wordt nog steeds berekend uit de benodigde recepthoeveelheid.',
+      AppLanguage.fr: 'Ces valeurs règlent uniquement l’alerte. La disponibilité réelle reste calculée selon la quantité requise par la recette.',
+      AppLanguage.pt: 'Estes valores controlam apenas o aviso. A disponibilidade real continua sendo calculada pela quantidade exigida pela receita.',
+      AppLanguage.pl: 'Te wartości sterują tylko ostrzeżeniem. Rzeczywista dostępność nadal jest obliczana na podstawie wymaganej ilości z przepisu.',
+      AppLanguage.tr: 'Bu değerler yalnızca uyarı görünümünü belirler. Gerçek kullanılabilirlik tarif için gereken miktara göre hesaplanmaya devam eder.',
+      AppLanguage.ru: 'Эти значения управляют только предупреждением. Фактическая доступность по-прежнему рассчитывается по требуемому объёму рецепта.',
+    },
     'Sicherheit & Freigaben': {
       AppLanguage.de: 'Sicherheit & Freigaben',
       AppLanguage.en: 'Security & permissions',
@@ -2599,6 +2683,8 @@ class MachineStore extends ChangeNotifier {
   List<double> primeTimesSeconds = List<double>.filled(18, 5);
   double cleaningSeconds = 15;
   int cocktailsPerPage = 10;
+  int lowStockWarningPortions = 2;
+  int lowFillWarningPercent = 20;
   RecipeSortMode recipeSortMode = RecipeSortMode.original;
   bool paypalPaymentEnabled = false;
   String paymentMachineId = 'CB-DEMO';
@@ -2782,6 +2868,14 @@ class MachineStore extends ChangeNotifier {
         cocktailsPerPage =
             ((j['cocktailsPerPage'] as num?)?.toInt() ?? 10)
                 .clamp(1, 1000)
+                .toInt();
+        lowStockWarningPortions =
+            ((j['lowStockWarningPortions'] as num?)?.toInt() ?? 2)
+                .clamp(1, 10)
+                .toInt();
+        lowFillWarningPercent =
+            ((j['lowFillWarningPercent'] as num?)?.toInt() ?? 20)
+                .clamp(5, 90)
                 .toInt();
         final savedRecipeSortMode = j['recipeSortMode']?.toString();
         recipeSortMode = RecipeSortMode.values.where(
@@ -3654,6 +3748,8 @@ class MachineStore extends ChangeNotifier {
       'primeTimesSeconds': primeTimesSeconds,
       'cleaningSeconds': cleaningSeconds,
       'cocktailsPerPage': cocktailsPerPage,
+      'lowStockWarningPortions': lowStockWarningPortions,
+      'lowFillWarningPercent': lowFillWarningPercent,
       'recipeSortMode': recipeSortMode.name,
       'paypalPaymentEnabled': paypalPaymentEnabled,
       'paymentMachineId': paymentMachineId,
@@ -4839,7 +4935,7 @@ class MachineStore extends ChangeNotifier {
       return RecipeAvailability.uncalibrated;
     }
 
-    if (minimumPortions <= 2.999999) {
+    if (minimumPortions <= lowStockWarningPortions.toDouble()) {
       return RecipeAvailability.low;
     }
 
@@ -9159,29 +9255,189 @@ class _PumpCalibrationCardState extends State<PumpCalibrationCard> {
   ])));
 }
 
-class FillLevelsPage extends StatelessWidget {
+class FillLevelsPage extends StatefulWidget {
   const FillLevelsPage({super.key, required this.store});
   final MachineStore store;
 
   @override
+  State<FillLevelsPage> createState() => _FillLevelsPageState();
+}
+
+class _FillLevelsPageState extends State<FillLevelsPage> {
+  Future<void> _setLowStockWarning(int value) async {
+    setState(() {
+      widget.store.lowStockWarningPortions = value.clamp(1, 10).toInt();
+    });
+    await widget.store.save();
+  }
+
+  Future<void> _setLowFillWarning(int value) async {
+    setState(() {
+      widget.store.lowFillWarningPercent = value.clamp(5, 90).toInt();
+    });
+    await widget.store.save();
+  }
+
+  Widget _stepper({
+    required int value,
+    required VoidCallback? onMinus,
+    required VoidCallback? onPlus,
+    required String suffix,
+  }) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        IconButton.filledTonal(
+          tooltip: tr('Weniger'),
+          onPressed: onMinus,
+          icon: const Icon(Icons.remove),
+        ),
+        SizedBox(
+          width: 92,
+          child: Text(
+            '$value $suffix',
+            textAlign: TextAlign.center,
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+          ),
+        ),
+        IconButton.filledTonal(
+          tooltip: tr('Mehr'),
+          onPressed: onPlus,
+          icon: const Icon(Icons.add),
+        ),
+      ],
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final store = widget.store;
     final activePumps = store.pumps.where((pump) => pump.active).toList();
+
     return PageFrame(
       title: tr('Füllstände'),
-      child: activePumps.isEmpty
-          ? const Center(child: T('Keine Pumpen aktiviert'))
-          : ListView.separated(
-              padding: const EdgeInsets.all(20),
-              itemCount: activePumps.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 14),
-              itemBuilder: (_, index) => FillCard(
-                store: store,
-                pump: activePumps[index],
+      child: ListView(
+        padding: const EdgeInsets.all(20),
+        children: [
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(Icons.warning_amber_rounded,
+                          color: store.appColors.warningColor),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          tr('Warnschwellen'),
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+                  LayoutBuilder(
+                    builder: (context, constraints) {
+                      final compact = constraints.maxWidth < 650;
+                      final portionsControl = Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            tr('Cocktailkarte orange ab'),
+                            style: const TextStyle(fontWeight: FontWeight.w700),
+                          ),
+                          const SizedBox(height: 6),
+                          _stepper(
+                            value: store.lowStockWarningPortions,
+                            suffix: tr('Restcocktails'),
+                            onMinus: store.lowStockWarningPortions <= 1
+                                ? null
+                                : () => _setLowStockWarning(
+                                    store.lowStockWarningPortions - 1),
+                            onPlus: store.lowStockWarningPortions >= 10
+                                ? null
+                                : () => _setLowStockWarning(
+                                    store.lowStockWarningPortions + 1),
+                          ),
+                        ],
+                      );
+                      final percentControl = Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            tr('Füllstandsseite orange unter'),
+                            style: const TextStyle(fontWeight: FontWeight.w700),
+                          ),
+                          const SizedBox(height: 6),
+                          _stepper(
+                            value: store.lowFillWarningPercent,
+                            suffix: '%',
+                            onMinus: store.lowFillWarningPercent <= 5
+                                ? null
+                                : () => _setLowFillWarning(
+                                    store.lowFillWarningPercent - 5),
+                            onPlus: store.lowFillWarningPercent >= 90
+                                ? null
+                                : () => _setLowFillWarning(
+                                    store.lowFillWarningPercent + 5),
+                          ),
+                        ],
+                      );
+
+                      if (compact) {
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            portionsControl,
+                            const SizedBox(height: 14),
+                            percentControl,
+                          ],
+                        );
+                      }
+                      return Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(child: portionsControl),
+                          const SizedBox(width: 18),
+                          Expanded(child: percentControl),
+                        ],
+                      );
+                    },
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    tr('Diese Werte bestimmen nur die Warnanzeige. Die tatsächliche Verfügbarkeit wird weiterhin aus der benötigten Rezeptmenge berechnet.'),
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ],
               ),
             ),
+          ),
+          const SizedBox(height: 14),
+          if (activePumps.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 40),
+              child: Center(child: Text(tr('Keine Pumpen aktiviert'))),
+            )
+          else
+            ...activePumps.expand(
+              (pump) => [
+                FillCard(store: store, pump: pump),
+                const SizedBox(height: 14),
+              ],
+            ),
+        ],
+      ),
     );
   }
 }
+
 class FillCard extends StatefulWidget {
   const FillCard({
     super.key,
@@ -9215,6 +9471,7 @@ class _FillCardState extends State<FillCard> {
   Widget build(BuildContext context) {
     final ing = widget.store.ingredientById(widget.pump.ingredientId);
     final percent = (widget.pump.level * 100).round();
+    final lowFill = percent <= widget.store.lowFillWarningPercent;
 
     return Card(
       child: Padding(
@@ -9232,12 +9489,19 @@ class _FillCardState extends State<FillCard> {
                     style: const TextStyle(fontWeight: FontWeight.w800),
                   ),
                 ),
-                T('$percent%'),
+                Text(
+                  '$percent%',
+                  style: TextStyle(
+                    color: lowFill ? widget.store.appColors.warningColor : null,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
               ],
             ),
             const SizedBox(height: 14),
             LinearProgressIndicator(
               value: widget.pump.level,
+              color: lowFill ? widget.store.appColors.warningColor : null,
               minHeight: 12,
               borderRadius: BorderRadius.circular(20),
             ),
