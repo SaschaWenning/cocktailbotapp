@@ -9,6 +9,8 @@ User=__USER__
 Group=__GROUP__
 SupplementaryGroups=gpio dialout
 Environment=PYTHONUNBUFFERED=1
+Environment=GPIOZERO_PIN_FACTORY=lgpio
+WorkingDirectory=/var/lib/cocktailbot
 EnvironmentFile=/etc/cocktailbot/cocktailbot.env
 EnvironmentFile=-/etc/cocktailbot/paypal.env
 ExecStart=/opt/cocktailbot/venv/bin/python /opt/cocktailbot/raspberry/cocktailbot_server.py --host 127.0.0.1 --port 8080 --web-root /opt/cocktailbot/web

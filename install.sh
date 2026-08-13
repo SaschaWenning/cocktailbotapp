@@ -211,10 +211,7 @@ install_runtime() {
   fi
   "$VENV_DIR/bin/pip" install --disable-pip-version-check -r "$RUNTIME_DIR/requirements.txt"
 
-  install -m 0755 "$SOURCE_DIR/tools/configure-paypal.sh" /usr/local/bin/cocktailbot-paypal-config
-
   install -d -m 0755 /etc/cocktailbot
-  install -d -o "$TARGET_USER" -g "$TARGET_GROUP" -m 0750 /var/lib/cocktailbot
   cat > /etc/cocktailbot/cocktailbot.env <<ENV
 COCKTAILBOT_ACTIVE_HIGH=$ACTIVE_HIGH
 COCKTAILBOT_STATE_FILE=/var/lib/cocktailbot/machine_state.json
@@ -222,21 +219,6 @@ COCKTAILBOT_PICO_PORT=$PICO_PORT
 COCKTAILBOT_PICO_BAUD=$PICO_BAUD
 ENV
   chmod 0644 /etc/cocktailbot/cocktailbot.env
-
-  if [[ ! -f /etc/cocktailbot/paypal.env ]]; then
-    cat > /etc/cocktailbot/paypal.env <<'ENV'
-COCKTAILBOT_PAYPAL_MODE=sandbox
-COCKTAILBOT_PAYPAL_CLIENT_ID=
-COCKTAILBOT_PAYPAL_CLIENT_SECRET=
-COCKTAILBOT_PAYMENT_DB=/var/lib/cocktailbot/payments.db
-COCKTAILBOT_PAYPAL_BRAND_NAME=CocktailBot
-COCKTAILBOT_PAYPAL_RETURN_URL=
-COCKTAILBOT_PAYPAL_CANCEL_URL=
-COCKTAILBOT_PAYPAL_TIMEOUT_SECONDS=15
-ENV
-  fi
-  chown root:root /etc/cocktailbot/paypal.env
-  chmod 0600 /etc/cocktailbot/paypal.env
 
   cat > /etc/cocktailbot/kiosk.env <<ENV
 COCKTAILBOT_KIOSK_URL=http://127.0.0.1:8080
@@ -441,9 +423,6 @@ configure_display_and_boot
 configure_kiosk
 start_services
 
-log "PayPal-Backend ist installiert; Zugangsdaten werden bewusst noch nicht abgefragt"
-log "PayPal kann später bei Bedarf mit 'sudo cocktailbot-paypal-config' aktiviert werden"
-
 cat <<SUMMARY
 
 ============================================================
@@ -459,17 +438,12 @@ LCD7C/GoodTFT:    $INSTALL_LCD
 Bootoptimierung:  $BOOT_OPTIMIZE
 Pico LED-Port:     $PICO_PORT
 Pico Baudrate:     $PICO_BAUD
-PayPal-Backend:    lokal installiert (optional nutzbar)
-PayPal-Konfig:     /etc/cocktailbot/paypal.env (0600)
-Displayziel:       1024x600
+Displayziel:      1024x600
 
 Status prüfen:
   systemctl status cocktailbot.service
   curl http://127.0.0.1:8080/api/status
-  curl http://127.0.0.1:8080/api/payment/status
   ls -l /dev/serial/by-id/ 2>/dev/null || true
-
-PayPal aktivieren: sudo cocktailbot-paypal-config
 
 Aktualisieren:
   sudo /opt/cocktailbot/source/tools/update.sh

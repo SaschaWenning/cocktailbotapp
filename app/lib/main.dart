@@ -3774,69 +3774,278 @@ class MachineStore extends ChangeNotifier {
 extension FirstOrNull<E> on Iterable<E> { E? get firstOrNull => isEmpty ? null : first; }
 
 class HomeShell extends StatefulWidget {
-  const HomeShell({super.key, required this.store});
+  const HomeShell({
+    super.key,
+    required this.store,
+    this.initialIndex = 0,
+  });
+
   final MachineStore store;
-  @override State<HomeShell> createState() => _HomeShellState();
+  final int initialIndex;
+
+  @override
+  State<HomeShell> createState() => _HomeShellState();
 }
 
 class _HomeShellState extends State<HomeShell> {
-  int index = 0;
-  @override Widget build(BuildContext context) {
-    final nav = [
-      (Icons.local_bar_outlined, Icons.local_bar, widget.store.t('navCocktails')),
-      (Icons.local_drink_outlined, Icons.local_drink, widget.store.t('navMocktails')),
-      (Icons.liquor_outlined, Icons.liquor, widget.store.t('navShots')),
-      (Icons.settings_outlined, Icons.settings, widget.store.t('navSettings')),
-    ];
+  late int index;
+
+  @override
+  void initState() {
+    super.initState();
+    index = widget.initialIndex.clamp(0, 3).toInt();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final pages = [
-      RecipeOverview(store: widget.store, category: DrinkCategory.cocktail, title: widget.store.t('titleAlcoholicCocktails')),
-      RecipeOverview(store: widget.store, category: DrinkCategory.mocktail, title: widget.store.t('titleMocktails')),
-      RecipeOverview(store: widget.store, category: DrinkCategory.shot, title: widget.store.t('navShots')),
+      RecipeOverview(
+        store: widget.store,
+        category: DrinkCategory.cocktail,
+        title: widget.store.t('titleAlcoholicCocktails'),
+      ),
+      RecipeOverview(
+        store: widget.store,
+        category: DrinkCategory.mocktail,
+        title: widget.store.t('titleMocktails'),
+      ),
+      RecipeOverview(
+        store: widget.store,
+        category: DrinkCategory.shot,
+        title: widget.store.t('navShots'),
+      ),
       SettingsLockGate(
         store: widget.store,
         child: SettingsPage(store: widget.store),
       ),
     ];
-    return LayoutBuilder(builder: (context, c) {
-      final responsive = CocktailBotResponsive.fromSize(c.maxWidth, c.maxHeight);
-      if (responsive.useSideNavigation) {
-        return Scaffold(body: Row(children: [
-          Container(
-            width: c.maxWidth >= 1100 ? 225 : 92,
-            decoration: BoxDecoration(color: widget.store.appColors.navigationColor, border: Border(right: BorderSide(color: widget.store.appColors.borderColor))),
-            child: SafeArea(child: Column(children: [
-              Padding(padding: const EdgeInsets.fromLTRB(18, 22, 18, 30), child: LogoMark(extended: c.maxWidth >= 1100)),
-              ...List.generate(nav.length, (i) => Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                child: Material(color: index == i ? widget.store.appColors.accentColor.withValues(alpha: .18) : Colors.transparent, borderRadius: BorderRadius.circular(12), child: InkWell(
-                  borderRadius: BorderRadius.circular(12), onTap: () => setState(() => index = i),
-                  child: Padding(padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14), child: Row(mainAxisAlignment: c.maxWidth >= 1100 ? MainAxisAlignment.start : MainAxisAlignment.center, children: [
-                    Icon(index == i ? nav[i].$2 : nav[i].$1, color: index == i ? widget.store.appColors.accentColor : widget.store.appColors.textSecondaryColor),
-                    if (c.maxWidth >= 1100) ...[const SizedBox(width: 13), Text(nav[i].$3, style: TextStyle(color: index == i ? widget.store.appColors.accentColor : widget.store.appColors.textPrimaryColor, fontWeight: FontWeight.w600))]
-                  ])),
-                )),
-              )),
-              const SizedBox(height: 14),
-              if (c.maxWidth >= 1100) MachineStatusCard(store: widget.store),
-              const SizedBox(height: 18),
-            ])),
+
+    return LayoutBuilder(
+      builder: (context, c) {
+        final responsive =
+            CocktailBotResponsive.fromSize(c.maxWidth, c.maxHeight);
+
+        if (responsive.useSideNavigation) {
+          return Scaffold(
+            body: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                CocktailBotSideNavigation(
+                  store: widget.store,
+                  selectedIndex: index,
+                  onSelected: (value) => setState(() => index = value),
+                  availableWidth: c.maxWidth,
+                ),
+                Expanded(child: pages[index]),
+              ],
+            ),
+          );
+        }
+
+        final nav = [
+          (Icons.local_bar_outlined, Icons.local_bar, widget.store.t('navCocktails')),
+          (Icons.local_drink_outlined, Icons.local_drink, widget.store.t('navMocktails')),
+          (Icons.liquor_outlined, Icons.liquor, widget.store.t('navShots')),
+          (Icons.settings_outlined, Icons.settings, widget.store.t('navSettings')),
+        ];
+
+        return Scaffold(
+          body: pages[index],
+          bottomNavigationBar: Container(
+            decoration: BoxDecoration(
+              color: widget.store.appColors.navigationColor,
+              border: Border(
+                top: BorderSide(color: widget.store.appColors.borderColor),
+              ),
+            ),
+            child: SafeArea(
+              top: false,
+              child: SizedBox(
+                height: 72,
+                child: Row(
+                  children: List.generate(
+                    nav.length,
+                    (i) => Expanded(
+                      child: InkWell(
+                        onTap: () => setState(() => index = i),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              index == i ? nav[i].$2 : nav[i].$1,
+                              color: index == i
+                                  ? widget.store.appColors.accentColor
+                                  : widget.store.appColors.textSecondaryColor,
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              nav[i].$3,
+                              maxLines: 1,
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: index == i
+                                    ? widget.store.appColors.accentColor
+                                    : widget.store.appColors.textSecondaryColor,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
           ),
-          Expanded(child: pages[index]),
-        ]));
-      }
-      return Scaffold(
-        body: pages[index],
-        bottomNavigationBar: Container(
-          decoration: BoxDecoration(color: widget.store.appColors.navigationColor, border: Border(top: BorderSide(color: widget.store.appColors.borderColor))),
-          child: SafeArea(top: false, child: SizedBox(height: 72, child: Row(children: List.generate(nav.length, (i) => Expanded(child: InkWell(
-            onTap: () => setState(() => index = i), child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-              Icon(index == i ? nav[i].$2 : nav[i].$1, color: index == i ? widget.store.appColors.accentColor : widget.store.appColors.textSecondaryColor),
-              const SizedBox(height: 4), Text(nav[i].$3, maxLines: 1, style: TextStyle(fontSize: 11, color: index == i ? widget.store.appColors.accentColor : widget.store.appColors.textSecondaryColor))
-            ]),
-          )))))),
+        );
+      },
+    );
+  }
+}
+
+class CocktailBotSideNavigation extends StatelessWidget {
+  const CocktailBotSideNavigation({
+    super.key,
+    required this.store,
+    required this.selectedIndex,
+    required this.onSelected,
+    required this.availableWidth,
+  });
+
+  final MachineStore store;
+  final int selectedIndex;
+  final ValueChanged<int> onSelected;
+  final double availableWidth;
+
+  @override
+  Widget build(BuildContext context) {
+    final extended = availableWidth >= 1100;
+    final width = extended ? 225.0 : 112.0;
+
+    final nav = [
+      (Icons.local_bar_outlined, Icons.local_bar, store.t('navCocktails')),
+      (Icons.local_drink_outlined, Icons.local_drink, store.t('navMocktails')),
+      (Icons.liquor_outlined, Icons.liquor, store.t('navShots')),
+      (Icons.settings_outlined, Icons.settings, store.t('navSettings')),
+    ];
+
+    return SizedBox(
+      width: width,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: store.appColors.navigationColor,
+          border: Border(
+            right: BorderSide(color: store.appColors.borderColor),
+          ),
         ),
-      );
-    });
+        child: SafeArea(
+          top: false,
+          bottom: false,
+          child: Align(
+            alignment: Alignment.topCenter,
+            child: Column(
+              mainAxisSize: MainAxisSize.max,
+              mainAxisAlignment: MainAxisAlignment.start,
+              children: [
+                Padding(
+                  padding: EdgeInsets.fromLTRB(
+                    extended ? 14 : 8,
+                    6,
+                    extended ? 14 : 8,
+                    8,
+                  ),
+                  child: LogoMark(extended: extended),
+                ),
+                ...List.generate(
+                  nav.length,
+                  (i) => Padding(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: extended ? 12 : 8,
+                      vertical: 3,
+                    ),
+                    child: Material(
+                      color: selectedIndex == i
+                          ? store.appColors.accentColor.withValues(alpha: .18)
+                          : Colors.transparent,
+                      borderRadius: BorderRadius.circular(12),
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(12),
+                        onTap: () => onSelected(i),
+                        child: SizedBox(
+                          width: double.infinity,
+                          child: Padding(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: extended ? 14 : 6,
+                              vertical: extended ? 13 : 9,
+                            ),
+                            child: extended
+                                ? Row(
+                                    children: [
+                                      Icon(
+                                        selectedIndex == i ? nav[i].$2 : nav[i].$1,
+                                        color: selectedIndex == i
+                                            ? store.appColors.accentColor
+                                            : store.appColors.textSecondaryColor,
+                                      ),
+                                      const SizedBox(width: 13),
+                                      Expanded(
+                                        child: Text(
+                                          nav[i].$3,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: TextStyle(
+                                            color: selectedIndex == i
+                                                ? store.appColors.accentColor
+                                                : store.appColors.textPrimaryColor,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  )
+                                : Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(
+                                        selectedIndex == i ? nav[i].$2 : nav[i].$1,
+                                        color: selectedIndex == i
+                                            ? store.appColors.accentColor
+                                            : store.appColors.textSecondaryColor,
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        nav[i].$3,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        textAlign: TextAlign.center,
+                                        style: TextStyle(
+                                          fontSize: 10,
+                                          color: selectedIndex == i
+                                              ? store.appColors.accentColor
+                                              : store.appColors.textSecondaryColor,
+                                          fontWeight: selectedIndex == i
+                                              ? FontWeight.w700
+                                              : FontWeight.w500,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                if (extended) ...[
+                  const SizedBox(height: 10),
+                  MachineStatusCard(store: store),
+                ],
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }
 
@@ -4443,6 +4652,12 @@ class _RecipeDetailPageState extends State<RecipeDetailPage> {
   Widget build(BuildContext context) {
     final r = widget.recipe;
     final image = r.imagePath ?? widget.fallbackAsset;
+    final responsive = CocktailBotResponsive.of(context);
+    final heroHeight = responsive.height <= 620
+        ? 180.0
+        : responsive.height <= 760
+            ? 220.0
+            : 285.0;
     final recipeAlcoholPercent = widget.store.recipeAlcoholPercent(
       r,
       targetVolumeMl: selectedSizeMl,
@@ -4477,7 +4692,7 @@ class _RecipeDetailPageState extends State<RecipeDetailPage> {
       targetAlcoholPercent: targetAlcoholPercent,
     );
 
-    return Scaffold(
+    final detailScaffold = Scaffold(
       appBar: AppBar(
         title: Text(widget.store.displayRecipeName(r)),
         backgroundColor: const Color(0xFF080D12),
@@ -4488,12 +4703,16 @@ class _RecipeDetailPageState extends State<RecipeDetailPage> {
             Expanded(
               child: ListView(
                 children: [
-                  SizedBox(
-                    height: 285,
+                  Container(
+                    height: heroHeight,
                     width: double.infinity,
+                    color: const Color(0xFF0B1015),
+                    padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+                    alignment: Alignment.center,
                     child: cocktailImage(
                       image,
                       fallbackAsset: widget.fallbackAsset,
+                      fit: BoxFit.contain,
                     ),
                   ),
                   Transform.translate(
@@ -4861,6 +5080,45 @@ class _RecipeDetailPageState extends State<RecipeDetailPage> {
             ),
           ],
         ),
+      ),
+    );
+
+    if (!responsive.useSideNavigation) {
+      return detailScaffold;
+    }
+
+    final selectedSection = switch (r.category) {
+      DrinkCategory.cocktail => 0,
+      DrinkCategory.mocktail => 1,
+      DrinkCategory.shot => 2,
+    };
+
+    return Scaffold(
+      body: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          CocktailBotSideNavigation(
+            store: widget.store,
+            selectedIndex: selectedSection,
+            availableWidth: MediaQuery.sizeOf(context).width,
+            onSelected: (section) {
+              if (section == selectedSection) {
+                Navigator.of(context).maybePop();
+                return;
+              }
+              Navigator.of(context).pushAndRemoveUntil(
+                MaterialPageRoute(
+                  builder: (_) => HomeShell(
+                    store: widget.store,
+                    initialIndex: section,
+                  ),
+                ),
+                (route) => false,
+              );
+            },
+          ),
+          Expanded(child: detailScaffold),
+        ],
       ),
     );
   }

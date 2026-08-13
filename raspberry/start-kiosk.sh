@@ -44,6 +44,8 @@ while true; do
     --disable-translate \
     --disable-pinch \
     --overscroll-history-navigation=0 \
+    --touch-events=enabled \
+    --enable-features=VirtualKeyboard \
     --autoplay-policy=no-user-gesture-required \
     --user-data-dir="$PROFILE" \
     "$URL" || true
