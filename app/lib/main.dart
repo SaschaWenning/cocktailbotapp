@@ -1412,7 +1412,621 @@ String appText(AppLanguage language, String key) {
     'Gespeichert': {AppLanguage.de: 'Gespeichert', AppLanguage.en: 'Saved', AppLanguage.es: 'Guardado', AppLanguage.it: 'Salvato', AppLanguage.nl: 'Opgeslagen', AppLanguage.fr: 'Enregistré', AppLanguage.pt: 'Salvo', AppLanguage.pl: 'Zapisano', AppLanguage.tr: 'Kaydedildi', AppLanguage.ru: 'Сохранено'},
     'Aktiv': {AppLanguage.de: 'Aktiv', AppLanguage.en: 'Active', AppLanguage.es: 'Activa', AppLanguage.it: 'Attiva', AppLanguage.nl: 'Actief', AppLanguage.fr: 'Active', AppLanguage.pt: 'Ativa', AppLanguage.pl: 'Aktywna', AppLanguage.tr: 'Aktif', AppLanguage.ru: 'Активно'},
   };
-  return texts[key]?[language] ?? uiTexts[key]?[language] ?? texts[key]?[AppLanguage.de] ?? uiTexts[key]?[AppLanguage.de] ?? key;
+  final settingsSupplementalTexts = <String, Map<AppLanguage, String>>{
+    'Sicherheit & Freigaben': {
+      AppLanguage.de: 'Sicherheit & Freigaben',
+      AppLanguage.en: 'Security & permissions',
+      AppLanguage.es: 'Seguridad y permisos',
+      AppLanguage.it: 'Sicurezza e autorizzazioni',
+      AppLanguage.nl: 'Beveiliging en rechten',
+      AppLanguage.fr: 'Sécurité et autorisations',
+      AppLanguage.pt: 'Segurança e permissões',
+      AppLanguage.pl: 'Bezpieczeństwo i uprawnienia',
+      AppLanguage.tr: 'Güvenlik ve izinler',
+      AppLanguage.ru: 'Безопасность и разрешения',
+    },
+    'Stärkeregler und Einstellungs-Passwort': {
+      AppLanguage.de: 'Stärkeregler und Einstellungs-Passwort',
+      AppLanguage.en: 'Strength control and settings password',
+      AppLanguage.es: 'Control de intensidad y contraseña de ajustes',
+      AppLanguage.it: 'Controllo intensità e password impostazioni',
+      AppLanguage.nl: 'Sterkteregeling en instellingenwachtwoord',
+      AppLanguage.fr: 'Réglage de l’intensité et mot de passe',
+      AppLanguage.pt: 'Controle de intensidade e senha das configurações',
+      AppLanguage.pl: 'Regulacja mocy i hasło ustawień',
+      AppLanguage.tr: 'Yoğunluk kontrolü ve ayarlar parolası',
+      AppLanguage.ru: 'Регулировка крепости и пароль настроек',
+    },
+    'Sortierung und Cocktails pro Seite einstellen': {
+      AppLanguage.de: 'Sortierung und Cocktails pro Seite einstellen',
+      AppLanguage.en: 'Configure sorting and cocktails per page',
+      AppLanguage.es: 'Configurar orden y cócteles por página',
+      AppLanguage.it: 'Configura ordinamento e cocktail per pagina',
+      AppLanguage.nl: 'Sortering en cocktails per pagina instellen',
+      AppLanguage.fr: 'Configurer le tri et les cocktails par page',
+      AppLanguage.pt: 'Configurar ordenação e coquetéis por página',
+      AppLanguage.pl: 'Ustaw sortowanie i koktajle na stronę',
+      AppLanguage.tr: 'Sıralama ve sayfa başına kokteyl ayarla',
+      AppLanguage.ru: 'Настроить сортировку и коктейли на странице',
+    },
+    'Gewerbelizenz': {
+      AppLanguage.de: 'Gewerbelizenz',
+      AppLanguage.en: 'Commercial license',
+      AppLanguage.es: 'Licencia comercial',
+      AppLanguage.it: 'Licenza commerciale',
+      AppLanguage.nl: 'Commerciële licentie',
+      AppLanguage.fr: 'Licence commerciale',
+      AppLanguage.pt: 'Licença comercial',
+      AppLanguage.pl: 'Licencja komercyjna',
+      AppLanguage.tr: 'Ticari lisans',
+      AppLanguage.ru: 'Коммерческая лицензия',
+    },
+    'Gewerbelizenz erforderlich': {
+      AppLanguage.de: 'Gewerbelizenz erforderlich',
+      AppLanguage.en: 'Commercial license required',
+      AppLanguage.es: 'Se requiere licencia comercial',
+      AppLanguage.it: 'Licenza commerciale richiesta',
+      AppLanguage.nl: 'Commerciële licentie vereist',
+      AppLanguage.fr: 'Licence commerciale requise',
+      AppLanguage.pt: 'Licença comercial necessária',
+      AppLanguage.pl: 'Wymagana licencja komercyjna',
+      AppLanguage.tr: 'Ticari lisans gerekli',
+      AppLanguage.ru: 'Требуется коммерческая лицензия',
+    },
+    'Gewerbelizenz aktiv': {
+      AppLanguage.de: 'Gewerbelizenz aktiv',
+      AppLanguage.en: 'Commercial license active',
+      AppLanguage.es: 'Licencia comercial activa',
+      AppLanguage.it: 'Licenza commerciale attiva',
+      AppLanguage.nl: 'Commerciële licentie actief',
+      AppLanguage.fr: 'Licence commerciale active',
+      AppLanguage.pt: 'Licença comercial ativa',
+      AppLanguage.pl: 'Licencja komercyjna aktywna',
+      AppLanguage.tr: 'Ticari lisans etkin',
+      AppLanguage.ru: 'Коммерческая лицензия активна',
+    },
+    'Privatmodus': {
+      AppLanguage.de: 'Privatmodus',
+      AppLanguage.en: 'Private mode',
+      AppLanguage.es: 'Modo privado',
+      AppLanguage.it: 'Modalità privata',
+      AppLanguage.nl: 'Privémodus',
+      AppLanguage.fr: 'Mode privé',
+      AppLanguage.pt: 'Modo privado',
+      AppLanguage.pl: 'Tryb prywatny',
+      AppLanguage.tr: 'Özel mod',
+      AppLanguage.ru: 'Частный режим',
+    },
+    'Privatmodus aktiv': {
+      AppLanguage.de: 'Privatmodus aktiv',
+      AppLanguage.en: 'Private mode active',
+      AppLanguage.es: 'Modo privado activo',
+      AppLanguage.it: 'Modalità privata attiva',
+      AppLanguage.nl: 'Privémodus actief',
+      AppLanguage.fr: 'Mode privé actif',
+      AppLanguage.pt: 'Modo privado ativo',
+      AppLanguage.pl: 'Tryb prywatny aktywny',
+      AppLanguage.tr: 'Özel mod etkin',
+      AppLanguage.ru: 'Частный режим активен',
+    },
+    'Verbrauchsstatistik': {
+      AppLanguage.de: 'Verbrauchsstatistik',
+      AppLanguage.en: 'Consumption statistics',
+      AppLanguage.es: 'Estadísticas de consumo',
+      AppLanguage.it: 'Statistiche di consumo',
+      AppLanguage.nl: 'Verbruiksstatistieken',
+      AppLanguage.fr: 'Statistiques de consommation',
+      AppLanguage.pt: 'Estatísticas de consumo',
+      AppLanguage.pl: 'Statystyki zużycia',
+      AppLanguage.tr: 'Tüketim istatistikleri',
+      AppLanguage.ru: 'Статистика расхода',
+    },
+    'Cocktail-Ranking, Kosten und Zutatenverbrauch': {
+      AppLanguage.de: 'Cocktail-Ranking, Kosten und Zutatenverbrauch',
+      AppLanguage.en: 'Cocktail ranking, costs and ingredient consumption',
+      AppLanguage.es: 'Ranking de cócteles, costes y consumo de ingredientes',
+      AppLanguage.it: 'Classifica cocktail, costi e consumo ingredienti',
+      AppLanguage.nl: 'Cocktailranglijst, kosten en ingrediëntenverbruik',
+      AppLanguage.fr: 'Classement des cocktails, coûts et consommation d’ingrédients',
+      AppLanguage.pt: 'Ranking de coquetéis, custos e consumo de ingredientes',
+      AppLanguage.pl: 'Ranking koktajli, koszty i zużycie składników',
+      AppLanguage.tr: 'Kokteyl sıralaması, maliyetler ve malzeme tüketimi',
+      AppLanguage.ru: 'Рейтинг коктейлей, расходы и расход ингредиентов',
+    },
+    'Partykarten': {
+      AppLanguage.de: 'Partykarten',
+      AppLanguage.en: 'Party cards',
+      AppLanguage.es: 'Tarjetas de fiesta',
+      AppLanguage.it: 'Schede festa',
+      AppLanguage.nl: 'Partykaarten',
+      AppLanguage.fr: 'Cartes de fête',
+      AppLanguage.pt: 'Cartões de festa',
+      AppLanguage.pl: 'Karty imprezowe',
+      AppLanguage.tr: 'Parti kartları',
+      AppLanguage.ru: 'Карты вечеринок',
+    },
+    'Auswahl und Beliebtheit für Veranstaltungen': {
+      AppLanguage.de: 'Auswahl und Beliebtheit für Veranstaltungen',
+      AppLanguage.en: 'Selection and popularity for events',
+      AppLanguage.es: 'Selección y popularidad para eventos',
+      AppLanguage.it: 'Selezione e popolarità per eventi',
+      AppLanguage.nl: 'Selectie en populariteit voor evenementen',
+      AppLanguage.fr: 'Sélection et popularité pour les événements',
+      AppLanguage.pt: 'Seleção e popularidade para eventos',
+      AppLanguage.pl: 'Wybór i popularność na wydarzenia',
+      AppLanguage.tr: 'Etkinlikler için seçim ve popülerlik',
+      AppLanguage.ru: 'Выбор и популярность для мероприятий',
+    },
+    'Partyplaner': {
+      AppLanguage.de: 'Partyplaner',
+      AppLanguage.en: 'Party planner',
+      AppLanguage.es: 'Planificador de fiestas',
+      AppLanguage.it: 'Pianificatore feste',
+      AppLanguage.nl: 'Partyplanner',
+      AppLanguage.fr: 'Planificateur de fête',
+      AppLanguage.pt: 'Planejador de festas',
+      AppLanguage.pl: 'Planer imprezy',
+      AppLanguage.tr: 'Parti planlayıcı',
+      AppLanguage.ru: 'Планировщик вечеринки',
+    },
+    'Prognose aus vergangenen Partys': {
+      AppLanguage.de: 'Prognose aus vergangenen Partys',
+      AppLanguage.en: 'Forecast based on past parties',
+      AppLanguage.es: 'Previsión basada en fiestas anteriores',
+      AppLanguage.it: 'Previsione basata sulle feste passate',
+      AppLanguage.nl: 'Prognose op basis van eerdere feesten',
+      AppLanguage.fr: 'Prévision basée sur les fêtes passées',
+      AppLanguage.pt: 'Previsão com base em festas anteriores',
+      AppLanguage.pl: 'Prognoza na podstawie wcześniejszych imprez',
+      AppLanguage.tr: 'Geçmiş partilere dayalı tahmin',
+      AppLanguage.ru: 'Прогноз на основе прошлых вечеринок',
+    },
+    'Einkaufsliste': {
+      AppLanguage.de: 'Einkaufsliste',
+      AppLanguage.en: 'Shopping list',
+      AppLanguage.es: 'Lista de compras',
+      AppLanguage.it: 'Lista della spesa',
+      AppLanguage.nl: 'Boodschappenlijst',
+      AppLanguage.fr: 'Liste de courses',
+      AppLanguage.pt: 'Lista de compras',
+      AppLanguage.pl: 'Lista zakupów',
+      AppLanguage.tr: 'Alışveriş listesi',
+      AppLanguage.ru: 'Список покупок',
+    },
+    'Zutatenbedarf und fehlende Mengen planen': {
+      AppLanguage.de: 'Zutatenbedarf und fehlende Mengen planen',
+      AppLanguage.en: 'Plan ingredient requirements and missing quantities',
+      AppLanguage.es: 'Planificar ingredientes necesarios y cantidades faltantes',
+      AppLanguage.it: 'Pianifica ingredienti necessari e quantità mancanti',
+      AppLanguage.nl: 'Benodigde ingrediënten en ontbrekende hoeveelheden plannen',
+      AppLanguage.fr: 'Planifier les besoins en ingrédients et les quantités manquantes',
+      AppLanguage.pt: 'Planejar ingredientes necessários e quantidades em falta',
+      AppLanguage.pl: 'Zaplanuj zapotrzebowanie na składniki i brakujące ilości',
+      AppLanguage.tr: 'Malzeme ihtiyacını ve eksik miktarları planla',
+      AppLanguage.ru: 'Планировать потребность в ингредиентах и недостающие количества',
+    },
+    'PayPal Kassenmodus': {
+      AppLanguage.de: 'PayPal Kassenmodus',
+      AppLanguage.en: 'PayPal checkout mode',
+      AppLanguage.es: 'Modo de caja PayPal',
+      AppLanguage.it: 'Modalità cassa PayPal',
+      AppLanguage.nl: 'PayPal-kassamodus',
+      AppLanguage.fr: 'Mode caisse PayPal',
+      AppLanguage.pt: 'Modo de caixa PayPal',
+      AppLanguage.pl: 'Tryb kasy PayPal',
+      AppLanguage.tr: 'PayPal kasa modu',
+      AppLanguage.ru: 'Режим кассы PayPal',
+    },
+    'Lokale PayPal-Zahlung über den Raspberry Pi': {
+      AppLanguage.de: 'Lokale PayPal-Zahlung über den Raspberry Pi',
+      AppLanguage.en: 'Local PayPal payments via the Raspberry Pi',
+      AppLanguage.es: 'Pagos PayPal locales mediante Raspberry Pi',
+      AppLanguage.it: 'Pagamenti PayPal locali tramite Raspberry Pi',
+      AppLanguage.nl: 'Lokale PayPal-betalingen via de Raspberry Pi',
+      AppLanguage.fr: 'Paiements PayPal locaux via le Raspberry Pi',
+      AppLanguage.pt: 'Pagamentos PayPal locais pelo Raspberry Pi',
+      AppLanguage.pl: 'Lokalne płatności PayPal przez Raspberry Pi',
+      AppLanguage.tr: 'Raspberry Pi üzerinden yerel PayPal ödemeleri',
+      AppLanguage.ru: 'Локальные платежи PayPal через Raspberry Pi',
+    },
+    'Cocktailpreise': {
+      AppLanguage.de: 'Cocktailpreise',
+      AppLanguage.en: 'Cocktail prices',
+      AppLanguage.es: 'Precios de cócteles',
+      AppLanguage.it: 'Prezzi cocktail',
+      AppLanguage.nl: 'Cocktailprijzen',
+      AppLanguage.fr: 'Prix des cocktails',
+      AppLanguage.pt: 'Preços dos coquetéis',
+      AppLanguage.pl: 'Ceny koktajli',
+      AppLanguage.tr: 'Kokteyl fiyatları',
+      AppLanguage.ru: 'Цены коктейлей',
+    },
+    'Einzelpreise pro Cocktail festlegen': {
+      AppLanguage.de: 'Einzelpreise pro Cocktail festlegen',
+      AppLanguage.en: 'Set individual prices per cocktail',
+      AppLanguage.es: 'Definir precios individuales por cóctel',
+      AppLanguage.it: 'Imposta prezzi individuali per cocktail',
+      AppLanguage.nl: 'Individuele prijzen per cocktail instellen',
+      AppLanguage.fr: 'Définir un prix individuel par cocktail',
+      AppLanguage.pt: 'Definir preços individuais por coquetel',
+      AppLanguage.pl: 'Ustaw indywidualne ceny koktajli',
+      AppLanguage.tr: 'Kokteyl başına ayrı fiyat belirle',
+      AppLanguage.ru: 'Задать отдельные цены для коктейлей',
+    },
+    'Branding': {
+      AppLanguage.de: 'Branding',
+      AppLanguage.en: 'Branding',
+      AppLanguage.es: 'Marca',
+      AppLanguage.it: 'Branding',
+      AppLanguage.nl: 'Branding',
+      AppLanguage.fr: 'Image de marque',
+      AppLanguage.pt: 'Marca',
+      AppLanguage.pl: 'Branding',
+      AppLanguage.tr: 'Markalama',
+      AppLanguage.ru: 'Брендинг',
+    },
+    'Barname und Gewerbehinweis': {
+      AppLanguage.de: 'Barname und Gewerbehinweis',
+      AppLanguage.en: 'Bar name and commercial note',
+      AppLanguage.es: 'Nombre del bar y nota comercial',
+      AppLanguage.it: 'Nome del bar e nota commerciale',
+      AppLanguage.nl: 'Barnaam en commerciële melding',
+      AppLanguage.fr: 'Nom du bar et mention commerciale',
+      AppLanguage.pt: 'Nome do bar e aviso comercial',
+      AppLanguage.pl: 'Nazwa baru i informacja handlowa',
+      AppLanguage.tr: 'Bar adı ve ticari not',
+      AppLanguage.ru: 'Название бара и коммерческая пометка',
+    },
+    'Raspberry Pi verbunden': {
+      AppLanguage.de: 'Raspberry Pi verbunden',
+      AppLanguage.en: 'Raspberry Pi connected',
+      AppLanguage.es: 'Raspberry Pi conectado',
+      AppLanguage.it: 'Raspberry Pi connesso',
+      AppLanguage.nl: 'Raspberry Pi verbonden',
+      AppLanguage.fr: 'Raspberry Pi connecté',
+      AppLanguage.pt: 'Raspberry Pi conectado',
+      AppLanguage.pl: 'Raspberry Pi połączony',
+      AppLanguage.tr: 'Raspberry Pi bağlı',
+      AppLanguage.ru: 'Raspberry Pi подключён',
+    },
+    'Lokale GPIO-Steuerung': {
+      AppLanguage.de: 'Lokale GPIO-Steuerung',
+      AppLanguage.en: 'Local GPIO control',
+      AppLanguage.es: 'Control GPIO local',
+      AppLanguage.it: 'Controllo GPIO locale',
+      AppLanguage.nl: 'Lokale GPIO-besturing',
+      AppLanguage.fr: 'Commande GPIO locale',
+      AppLanguage.pt: 'Controle GPIO local',
+      AppLanguage.pl: 'Lokalne sterowanie GPIO',
+      AppLanguage.tr: 'Yerel GPIO kontrolü',
+      AppLanguage.ru: 'Локальное управление GPIO',
+    },
+    'App schließen': {
+      AppLanguage.de: 'App schließen',
+      AppLanguage.en: 'Close app',
+      AppLanguage.es: 'Cerrar aplicación',
+      AppLanguage.it: 'Chiudi app',
+      AppLanguage.nl: 'App sluiten',
+      AppLanguage.fr: 'Fermer l’application',
+      AppLanguage.pt: 'Fechar app',
+      AppLanguage.pl: 'Zamknij aplikację',
+      AppLanguage.tr: 'Uygulamayı kapat',
+      AppLanguage.ru: 'Закрыть приложение',
+    },
+    'CocktailBot wirklich schließen und zum Raspberry-Desktop zurückkehren?': {
+      AppLanguage.de: 'CocktailBot wirklich schließen und zum Raspberry-Desktop zurückkehren?',
+      AppLanguage.en: 'Really close CocktailBot and return to the Raspberry desktop?',
+      AppLanguage.es: '¿Cerrar CocktailBot y volver al escritorio de Raspberry?',
+      AppLanguage.it: 'Chiudere CocktailBot e tornare al desktop Raspberry?',
+      AppLanguage.nl: 'CocktailBot echt sluiten en terugkeren naar het Raspberry-bureaublad?',
+      AppLanguage.fr: 'Fermer CocktailBot et revenir au bureau Raspberry ?',
+      AppLanguage.pt: 'Fechar o CocktailBot e voltar à área de trabalho do Raspberry?',
+      AppLanguage.pl: 'Zamknąć CocktailBot i wrócić do pulpitu Raspberry?',
+      AppLanguage.tr: 'CocktailBot kapatılsın ve Raspberry masaüstüne dönülsün mü?',
+      AppLanguage.ru: 'Закрыть CocktailBot и вернуться на рабочий стол Raspberry?',
+    },
+    'App konnte nicht geschlossen werden.': {
+      AppLanguage.de: 'App konnte nicht geschlossen werden.',
+      AppLanguage.en: 'The app could not be closed.',
+      AppLanguage.es: 'No se pudo cerrar la aplicación.',
+      AppLanguage.it: 'Impossibile chiudere l’app.',
+      AppLanguage.nl: 'De app kon niet worden gesloten.',
+      AppLanguage.fr: 'Impossible de fermer l’application.',
+      AppLanguage.pt: 'Não foi possível fechar o app.',
+      AppLanguage.pl: 'Nie udało się zamknąć aplikacji.',
+      AppLanguage.tr: 'Uygulama kapatılamadı.',
+      AppLanguage.ru: 'Не удалось закрыть приложение.',
+    },
+    'Einstellungen gesperrt': {
+      AppLanguage.de: 'Einstellungen gesperrt',
+      AppLanguage.en: 'Settings locked',
+      AppLanguage.es: 'Ajustes bloqueados',
+      AppLanguage.it: 'Impostazioni bloccate',
+      AppLanguage.nl: 'Instellingen vergrendeld',
+      AppLanguage.fr: 'Paramètres verrouillés',
+      AppLanguage.pt: 'Configurações bloqueadas',
+      AppLanguage.pl: 'Ustawienia zablokowane',
+      AppLanguage.tr: 'Ayarlar kilitli',
+      AppLanguage.ru: 'Настройки заблокированы',
+    },
+    'Einstellungen': {
+      AppLanguage.de: 'Einstellungen',
+      AppLanguage.en: 'Settings',
+      AppLanguage.es: 'Ajustes',
+      AppLanguage.it: 'Impostazioni',
+      AppLanguage.nl: 'Instellingen',
+      AppLanguage.fr: 'Paramètres',
+      AppLanguage.pt: 'Configurações',
+      AppLanguage.pl: 'Ustawienia',
+      AppLanguage.tr: 'Ayarlar',
+      AppLanguage.ru: 'Настройки',
+    },
+    'Zubereitung starten': {
+      AppLanguage.de: 'Zubereitung starten',
+      AppLanguage.en: 'Start preparation',
+      AppLanguage.es: 'Iniciar preparación',
+      AppLanguage.it: 'Avvia preparazione',
+      AppLanguage.nl: 'Bereiding starten',
+      AppLanguage.fr: 'Démarrer la préparation',
+      AppLanguage.pt: 'Iniciar preparo',
+      AppLanguage.pl: 'Rozpocznij przygotowanie',
+      AppLanguage.tr: 'Hazırlamayı başlat',
+      AppLanguage.ru: 'Начать приготовление',
+    },
+    'Lizenzierte Maschine': {
+      AppLanguage.de: 'Lizenzierte Maschine',
+      AppLanguage.en: 'Licensed machine',
+      AppLanguage.es: 'Máquina con licencia',
+      AppLanguage.it: 'Macchina con licenza',
+      AppLanguage.nl: 'Gelicentieerde machine',
+      AppLanguage.fr: 'Machine sous licence',
+      AppLanguage.pt: 'Máquina licenciada',
+      AppLanguage.pl: 'Licencjonowana maszyna',
+      AppLanguage.tr: 'Lisanslı makine',
+      AppLanguage.ru: 'Лицензированная машина',
+    },
+    'Neu prüfen': {
+      AppLanguage.de: 'Neu prüfen',
+      AppLanguage.en: 'Check again',
+      AppLanguage.es: 'Comprobar de nuevo',
+      AppLanguage.it: 'Controlla di nuovo',
+      AppLanguage.nl: 'Opnieuw controleren',
+      AppLanguage.fr: 'Vérifier à nouveau',
+      AppLanguage.pt: 'Verificar novamente',
+      AppLanguage.pl: 'Sprawdź ponownie',
+      AppLanguage.tr: 'Tekrar kontrol et',
+      AppLanguage.ru: 'Проверить снова',
+    },
+  };
+  final settingsEnglishFallback = <String, String>{
+    'Diese Einstellungen gelten für Cocktails, alkoholfreie Cocktails und Shots. Auf den Cocktail-Seiten selbst wird die obere Navigation angezeigt.': 'These settings apply to cocktails, alcohol-free cocktails and shots. The top navigation is shown on the cocktail pages.',
+    'Laden': 'Load',
+    'Rezepte': 'Recipes',
+    'Für eigene Reihenfolge „Originale Reihenfolge“ verwenden.': 'Use “Original order” for a custom order.',
+    'Verschiebe einzelne Cocktails mit den Pfeilen. Die App stellt danach automatisch auf „Originale Reihenfolge“, damit deine eigene Reihenfolge sichtbar ist.': 'Move individual cocktails with the arrows. The app then automatically switches to “Original order” so your custom order remains visible.',
+    'LED-Einstellungen wurden übernommen': 'LED settings applied',
+    'LED-Einstellungen gespeichert. Sie werden beim nächsten Verbinden übertragen.': 'LED settings saved. They will be transferred the next time a connection is established.',
+    'Nächste Pumpe wird vorbereitet': 'Preparing next pump',
+    'läuft': 'running',
+    'Zeitüberschreitung beim Warten auf die Raspberry-Steuerung': 'Timed out while waiting for Raspberry control',
+    'Statistik': 'Statistics',
+    'Kosten- und Margenberechnung': 'Cost and margin calculation',
+    'CSV/PDF-Export vorbereitet': 'CSV/PDF export prepared',
+    'Bar-/Firmenbranding': 'Bar/company branding',
+    'wird noch in': 'is still used in',
+    'Rezept(en) verwendet. Entferne die Zutat zuerst aus den betroffenen Rezepten.': 'recipe(s). Remove the ingredient from the affected recipes first.',
+    'ist noch': 'is still assigned to',
+    'Pumpe(n) zugeordnet. Beim Löschen wird die Zuordnung entfernt und die Pumpenkalibrierung zurückgesetzt.': 'pump(s). Deleting it will remove the assignment and reset the pump calibration.',
+    'wirklich löschen?': 'really delete?',
+    'wurde gelöscht.': 'was deleted.',
+    'Kiosk-Steuerung über den lokalen Raspberry-Pi-Dienst. Das Feld bleibt leer, wenn App und GPIO-API auf demselben Raspberry Pi laufen.': 'Kiosk control via the local Raspberry Pi service. Leave the field empty when the app and GPIO API run on the same Raspberry Pi.',
+    '1. Fülle einen großen Behälter mit etwa 40–50 °C warmem Wasser und etwas Spülmittel. Lege alle Ansaugschläuche in den Behälter und starte die Reinigung.\n\n2. Fülle den Behälter anschließend mit klarem Wasser und starte die Reinigung erneut.\n\n3. Entferne die Schläuche aus dem Wasser und lasse sie nochmal trocken durchlaufen. Der Auffangbehälter muss weiterhin unter dem Ausguss stehen.\n\n4. Bei Membranpumpen bitte alle Schläuche der Pumpen entfernen und das Reinigungsprogramm erneut starten. Lege vorher ein Handtuch unter die Pumpen. Dieser Schritt ist wichtig, um Schimmel in den Pumpen zu verhindern.': '1. Fill a large container with warm water at about 40–50 °C and a little detergent. Put all intake tubes into the container and start cleaning.\n\n2. Then fill the container with clean water and start cleaning again.\n\n3. Remove the tubes from the water and run them dry once more. Keep the collection container under the outlet.\n\n4. For diaphragm pumps, remove all pump tubes and start the cleaning program again. Place a towel under the pumps first. This step is important to prevent mold inside the pumps.',
+    'Hinweis: Verbrauch und Kosten werden aus den Rezeptmengen und den eingetragenen Literpreisen berechnet. Manuelle Zutaten werden in der Statistik mitgezählt, sofern sie im Rezept als Zutat hinterlegt sind.': 'Note: Consumption and costs are calculated from recipe quantities and the entered prices per liter. Manual ingredients are included in the statistics if they are stored as ingredients in the recipe.',
+    'Kiosk-Steuerung über den lokalen Raspberry-Pi-Dienst.': 'Kiosk control via the local Raspberry Pi service.',
+    'API-Host (optional)': 'API host (optional)',
+    'Aktive Party': 'Active party',
+    'Aktivieren': 'Enable',
+    'Aktiviert am': 'Activated on',
+    'Aktuell': 'Current',
+    'Alkoholfrei Preis EUR': 'Alcohol-free price EUR',
+    'Anzeige gespeichert': 'Display settings saved',
+    'App konnte nicht geschlossen werden.': 'The app could not be closed.',
+    'App schließen': 'Close app',
+    'Ausgewählt': 'Selected',
+    'Auswahl und Beliebtheit für Veranstaltungen': 'Selection and popularity for events',
+    'Automatische Sortierung': 'Automatic sorting',
+    'Bar- oder Firmenname': 'Bar or company name',
+    'Barname und Gewerbehinweis': 'Bar name and commercial note',
+    'Basis': 'Base',
+    'Bestellungen und Zahlungsstatus laufen direkt über den Raspberry Pi. Es wird kein Cloudflare-Backend benötigt. PayPal-Client-ID und Secret werden ausschließlich auf dem Raspberry gespeichert.': 'Orders and payment status are handled directly by the Raspberry Pi. No Cloudflare backend is required. PayPal client ID and secret are stored only on the Raspberry.',
+    'Bezahlung erfolgreich': 'Payment successful',
+    'Bitte Passwort eingeben. Das Notfall-Passwort cocktailbot funktioniert immer.': 'Enter the password. The emergency password cocktailbot always works.',
+    'Bitte eine gültige Zahl eingeben': 'Please enter a valid number',
+    'Bitte mindestens einen Cocktail auswählen': 'Please select at least one cocktail',
+    'Bitte zuerst ein Passwort festlegen': 'Please set a password first',
+    'Bitte zuerst unter Einstellungen → Partykarten eine Partykarte erstellen.': 'First create a party card under Settings → Party cards.',
+    'Branding': 'Branding',
+    'Branding speichern': 'Save branding',
+    'Branding wurde gespeichert': 'Branding saved',
+    'Cocktail Preis EUR': 'Cocktail price EUR',
+    'Cocktail zubereiten': 'Prepare cocktail',
+    'Cocktail-Listen': 'Cocktail lists',
+    'Cocktail-Ranking, Kosten und Zutatenverbrauch': 'Cocktail ranking, costs and ingredient consumption',
+    'CocktailBot Lizenzdatei auswählen': 'Select CocktailBot license file',
+    'CocktailBot wirklich schließen und zum Raspberry-Desktop zurückkehren?': 'Really close CocktailBot and return to the Raspberry desktop?',
+    'Cocktailpreise': 'Cocktail prices',
+    'Cocktails': 'Cocktails',
+    'Cocktails einzeln sortieren': 'Sort cocktails individually',
+    'Cocktails können direkt gestartet werden': 'Cocktails can be started directly',
+    'Cocktails pro Gast werden automatisch aus vergangenen Partys berechnet.': 'Cocktails per guest are calculated automatically from past parties.',
+    'Cocktails starten erst nach Zahlungsfreigabe': 'Cocktails start only after payment approval',
+    'Deaktivieren': 'Disable',
+    'Der Raspberry installiert die Lizenz nach erfolgreicher Prüfung automatisch. Es sind keine Terminal- oder sudo-Befehle nötig.': 'The Raspberry installs the license automatically after successful verification. No terminal or sudo commands are required.',
+    'Design wurde gespeichert': 'Design saved',
+    'Die Lizenzdatei ist leer.': 'The license file is empty.',
+    'Die ausgewählte Datei ist keine gültige CocktailBot-Lizenzdatei.': 'The selected file is not a valid CocktailBot license file.',
+    'Diese Daten können später auf Kassenmodus, Exporten und Berichten angezeigt werden.': 'These details can later be shown in checkout mode, exports and reports.',
+    'Diese Zahlung wurde bereits verwendet': 'This payment has already been used',
+    'Eigener Preis aktiv': 'Custom price enabled',
+    'Eine Partykarte ist die kleinere Auswahl aus deiner Cocktailliste. Dazu wird je Cocktail eine erwartete Beliebtheit gespeichert.': 'A party card is a smaller selection from your cocktail list. An expected popularity is stored for each cocktail.',
+    'Einkaufsliste': 'Shopping list',
+    'Einstellungen sperren': 'Lock settings',
+    'Einstellungsbereich sperren': 'Lock settings area',
+    'Einzelpreise pro Cocktail': 'Individual prices per cocktail',
+    'Einzelpreise pro Cocktail festlegen': 'Set individual prices per cocktail',
+    'Enthaltene Gewerbefunktionen': 'Included commercial features',
+    'Entsperren': 'Unlock',
+    'Falsches Passwort': 'Wrong password',
+    'Fehlt ca.': 'Approx. missing',
+    'Geplant': 'Planned',
+    'Geplanter Zutatenbedarf': 'Planned ingredient requirement',
+    'Geräte-ID': 'Device ID',
+    'Geräte-ID für Zahlungen': 'Device ID for payments',
+    'Geräte-ID kopiert': 'Device ID copied',
+    'Gerätegebundene Offline-Lizenz': 'Device-bound offline license',
+    'Gespeicherte Lizenz gehört zu einem anderen Gerät': 'Stored license belongs to another device',
+    'Gewerbelizenz': 'Commercial license',
+    'Gewerbelizenz aktiv': 'Commercial license active',
+    'Gewerbelizenz erforderlich': 'Commercial license required',
+    'Gewerbelizenz wurde aktiviert': 'Commercial license activated',
+    'Gewerbelizenz wurde deaktiviert': 'Commercial license deactivated',
+    'Gewerbelizenz wurde erfolgreich importiert und aktiviert.': 'Commercial license imported and activated successfully.',
+    'Gewerbelizenz öffnen': 'Open commercial license',
+    'Gewerbliche Nutzung erlaubt': 'Commercial use permitted',
+    'Gäste': 'Guests',
+    'Gästezahl': 'Number of guests',
+    'Hier kannst du die wichtigsten App-Farben selbst anpassen.': 'You can customize the most important app colors here.',
+    'Hier legst du die Verkaufspreise pro Cocktail fest. Ohne Einzelpreis gilt der Standardpreis aus dem PayPal Kassenmodus.': 'Set the selling price for each cocktail here. If no individual price is set, the default price from PayPal checkout mode applies.',
+    'In der Datei wurde kein CocktailBot-Lizenzcode gefunden.': 'No CocktailBot license code was found in the file.',
+    'Keine Zutaten berechnet': 'No ingredients calculated',
+    'Kopieren': 'Copy',
+    'Leer lassen, wenn das vorhandene Passwort bleiben soll': 'Leave empty to keep the current password',
+    'Liste auswählen': 'Select list',
+    'Literpreise und Kostenberechnung sind nur in der Lizenzversion verfügbar.': 'Liter prices and cost calculation are only available with a commercial license.',
+    'Live-Vorschau': 'Live preview',
+    'Lizenz gültig': 'License valid',
+    'Lizenz wird geprüft …': 'Checking license …',
+    'Lizenzcode hat ein ungültiges Format': 'License code has an invalid format',
+    'Lizenzcode hat eine ungültige Länge': 'License code has an invalid length',
+    'Lizenzcode ist für dieses Gerät ungültig': 'License code is invalid for this device',
+    'Lizenzcode ist leer': 'License code is empty',
+    'Lizenzcode kann nicht gelesen werden': 'License code cannot be read',
+    'Lizenzdatei importieren': 'Import license file',
+    'Lizenzdatei vom CocktailBot-Anbieter': 'License file from your CocktailBot provider',
+    'Lizenzimport fehlgeschlagen': 'License import failed',
+    'Lizenzprüfung fehlgeschlagen': 'License verification failed',
+    'Lizenzstatus aktualisieren': 'Refresh license status',
+    'Lizenzstatus wird geprüft …': 'Checking license status …',
+    'Lokale GPIO-Steuerung': 'Local GPIO control',
+    'Lokale PayPal-Zahlung über den Raspberry Pi': 'Local PayPal payments via the Raspberry Pi',
+    'Lokale PayPal-Zahlungsfreigabe': 'Local PayPal payment approval',
+    'Lokales Zahlungsbackend nicht erreichbar': 'Local payment backend is not reachable',
+    'Lokales Zahlungsbackend wird geprüft …': 'Checking local payment backend …',
+    'Löschen': 'Delete',
+    'Max': 'Max',
+    'Max. gesamt': 'Max. total',
+    'Min': 'Min',
+    'Min. gesamt': 'Min. total',
+    'Modus': 'Mode',
+    'Nach oben': 'Move up',
+    'Nach unten': 'Move down',
+    'Name der Partykarte': 'Party card name',
+    'Neue Partykarte erstellen': 'Create new party card',
+    'Neues Passwort': 'New password',
+    'Noch keine Min/Ø/Max-Werte': 'No min/avg/max values yet',
+    'Noch keine Partykarte gespeichert': 'No party card saved yet',
+    'Noch keine abgeschlossene Party mit dieser Partykarte. Die Planung nutzt Standardwerte und die Beliebtheit der Partykarte.': 'No completed party with this party card yet. Planning uses default values and the party card popularity.',
+    'Party beenden': 'End party',
+    'Party planen': 'Plan party',
+    'Party starten': 'Start party',
+    'Partykarte': 'Party card',
+    'Partykarte bearbeiten': 'Edit party card',
+    'Partykarte speichern': 'Save party card',
+    'Partykarten': 'Party cards',
+    'Partyname': 'Party name',
+    'Partyplaner': 'Party planner',
+    'Passwort': 'Password',
+    'Passwort ändern': 'Change password',
+    'PayPal Kassenmodus': 'PayPal checkout mode',
+    'PayPal Kassenmodus gespeichert': 'PayPal checkout mode saved',
+    'PayPal Zahlung': 'PayPal payment',
+    'PayPal lokal auf dem Raspberry konfiguriert': 'PayPal configured locally on the Raspberry',
+    'PayPal-Zahlung vor Zubereitung erzwingen': 'Require PayPal payment before preparation',
+    'PayPal-Zugangsdaten auf dem Raspberry fehlen': 'PayPal credentials are missing on the Raspberry',
+    'Plan': 'Plan',
+    'Preise': 'Prices',
+    'Privatmodus': 'Private mode',
+    'Privatmodus aktiv': 'Private mode active',
+    'Prognose aus vergangenen Partys': 'Forecast based on past parties',
+    'QR-Code scannen und mit PayPal bezahlen': 'Scan the QR code and pay with PayPal',
+    'Raspberry Pi verbunden': 'Raspberry Pi connected',
+    'Reserve in Prozent': 'Reserve in percent',
+    'Sende diese Geräte-ID an deinen CocktailBot-Anbieter. Du erhältst eine TXT-Lizenzdatei, die ausschließlich auf diesem Raspberry funktioniert. Speichere die Datei z. B. auf einem USB-Stick und importiere sie hier. Eine Internetverbindung ist nicht erforderlich.': 'Send this device ID to your CocktailBot provider. You will receive a TXT license file that works only on this Raspberry. Save it, for example, on a USB drive and import it here. No internet connection is required.',
+    'Shot Preis EUR': 'Shot price EUR',
+    'Shots': 'Shots',
+    'Sicherheit & Freigaben': 'Security & permissions',
+    'Sicherheitseinstellungen gespeichert': 'Security settings saved',
+    'So wirken Navigation, Cocktailkarten, Buttons und Statusfarben zusammen.': 'This preview shows how navigation, cocktail cards, buttons and status colors work together.',
+    'Sortierung und Cocktails pro Seite einstellen': 'Configure sorting and cocktails per page',
+    'Speichern': 'Save',
+    'Speichern fehlgeschlagen': 'Save failed',
+    'Standardpreis': 'Default price',
+    'Standardpreis verwenden': 'Use default price',
+    'Stärkeregler für alkoholische Cocktails freigeben': 'Enable strength control for alcoholic cocktails',
+    'Stärkeregler und Einstellungs-Passwort': 'Strength control and settings password',
+    'TXT-Datei auswählen. Geräte-ID und Signatur werden automatisch geprüft.': 'Select the TXT file. Device ID and signature are checked automatically.',
+    'Untertitel / Hinweis': 'Subtitle / note',
+    'Verbrauchsstatistik': 'Consumption statistics',
+    'Vergangene Partys': 'Past parties',
+    'Voreingestellte Designs': 'Preset designs',
+    'Warte auf Zahlung': 'Waiting for payment',
+    'Wenn aktiv, erscheint in alkoholischen Cocktail-Details ein Slider von 0 bis 25 % vol.': 'When enabled, alcoholic cocktail details show a slider from 0 to 25% vol.',
+    'Wenn aktiv, kommt man nur mit deinem Passwort in die Einstellungen. Das Notfall-Passwort cocktailbot funktioniert immer.': 'When enabled, settings can only be opened with your password. The emergency password cocktailbot always works.',
+    'Wird automatisch aus der hardwaregebundenen CocktailBot Geräte-ID übernommen.': 'Automatically taken from the hardware-bound CocktailBot device ID.',
+    'Wird ermittelt …': 'Detecting …',
+    'Wird freigegeben …': 'Approving …',
+    'Wähle eine hochwertige Farbkombination mit direkter Vorschau.': 'Choose a high-quality color combination with a live preview.',
+    'Zahlung bestätigt – Cocktail kann zubereitet werden': 'Payment confirmed – cocktail can be prepared',
+    'Zahlung konnte nicht freigegeben werden': 'Payment could not be approved',
+    'Zahlung prüfen': 'Check payment',
+    'Zahlungseinstellungen speichern': 'Save payment settings',
+    'Zahlungsstatus konnte nicht geprüft werden': 'Payment status could not be checked',
+    'Zutat kann nicht gelöscht werden': 'Ingredient cannot be deleted',
+    'Zutat löschen': 'Delete ingredient',
+    'Zutat löschen?': 'Delete ingredient?',
+    'Zutatenbedarf und fehlende Mengen planen': 'Plan ingredient requirements and missing quantities',
+    'abgeschlossene Partys mit dieser Partykarte': 'completed parties with this party card',
+    'fehlt': 'missing',
+    'ist Teil der CocktailBot Gewerbelizenz. Die Grundfunktionen der Maschine bleiben im Privatmodus nutzbar.': 'is part of the CocktailBot commercial license. The machine’s basic functions remain available in private mode.',
+    'leer = lokale Steuerung': 'empty = local control',
+    'ml': 'ml',
+    'vorhanden': 'available',
+    'Ø gesamt': 'Average total',
+  };
+
+  final directTranslation =
+      texts[key]?[language] ??
+      uiTexts[key]?[language] ??
+      settingsSupplementalTexts[key]?[language];
+  if (directTranslation != null) return directTranslation;
+
+  // Neuere Einstellungsseiten dürfen bei einer Nicht-Deutsch-Sprache niemals
+  // still auf den deutschen Schlüssel zurückfallen. Bis für einen seltenen
+  // Hinweis eine eigene Sprachvariante ergänzt ist, wird mindestens Englisch
+  // angezeigt.
+  if (language != AppLanguage.de) {
+    final englishFallback =
+        settingsSupplementalTexts[key]?[AppLanguage.en] ??
+        texts[key]?[AppLanguage.en] ??
+        uiTexts[key]?[AppLanguage.en] ??
+        settingsEnglishFallback[key];
+    if (englishFallback != null) return englishFallback;
+  }
+
+  return texts[key]?[AppLanguage.de] ??
+      uiTexts[key]?[AppLanguage.de] ??
+      settingsSupplementalTexts[key]?[AppLanguage.de] ??
+      key;
 
 }
 
@@ -3247,8 +3861,8 @@ class MachineStore extends ChangeNotifier {
   }
 
   String get commercialLicenseStatusText => commercialLicenseActive
-      ? 'Gewerbelizenz aktiv'
-      : 'Privatmodus';
+      ? t('Gewerbelizenz aktiv')
+      : t('Privatmodus');
 
   bool get hasCommercialMachineMatch =>
       commercialLicenseActive &&
@@ -6934,7 +7548,7 @@ class _CocktailDisplaySettingsPageState
                   const SizedBox(height: 8),
                   Text(
                     widget.store.t(
-                      'Diese Einstellungen gelten für Cocktails, alkoholfreie Cocktails und Shots. Auf den Cocktail-Seiten selbst wird nur noch die Seiten-Navigation angezeigt.',
+                      'Diese Einstellungen gelten für Cocktails, alkoholfreie Cocktails und Shots. Auf den Cocktail-Seiten selbst wird die obere Navigation angezeigt.',
                     ),
                     style: TextStyle(
                       color: widget.store.appColors.textSecondaryColor,
@@ -8044,9 +8658,10 @@ class _LedSettingsPageState extends State<LedSettingsPage> {
         SnackBar(
           content: Text(
             sent
-                ? 'LED-Einstellungen wurden übernommen'
-                : 'LED-Einstellungen gespeichert. '
-                    'Sie werden beim nächsten Verbinden übertragen.',
+                ? tr('LED-Einstellungen wurden übernommen')
+                : tr(
+                    'LED-Einstellungen gespeichert. Sie werden beim nächsten Verbinden übertragen.',
+                  ),
           ),
         ),
       );
@@ -8802,8 +9417,8 @@ class _SequencePageState extends State<SequencePage> {
                 Expanded(
                   child: Text(
                     currentPump > 0
-                        ? 'Pumpe $currentPump läuft'
-                        : 'Nächste Pumpe wird vorbereitet',
+                        ? '${tr('Pumpe')} $currentPump ${tr('läuft')}'
+                        : tr('Nächste Pumpe wird vorbereitet'),
                     style: const TextStyle(fontWeight: FontWeight.w800),
                   ),
                 ),
@@ -9868,11 +10483,11 @@ class _IngredientPageState extends State<IngredientPage> {
       await showDialog<void>(
         context: context,
         builder: (context) => AlertDialog(
-          title: const Text('Zutat kann nicht gelöscht werden'),
+          title: const T('Zutat kann nicht gelöscht werden'),
           content: Text(
-            '${widget.store.displayIngredientName(ingredient)} wird noch in '
-            '$recipeReferences Rezept(en) verwendet. Entferne die Zutat zuerst '
-            'aus den betroffenen Rezepten.',
+            '${widget.store.displayIngredientName(ingredient)} '
+            '${tr('wird noch in')} $recipeReferences '
+            '${tr('Rezept(en) verwendet. Entferne die Zutat zuerst aus den betroffenen Rezepten.')}',
           ),
           actions: [
             FilledButton(
@@ -9888,23 +10503,24 @@ class _IngredientPageState extends State<IngredientPage> {
     final confirmed = await showDialog<bool>(
           context: context,
           builder: (context) => AlertDialog(
-            title: const Text('Zutat löschen?'),
+            title: const T('Zutat löschen?'),
             content: Text(
               pumpReferences > 0
-                  ? '${widget.store.displayIngredientName(ingredient)} ist noch '
-                      '$pumpReferences Pumpe(n) zugeordnet. Beim Löschen wird die '
-                      'Zuordnung entfernt und die Pumpenkalibrierung zurückgesetzt.'
-                  : '${widget.store.displayIngredientName(ingredient)} wirklich löschen?',
+                  ? '${widget.store.displayIngredientName(ingredient)} '
+                      '${tr('ist noch')} $pumpReferences '
+                      '${tr('Pumpe(n) zugeordnet. Beim Löschen wird die Zuordnung entfernt und die Pumpenkalibrierung zurückgesetzt.')}'
+                  : '${widget.store.displayIngredientName(ingredient)} '
+                      '${tr('wirklich löschen?')}',
             ),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(context, false),
-                child: const Text('Abbrechen'),
+                child: const T('Abbrechen'),
               ),
               FilledButton.icon(
                 onPressed: () => Navigator.pop(context, true),
                 icon: const Icon(Icons.delete_outline),
-                label: const Text('Löschen'),
+                label: const T('Löschen'),
               ),
             ],
           ),
@@ -9927,7 +10543,8 @@ class _IngredientPageState extends State<IngredientPage> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
-          '${widget.store.displayIngredientName(ingredient)} wurde gelöscht.',
+          '${widget.store.displayIngredientName(ingredient)} '
+          '${tr('wurde gelöscht.')}',
         ),
       ),
     );
@@ -10107,7 +10724,7 @@ class _IngredientPageState extends State<IngredientPage> {
                           ),
                         const SizedBox(width: 8),
                         IconButton(
-                          tooltip: 'Zutat löschen',
+                          tooltip: tr('Zutat löschen'),
                           onPressed: () => _deleteIngredient(ingredient),
                           icon: const Icon(Icons.delete_outline),
                         ),
@@ -10440,7 +11057,7 @@ class _CommercialLicensePageState extends State<CommercialLicensePage> {
                         ),
                         const SizedBox(height: 6),
                         Text(
-                          widget.store.commercialLicenseMessage,
+                          tr(widget.store.commercialLicenseMessage),
                           style: TextStyle(
                             color: widget.store.appColors.textSecondaryColor,
                             height: 1.35,
@@ -11050,7 +11667,7 @@ class _PaymentSettingsPageState extends State<PaymentSettingsPage> {
   );
   final recipePriceControllers = <String, TextEditingController>{};
   bool? backendReady;
-  String backendState = 'Lokales Zahlungsbackend wird geprüft …';
+  String backendState = tr('Lokales Zahlungsbackend wird geprüft …');
 
   @override
   void initState() {
@@ -11080,14 +11697,15 @@ class _PaymentSettingsPageState extends State<PaymentSettingsPage> {
       setState(() {
         backendReady = configured;
         backendState = configured
-            ? 'PayPal lokal auf dem Raspberry konfiguriert ($mode)'
-            : 'PayPal-Zugangsdaten auf dem Raspberry fehlen';
+            ? '${tr('PayPal lokal auf dem Raspberry konfiguriert')} ($mode)'
+            : tr('PayPal-Zugangsdaten auf dem Raspberry fehlen');
       });
     } catch (error) {
       if (!mounted) return;
       setState(() {
         backendReady = false;
-        backendState = 'Lokales Zahlungsbackend nicht erreichbar: $error';
+        backendState =
+            '${tr('Lokales Zahlungsbackend nicht erreichbar')}: $error';
       });
     }
   }
