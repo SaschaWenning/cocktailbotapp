@@ -21,6 +21,8 @@ class _CocktailMachineAppState extends State<CocktailMachineApp> {
   final store = MachineStore();
   Timer? _keyboardDebounce;
   EditableTextState? _activeEditable;
+  TextEditingValue _virtualKeyboardValue = const TextEditingValue();
+  bool _virtualKeyboardObscure = false;
   bool _virtualKeyboardVisible = false;
   bool _virtualKeyboardShift = false;
 
@@ -54,6 +56,8 @@ class _CocktailMachineAppState extends State<CocktailMachineApp> {
         if (current == null || !current.mounted || current.widget.readOnly) return;
         setState(() {
           _activeEditable = current;
+          _virtualKeyboardValue = current.textEditingValue;
+          _virtualKeyboardObscure = current.widget.obscureText;
           _virtualKeyboardVisible = true;
         });
       });
@@ -68,6 +72,8 @@ class _CocktailMachineAppState extends State<CocktailMachineApp> {
         setState(() {
           _virtualKeyboardVisible = false;
           _activeEditable = null;
+          _virtualKeyboardValue = const TextEditingValue();
+          _virtualKeyboardObscure = false;
           _virtualKeyboardShift = false;
         });
       }
@@ -87,14 +93,61 @@ class _CocktailMachineAppState extends State<CocktailMachineApp> {
   void _updateActiveValue(TextEditingValue value) {
     final editable = _activeEditable;
     if (editable == null || !editable.mounted || editable.widget.readOnly) return;
-    editable.userUpdateTextEditingValue(value, SelectionChangedCause.keyboard);
+
+    // Die Popup-Tastatur verwaltet ihre Cursorposition selbst. Damit bleibt
+    // nach dem ersten Tastendruck nicht der komplette Inhalt markiert und
+    // weitere Zeichen werden angehängt statt den vorherigen Wert zu ersetzen.
+    final requestedOffset = value.selection.isValid
+        ? value.selection.extentOffset.clamp(0, value.text.length).toInt()
+        : value.text.length;
+    var normalized = value.copyWith(
+      selection: TextSelection.collapsed(offset: requestedOffset),
+      composing: TextRange.empty,
+    );
+
+    _virtualKeyboardValue = normalized;
+    editable.userUpdateTextEditingValue(
+      normalized,
+      SelectionChangedCause.keyboard,
+    );
+
+    // InputFormatter dürfen den Text verändern. Danach übernehmen wir den
+    // tatsächlich akzeptierten Text, erzwingen aber wieder einen
+    // zusammengeklappten Cursor. So kann die Browser-Selektion nicht bei
+    // jedem virtuellen Tastendruck erneut den ganzen Inhalt markieren.
+    final formatted = editable.textEditingValue;
+    final formattedOffset = requestedOffset
+        .clamp(0, formatted.text.length)
+        .toInt();
+    normalized = formatted.copyWith(
+      selection: TextSelection.collapsed(offset: formattedOffset),
+      composing: TextRange.empty,
+    );
+    _virtualKeyboardValue = normalized;
+
+    if (formatted.selection != normalized.selection ||
+        formatted.composing != TextRange.empty) {
+      editable.userUpdateTextEditingValue(
+        normalized,
+        SelectionChangedCause.keyboard,
+      );
+    }
+
+    // Zusätzlich die Controller-Selektion explizit zusammenklappen. Das ist
+    // besonders im Flutter-Web-Kiosk wichtig, weil Chromium sonst die zuletzt
+    // markierte Auswahl optisch beibehalten kann.
+    if (editable.widget.controller.selection != normalized.selection) {
+      editable.widget.controller.selection = normalized.selection;
+    }
+
     editable.widget.focusNode.requestFocus();
+    if (mounted) setState(() {});
   }
 
   void _insertVirtualText(String text) {
     final editable = _activeEditable;
     if (editable == null || !editable.mounted) return;
-    final value = editable.widget.controller.value;
+    final value = _virtualKeyboardValue;
     final selection = value.selection;
     final start = selection.isValid
         ? (selection.start < selection.end ? selection.start : selection.end)
@@ -115,7 +168,7 @@ class _CocktailMachineAppState extends State<CocktailMachineApp> {
   void _virtualBackspace() {
     final editable = _activeEditable;
     if (editable == null || !editable.mounted) return;
-    final value = editable.widget.controller.value;
+    final value = _virtualKeyboardValue;
     if (value.text.isEmpty) return;
     final selection = value.selection;
     var start = selection.isValid
@@ -151,6 +204,8 @@ class _CocktailMachineAppState extends State<CocktailMachineApp> {
     setState(() {
       _virtualKeyboardVisible = false;
       _activeEditable = null;
+      _virtualKeyboardValue = const TextEditingValue();
+      _virtualKeyboardObscure = false;
       _virtualKeyboardShift = false;
     });
   }
@@ -207,6 +262,8 @@ class _CocktailMachineAppState extends State<CocktailMachineApp> {
                     colors: store.appColors,
                     numeric: _activeKeyboardIsNumeric,
                     shift: _virtualKeyboardShift,
+                    value: _virtualKeyboardValue,
+                    obscureText: _virtualKeyboardObscure,
                     onCharacter: (value) {
                       final output = _virtualKeyboardShift
                           ? value.toUpperCase()
@@ -237,6 +294,8 @@ class _CocktailBotVirtualKeyboardLayer extends StatelessWidget {
     required this.colors,
     required this.numeric,
     required this.shift,
+    required this.value,
+    required this.obscureText,
     required this.onCharacter,
     required this.onBackspace,
     required this.onClear,
@@ -250,6 +309,8 @@ class _CocktailBotVirtualKeyboardLayer extends StatelessWidget {
   final AppColorThemeConfig colors;
   final bool numeric;
   final bool shift;
+  final TextEditingValue value;
+  final bool obscureText;
   final ValueChanged<String> onCharacter;
   final VoidCallback onBackspace;
   final VoidCallback onClear;
@@ -259,6 +320,24 @@ class _CocktailBotVirtualKeyboardLayer extends StatelessWidget {
   final VoidCallback onClose;
   final VoidCallback onShift;
 
+  String get _previewText {
+    if (value.text.isEmpty) return '';
+    if (!obscureText) return value.text;
+    return List.filled(value.text.runes.length, '•').join();
+  }
+
+  int get _previewCursorOffset {
+    if (!value.selection.isValid) return value.text.length;
+    return value.selection.extentOffset.clamp(0, value.text.length).toInt();
+  }
+
+  String get _previewWithCursor {
+    final text = _previewText;
+    if (text.isEmpty) return '▌';
+    final offset = _previewCursorOffset.clamp(0, text.length).toInt();
+    return '${text.substring(0, offset)}▌${text.substring(offset)}';
+  }
+
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.sizeOf(context);
@@ -266,10 +345,7 @@ class _CocktailBotVirtualKeyboardLayer extends StatelessWidget {
             ? math.min(560.0, size.width - 28)
             : math.min(980.0, size.width - 28))
         .toDouble();
-    final double popupHeight = (numeric
-            ? math.min(330.0, size.height * .58)
-            : math.min(305.0, size.height * .52))
-        .toDouble();
+    final double popupHeight = math.min(370.0, size.height * .65).toDouble();
 
     return SafeArea(
       top: false,
@@ -326,9 +402,77 @@ class _CocktailBotVirtualKeyboardLayer extends StatelessWidget {
                             ),
                           ),
                           Divider(height: 1, color: colors.borderColor),
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
+                            child: Container(
+                              height: 58,
+                              width: double.infinity,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 13,
+                                vertical: 7,
+                              ),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF121B24),
+                                borderRadius: BorderRadius.circular(11),
+                                border: Border.all(
+                                  color: colors.accentColor.withValues(alpha: .65),
+                                ),
+                              ),
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    Icons.edit_outlined,
+                                    color: colors.accentColor,
+                                    size: 20,
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: Column(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          numeric ? 'Zahleneingabe' : 'Texteingabe',
+                                          style: const TextStyle(
+                                            color: Color(0xFF97A3AE),
+                                            fontSize: 10,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 2),
+                                        SingleChildScrollView(
+                                          scrollDirection: Axis.horizontal,
+                                          reverse: true,
+                                          child: Text(
+                                            _previewWithCursor,
+                                            maxLines: 1,
+                                            style: TextStyle(
+                                              color: colors.textPrimaryColor,
+                                              fontSize: 22,
+                                              height: 1,
+                                              fontWeight: FontWeight.w800,
+                                              letterSpacing: .4,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  if (value.selection.isValid)
+                                    Text(
+                                      '${_previewCursorOffset}/${value.text.length}',
+                                      style: const TextStyle(
+                                        color: Color(0xFF6F7D89),
+                                        fontSize: 10,
+                                      ),
+                                    ),
+                                ],
+                              ),
+                            ),
+                          ),
                           Expanded(
                             child: Padding(
-                              padding: const EdgeInsets.all(8),
+                              padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
                               child: numeric
                                   ? _numericKeyboard()
                                   : _textKeyboard(),
