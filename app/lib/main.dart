@@ -3912,12 +3912,11 @@ class _HomeShellState extends State<HomeShell> {
       builder: (context, c) {
         final responsive =
             CocktailBotResponsive.fromSize(c.maxWidth, c.maxHeight);
-        if (responsive.useSideNavigation) {
+        if (responsive.useTopNavigation) {
           return Scaffold(
-            body: Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
+            body: Column(
               children: [
-                CocktailBotSideNavigation(
+                CocktailBotTopNavigation(
                   store: widget.store,
                   selectedIndex: index,
                   onSelected: (value) => setState(() => index = value),
@@ -4008,6 +4007,106 @@ List<(IconData, IconData, String)> cocktailBotNavigationItems(
         store.t('navSettings'),
       ),
     ];
+
+class CocktailBotTopNavigation extends StatelessWidget {
+  const CocktailBotTopNavigation({
+    super.key,
+    required this.store,
+    required this.selectedIndex,
+    required this.onSelected,
+  });
+
+  final MachineStore store;
+  final int selectedIndex;
+  final ValueChanged<int> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    final nav = cocktailBotNavigationItems(store);
+    final width = MediaQuery.sizeOf(context).width;
+    final extendedLogo = width >= 1180;
+
+    return SafeArea(
+      bottom: false,
+      child: Container(
+        height: 66,
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+        decoration: BoxDecoration(
+          color: store.appColors.navigationColor,
+          border: Border(
+            bottom: BorderSide(color: store.appColors.borderColor),
+          ),
+        ),
+        child: Row(
+          children: [
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 6),
+              child: LogoMark(extended: extendedLogo),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Row(
+                children: List.generate(nav.length, (i) {
+                  final selected = selectedIndex == i;
+                  return Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 4),
+                      child: Material(
+                        color: selected
+                            ? store.appColors.accentColor.withValues(alpha: .18)
+                            : Colors.transparent,
+                        borderRadius: BorderRadius.circular(11),
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(11),
+                          onTap: () => onSelected(i),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 8,
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  selected ? nav[i].$2 : nav[i].$1,
+                                  size: 23,
+                                  color: selected
+                                      ? store.appColors.accentColor
+                                      : store.appColors.textSecondaryColor,
+                                ),
+                                const SizedBox(width: 7),
+                                Flexible(
+                                  child: Text(
+                                    nav[i].$3,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      fontSize: width <= 1050 ? 12.5 : 14,
+                                      color: selected
+                                          ? store.appColors.accentColor
+                                          : store.appColors.textPrimaryColor,
+                                      fontWeight: selected
+                                          ? FontWeight.w800
+                                          : FontWeight.w600,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  );
+                }),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
 
 class CocktailBotSideNavigation extends StatelessWidget {
   const CocktailBotSideNavigation({
@@ -4209,7 +4308,7 @@ class CocktailBotResponsive {
     return CocktailBotScreenClass.phonePortrait;
   }
 
-  bool get useSideNavigation =>
+  bool get useTopNavigation =>
       width >= 760 && screenClass != CocktailBotScreenClass.phoneLandscape;
 
   double get horizontalPadding {
@@ -4748,7 +4847,7 @@ class _RecipeDetailPageState extends State<RecipeDetailPage> {
     final r = widget.recipe;
     final image = r.imagePath ?? widget.fallbackAsset;
     final responsive = CocktailBotResponsive.of(context);
-    final kioskLandscape = responsive.useSideNavigation &&
+    final kioskLandscape = responsive.useTopNavigation &&
         responsive.isLandscape &&
         responsive.height <= 800;
 
@@ -5176,11 +5275,10 @@ class _RecipeDetailPageState extends State<RecipeDetailPage> {
     );
 
     return Scaffold(
-      body: responsive.useSideNavigation
-          ? Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
+      body: responsive.useTopNavigation
+          ? Column(
               children: [
-                CocktailBotSideNavigation(
+                CocktailBotTopNavigation(
                   store: widget.store,
                   selectedIndex: widget.selectedNavigationIndex,
                   onSelected: _navigateFromRail,
