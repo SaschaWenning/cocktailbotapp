@@ -11,7 +11,7 @@ fi
 if [[ -f /etc/cocktailbot/kiosk.env ]]; then
   DELAY="$(grep -E '^COCKTAILBOT_KIOSK_DELAY_SECONDS=' /etc/cocktailbot/kiosk.env | tail -1 | cut -d= -f2- || echo 30)"
 fi
-exec /opt/cocktailbot/source/install.sh \
+exec bash /opt/cocktailbot/source/install.sh \
   --active-high "${ACTIVE_HIGH:-1}" \
   --pico-port "${PICO_PORT:-auto}" \
   --kiosk-delay "${DELAY:-30}" \

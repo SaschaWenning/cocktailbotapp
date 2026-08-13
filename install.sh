@@ -108,7 +108,7 @@ install_packages() {
   apt-get install -y \
     ca-certificates curl git rsync unzip xz-utils zip libglu1-mesa \
     python3 python3-venv python3-pip python3-gpiozero python3-serial \
-    x11-xserver-utils unclutter util-linux
+    x11-xserver-utils unclutter util-linux onboard dbus-x11 dconf-cli
 
   if apt-cache show python3-lgpio >/dev/null 2>&1; then
     apt-get install -y python3-lgpio
@@ -195,6 +195,16 @@ build_web() {
   rsync -a --delete "$SOURCE_DIR/app/build/web/" "$WEB_DIR/"
 }
 
+fix_web_permissions() {
+  log "Setze sichere Leserechte für den Flutter-Web-Build"
+  [[ -d "$WEB_DIR" ]] || die "Web-Verzeichnis fehlt: $WEB_DIR"
+  chmod 0755 "$INSTALL_ROOT" "$WEB_DIR"
+  find "$WEB_DIR" -type d -exec chmod 0755 {} +
+  find "$WEB_DIR" -type f -exec chmod 0644 {} +
+  chown -R root:root "$WEB_DIR"
+  [[ -r "$WEB_DIR/index.html" ]] || die "index.html ist für den Webdienst nicht lesbar."
+}
+
 install_runtime() {
   log "Installiere GPIO-/Webdienst"
   install -d -m 0755 "$RUNTIME_DIR"
@@ -203,6 +213,7 @@ install_runtime() {
   usermod -aG dialout "$TARGET_USER" || true
   install -m 0755 "$SOURCE_DIR/raspberry/cocktailbot_server.py" "$RUNTIME_DIR/cocktailbot_server.py"
   install -m 0755 "$SOURCE_DIR/raspberry/start-kiosk.sh" "$RUNTIME_DIR/start-kiosk.sh"
+  install -m 0755 "$SOURCE_DIR/raspberry/start-onboard.sh" "$RUNTIME_DIR/start-onboard.sh"
   install -m 0644 "$SOURCE_DIR/raspberry/requirements.txt" "$RUNTIME_DIR/requirements.txt"
 
   if [[ ! -x "$VENV_DIR/bin/python" ]]; then
@@ -224,6 +235,7 @@ ENV
 COCKTAILBOT_KIOSK_URL=http://127.0.0.1:8080
 COCKTAILBOT_KIOSK_DELAY_SECONDS=$KIOSK_DELAY
 COCKTAILBOT_CHROMIUM_PROFILE=$TARGET_HOME/.config/cocktailbot-chromium
+COCKTAILBOT_KIOSK_STOP_FILE=/var/lib/cocktailbot/kiosk.stop
 ENV
   chmod 0644 /etc/cocktailbot/kiosk.env
 
@@ -267,48 +279,13 @@ install_lcd_driver() {
 configure_display_and_boot() {
   [[ "$BOOT_OPTIMIZE" == "1" ]] || { log "Bootoptimierung übersprungen"; return 0; }
 
-  log "Entferne Plymouth/Splash-Pakete"
-  local plymouth_packages=()
-  local package
-  for package in plymouth plymouth-label plymouth-themes rpd-plym-splash; do
-    if dpkg-query -W -f='${Status}' "$package" 2>/dev/null | grep -q 'install ok installed'; then
-      plymouth_packages+=("$package")
-    fi
-  done
-  if (( ${#plymouth_packages[@]} > 0 )); then
-    apt-get purge -y "${plymouth_packages[@]}" || true
-  fi
-
   local cmdline_file=""
+  local config_file=""
   if [[ -f /boot/firmware/cmdline.txt ]]; then
     cmdline_file=/boot/firmware/cmdline.txt
   elif [[ -f /boot/cmdline.txt ]]; then
     cmdline_file=/boot/cmdline.txt
   fi
-
-  if [[ -n "$cmdline_file" ]]; then
-    log "Entferne quiet/splash aus $cmdline_file"
-    cp -a "$cmdline_file" "${cmdline_file}.cocktailbot.bak" || true
-    sed -i -E \
-      's/(^|[[:space:]])quiet([[:space:]]|$)/ /g; s/(^|[[:space:]])splash([[:space:]]|$)/ /g; s/[[:space:]]+/ /g; s/^ //; s/ $//' \
-      "$cmdline_file"
-  else
-    warn "Keine cmdline.txt unter /boot/firmware oder /boot gefunden."
-  fi
-
-  log "Deaktiviere NetworkManager-wait-online"
-  systemctl disable NetworkManager-wait-online.service >/dev/null 2>&1 || true
-
-  # Nur maskieren, wenn die Geräte tatsächlich fehlen. So wird vorhandene
-  # Grafikbeschleunigung nicht unnötig deaktiviert.
-  if [[ ! -e /dev/dri/card0 ]]; then
-    systemctl mask dev-dri-card0.device >/dev/null 2>&1 || true
-  fi
-  if [[ ! -e /dev/dri/renderD128 ]]; then
-    systemctl mask dev-dri-renderD128.device >/dev/null 2>&1 || true
-  fi
-
-  local config_file=""
   if [[ -f /boot/firmware/config.txt ]]; then
     config_file=/boot/firmware/config.txt
   elif [[ -f /boot/config.txt ]]; then
@@ -316,34 +293,47 @@ configure_display_and_boot() {
   fi
 
   if [[ -n "$config_file" ]]; then
-    log "Sichere HDMI-Auflösung 1024x600 in $config_file ab"
+    log "Aktiviere KMS und entferne alte 1920x1080-/Framebuffer-Zwangseinstellungen"
     cp -a "$config_file" "${config_file}.cocktailbot.bak" || true
-    if ! grep -Eq '^[[:space:]]*hdmi_cvt[=[:space:]]+1024[[:space:]]+600[[:space:]]+60' "$config_file"; then
-      cat >> "$config_file" <<'EOF'
-
-# --- CocktailBot LCD Setup BEGIN ---
-hdmi_force_hotplug=1
-dtparam=i2c_arm=on
-dtparam=spi=on
-enable_uart=1
-display_rotate=0
-max_usb_current=1
-config_hdmi_boost=7
-hdmi_group=2
-hdmi_mode=87
-hdmi_drive=1
-hdmi_cvt 1024 600 60 6 0 0 0
-# --- CocktailBot LCD Setup END ---
-EOF
-    fi
+    sed -i -E \
+      '/^[[:space:]]*#?[[:space:]]*dtoverlay=vc4-fkms-v3d/d; \
+       /^[[:space:]]*#?[[:space:]]*dtoverlay=vc4-kms-v3d/d; \
+       /^[[:space:]]*hdmi_force_hotplug=/d; \
+       /^[[:space:]]*hdmi_group=/d; \
+       /^[[:space:]]*hdmi_mode=/d; \
+       /^[[:space:]]*hdmi_cvt([=[:space:]])/d; \
+       /^[[:space:]]*framebuffer_width=/d; \
+       /^[[:space:]]*framebuffer_height=/d; \
+       /^[[:space:]]*disable_fw_kms_setup=/d' \
+      "$config_file"
+    printf '\n# CocktailBot Display\ndtoverlay=vc4-kms-v3d\n' >> "$config_file"
   else
     warn "Keine config.txt unter /boot/firmware oder /boot gefunden."
   fi
+
+  if [[ -n "$cmdline_file" ]]; then
+    log "Setze KMS-Ausgabe auf 1024x600@60"
+    cp -a "$cmdline_file" "${cmdline_file}.cocktailbot.bak" || true
+    sed -i -E \
+      's/(^|[[:space:]])quiet([[:space:]]|$)/ /g; \
+       s/(^|[[:space:]])splash([[:space:]]|$)/ /g; \
+       s/(^|[[:space:]])video=[^[:space:]]+([[:space:]]|$)/ /g; \
+       s/[[:space:]]+/ /g; s/^ //; s/ $//' \
+      "$cmdline_file"
+    sed -i 's/$/ video=HDMI-A-1:1024x600M@60/' "$cmdline_file"
+  else
+    warn "Keine cmdline.txt unter /boot/firmware oder /boot gefunden."
+  fi
+
+  systemctl unmask dev-dri-card0.device >/dev/null 2>&1 || true
+  systemctl unmask dev-dri-renderD128.device >/dev/null 2>&1 || true
+  systemctl disable NetworkManager-wait-online.service >/dev/null 2>&1 || true
 
   log "Erzwinge grafischen Desktopstart und Autologin"
   systemctl set-default graphical.target >/dev/null 2>&1 || true
   if command -v raspi-config >/dev/null 2>&1; then
     raspi-config nonint do_boot_behaviour B4 || warn "Desktop-Autologin konnte nicht gesetzt werden."
+    raspi-config nonint do_blanking 1 || warn "Bildschirmabschaltung konnte nicht deaktiviert werden."
   fi
 }
 
@@ -355,6 +345,32 @@ configure_kiosk() {
   install -o "$TARGET_USER" -g "$TARGET_GROUP" -m 0644 \
     "$SOURCE_DIR/raspberry/autostart/cocktailbot-kiosk.desktop" \
     "$TARGET_HOME/.config/autostart/cocktailbot-kiosk.desktop"
+
+  chown "$TARGET_USER:$TARGET_GROUP" "$RUNTIME_DIR/start-onboard.sh"
+  chmod 0755 "$RUNTIME_DIR/start-onboard.sh"
+
+  cat > "$TARGET_HOME/.config/autostart/cocktailbot-onboard.desktop" <<EOF_ONBOARD_DESKTOP
+[Desktop Entry]
+Type=Application
+Name=CocktailBot Bildschirmtastatur
+Exec=$RUNTIME_DIR/start-onboard.sh
+X-GNOME-Autostart-enabled=true
+EOF_ONBOARD_DESKTOP
+  chown "$TARGET_USER:$TARGET_GROUP" "$TARGET_HOME/.config/autostart/cocktailbot-onboard.desktop"
+  chmod 0644 "$TARGET_HOME/.config/autostart/cocktailbot-onboard.desktop"
+
+  install -d -o "$TARGET_USER" -g "$TARGET_GROUP" -m 0755 "$TARGET_HOME/Desktop"
+  cat > "$TARGET_HOME/Desktop/CocktailBot starten.desktop" <<EOF_DESKTOP
+[Desktop Entry]
+Type=Application
+Name=CocktailBot starten
+Comment=CocktailBot Kiosk starten
+Exec=$RUNTIME_DIR/start-kiosk.sh
+Icon=applications-system
+Terminal=false
+EOF_DESKTOP
+  chown "$TARGET_USER:$TARGET_GROUP" "$TARGET_HOME/Desktop/CocktailBot starten.desktop"
+  chmod 0755 "$TARGET_HOME/Desktop/CocktailBot starten.desktop"
 
   local labwc_file="$TARGET_HOME/.config/labwc/autostart"
   touch "$labwc_file"
@@ -417,6 +433,7 @@ else
   build_web
 fi
 
+fix_web_permissions
 install_runtime
 install_lcd_driver
 configure_display_and_boot

@@ -22,6 +22,7 @@ import json
 import os
 import signal
 import sqlite3
+import subprocess
 import threading
 import time
 import uuid
@@ -76,6 +77,109 @@ PAYPAL_BRAND_NAME = os.getenv("COCKTAILBOT_PAYPAL_BRAND_NAME", "CocktailBot").st
 PAYPAL_RETURN_URL = os.getenv("COCKTAILBOT_PAYPAL_RETURN_URL", "").strip()
 PAYPAL_CANCEL_URL = os.getenv("COCKTAILBOT_PAYPAL_CANCEL_URL", "").strip()
 PAYPAL_TIMEOUT_SECONDS = float(os.getenv("COCKTAILBOT_PAYPAL_TIMEOUT_SECONDS", "15"))
+KIOSK_STOP_FILE = Path(
+    os.getenv("COCKTAILBOT_KIOSK_STOP_FILE", "/var/lib/cocktailbot/kiosk.stop")
+)
+
+
+def desktop_environment() -> dict[str, str]:
+    """Environment for programs that must appear in the local X11 session."""
+    env = os.environ.copy()
+    uid = os.getuid()
+    home = str(Path.home())
+    env.setdefault("HOME", home)
+    env.setdefault("USER", os.getenv("USER", "pi"))
+    env["DISPLAY"] = os.getenv("COCKTAILBOT_DISPLAY", ":0")
+    env["XAUTHORITY"] = os.getenv(
+        "COCKTAILBOT_XAUTHORITY", str(Path(home) / ".Xauthority")
+    )
+    session_bus = Path(f"/run/user/{uid}/bus")
+    if session_bus.exists():
+        env["DBUS_SESSION_BUS_ADDRESS"] = f"unix:path={session_bus}"
+    return env
+
+
+def onboard_running() -> bool:
+    try:
+        result = subprocess.run(
+            ["pgrep", "-u", str(os.getuid()), "-x", "onboard"],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            check=False,
+        )
+        return result.returncode == 0
+    except OSError:
+        return False
+
+
+def onboard_dbus(method: str) -> bool:
+    env = desktop_environment()
+    try:
+        result = subprocess.run(
+            [
+                "dbus-send",
+                "--session",
+                "--type=method_call",
+                "--dest=org.onboard.Onboard",
+                "/org/onboard/Onboard/Keyboard",
+                f"org.onboard.Onboard.Keyboard.{method}",
+            ],
+            env=env,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            timeout=2,
+            check=False,
+        )
+        return result.returncode == 0
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+
+
+def show_onboard_keyboard() -> bool:
+    env = desktop_environment()
+    if not onboard_running():
+        try:
+            subprocess.Popen(
+                ["onboard"],
+                env=env,
+                cwd=env.get("HOME") or None,
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                start_new_session=True,
+            )
+        except OSError:
+            return False
+        # Onboard needs a short moment to register its D-Bus service.
+        for _ in range(8):
+            time.sleep(0.12)
+            if onboard_running() and onboard_dbus("Show"):
+                return True
+        return onboard_running()
+
+    # Launching Onboard again is also a supported way of bringing an existing
+    # keyboard to the foreground; D-Bus is preferred because it is immediate.
+    if onboard_dbus("Show"):
+        return True
+    try:
+        subprocess.Popen(
+            ["onboard"],
+            env=env,
+            cwd=env.get("HOME") or None,
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            start_new_session=True,
+        )
+        return True
+    except OSError:
+        return False
+
+
+def hide_onboard_keyboard() -> bool:
+    if not onboard_running():
+        return True
+    return onboard_dbus("Hide")
 
 if MOCK_GPIO:
     Device.pin_factory = MockFactory()
@@ -1072,12 +1176,61 @@ def create_app(controller: PumpController, web_root: Path) -> Flask:
         response.headers["Access-Control-Allow-Origin"] = "*"
         response.headers["Access-Control-Allow-Methods"] = "GET,POST,OPTIONS"
         response.headers["Access-Control-Allow-Headers"] = "Content-Type"
-        response.headers["Cache-Control"] = "no-store" if request.path.startswith("/api/") else "public, max-age=3600"
+        # Lokaler Kiosk: keine alten Flutter-/500-Seiten nach einem Update cachen.
+        response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "0"
         return response
 
     @app.get("/api/status")
     def api_status():
         return jsonify(controller.status())
+
+    @app.route("/api/keyboard/show", methods=["POST", "OPTIONS"])
+    def api_keyboard_show():
+        if request.method == "OPTIONS":
+            return ("", 204)
+        shown = show_onboard_keyboard()
+        return jsonify(ok=shown, keyboard="onboard", visible=shown), (200 if shown else 503)
+
+    @app.route("/api/keyboard/hide", methods=["POST", "OPTIONS"])
+    def api_keyboard_hide():
+        if request.method == "OPTIONS":
+            return ("", 204)
+        hidden = hide_onboard_keyboard()
+        return jsonify(ok=hidden, keyboard="onboard", visible=False), (200 if hidden else 503)
+
+    @app.route("/api/kiosk/exit", methods=["POST", "OPTIONS"])
+    def api_kiosk_exit():
+        if request.method == "OPTIONS":
+            return ("", 204)
+
+        controller.stop("Kiosk wird beendet")
+        try:
+            KIOSK_STOP_FILE.parent.mkdir(parents=True, exist_ok=True)
+            KIOSK_STOP_FILE.write_text(str(time.time()), encoding="utf-8")
+        except OSError as exc:
+            return jsonify(ok=False, error=f"Kiosk-Stopdatei: {exc}"), 500
+
+        hide_onboard_keyboard()
+
+        def stop_browser() -> None:
+            time.sleep(0.35)
+            subprocess.run(
+                [
+                    "pkill",
+                    "-u",
+                    str(os.getuid()),
+                    "-f",
+                    "chromium.*cocktailbot-chromium",
+                ],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                check=False,
+            )
+
+        threading.Thread(target=stop_browser, daemon=True).start()
+        return jsonify(ok=True, message="CocktailBot-Kiosk wird geschlossen")
 
     @app.route("/api/command", methods=["POST", "OPTIONS"])
     def api_command():

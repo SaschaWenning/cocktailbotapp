@@ -5,10 +5,15 @@ set -Eeuo pipefail
 URL="${COCKTAILBOT_KIOSK_URL:-http://127.0.0.1:8080}"
 DELAY="${COCKTAILBOT_KIOSK_DELAY_SECONDS:-30}"
 PROFILE="${COCKTAILBOT_CHROMIUM_PROFILE:-$HOME/.config/cocktailbot-chromium}"
+STOP_FILE="${COCKTAILBOT_KIOSK_STOP_FILE:-/var/lib/cocktailbot/kiosk.stop}"
 LOCK="${XDG_RUNTIME_DIR:-/tmp}/cocktailbot-kiosk-${UID}.lock"
 
 exec 9>"$LOCK"
 flock -n 9 || exit 0
+
+# Ein neuer manueller Start oder Desktop-Autostart hebt einen vorherigen
+# absichtlichen "App schließen"-Zustand auf.
+rm -f "$STOP_FILE" 2>/dev/null || true
 
 sleep "$DELAY"
 
@@ -33,7 +38,25 @@ if [[ -n "${DISPLAY:-}" ]] && command -v xset >/dev/null 2>&1; then
 fi
 
 mkdir -p "$PROFILE"
-while true; do
+
+# Flutter-Web/Service-Worker und Chromium-Cache dürfen nach einem Update keine
+# alte 500-Seite oder einen alten Web-Build festhalten. Local Storage bleibt
+# erhalten, damit CocktailBot-Einstellungen nicht verloren gehen.
+clear_web_cache() {
+  rm -rf \
+    "$PROFILE/Default/Cache" \
+    "$PROFILE/Default/Code Cache" \
+    "$PROFILE/Default/GPUCache" \
+    "$PROFILE/Default/Service Worker" \
+    "$PROFILE/ShaderCache" \
+    "$PROFILE/GrShaderCache" \
+    2>/dev/null || true
+}
+
+clear_web_cache
+
+while [[ ! -f "$STOP_FILE" ]]; do
+  CACHE_BUSTER="$(date +%s%N)"
   "$BROWSER" \
     --kiosk \
     --no-first-run \
@@ -43,11 +66,15 @@ while true; do
     --disable-session-crashed-bubble \
     --disable-translate \
     --disable-pinch \
+    --disable-cache \
+    --disk-cache-size=1 \
     --overscroll-history-navigation=0 \
     --touch-events=enabled \
-    --enable-features=VirtualKeyboard \
     --autoplay-policy=no-user-gesture-required \
     --user-data-dir="$PROFILE" \
-    "$URL" || true
+    "$URL/?v=$CACHE_BUSTER" || true
+
+  [[ -f "$STOP_FILE" ]] && break
+  clear_web_cache
   sleep 2
 done

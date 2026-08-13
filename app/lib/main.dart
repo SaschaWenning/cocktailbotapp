@@ -19,8 +19,55 @@ class CocktailMachineApp extends StatefulWidget {
 
 class _CocktailMachineAppState extends State<CocktailMachineApp> {
   final store = MachineStore();
+  Timer? _keyboardDebounce;
+  bool _editableFocused = false;
+
   @override
-  void initState() { super.initState(); store.load(); }
+  void initState() {
+    super.initState();
+    FocusManager.instance.addListener(_handleFocusChange);
+    store.load();
+  }
+
+  bool _focusIsEditable(FocusNode? focus) {
+    final focusContext = focus?.context;
+    if (focusContext == null) return false;
+    if (focusContext.widget is EditableText) return true;
+
+    bool editable = false;
+    focusContext.visitAncestorElements((element) {
+      if (element.widget is EditableText) {
+        editable = true;
+        return false;
+      }
+      return true;
+    });
+    return editable;
+  }
+
+  void _handleFocusChange() {
+    final editable = _focusIsEditable(FocusManager.instance.primaryFocus);
+    if (editable == _editableFocused) return;
+    _editableFocused = editable;
+    _keyboardDebounce?.cancel();
+    _keyboardDebounce = Timer(
+      Duration(milliseconds: editable ? 60 : 350),
+      () {
+        if (editable) {
+          store.showOnScreenKeyboard();
+        } else {
+          store.hideOnScreenKeyboard();
+        }
+      },
+    );
+  }
+
+  @override
+  void dispose() {
+    _keyboardDebounce?.cancel();
+    FocusManager.instance.removeListener(_handleFocusChange);
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -3448,6 +3495,38 @@ class MachineStore extends ChangeNotifier {
     return base.resolve(path.startsWith('/') ? path.substring(1) : path);
   }
 
+  Future<void> showOnScreenKeyboard() async {
+    try {
+      await http
+          .post(_apiUri('/api/keyboard/show'))
+          .timeout(const Duration(seconds: 2));
+    } catch (_) {
+      // Die Bildschirmtastatur ist Komfortfunktion. Ein Fehler darf die App
+      // oder die Pumpensteuerung nicht blockieren.
+    }
+  }
+
+  Future<void> hideOnScreenKeyboard() async {
+    try {
+      await http
+          .post(_apiUri('/api/keyboard/hide'))
+          .timeout(const Duration(seconds: 2));
+    } catch (_) {
+      // Nicht kritisch.
+    }
+  }
+
+  Future<bool> closeKioskApp() async {
+    try {
+      final response = await http
+          .post(_apiUri('/api/kiosk/exit'))
+          .timeout(const Duration(seconds: 3));
+      return response.statusCode >= 200 && response.statusCode < 300;
+    } catch (_) {
+      return false;
+    }
+  }
+
   Future<Map<String, dynamic>> sendCommand(
     Map<String, dynamic> command,
   ) async {
@@ -3774,26 +3853,32 @@ class MachineStore extends ChangeNotifier {
 extension FirstOrNull<E> on Iterable<E> { E? get firstOrNull => isEmpty ? null : first; }
 
 class HomeShell extends StatefulWidget {
-  const HomeShell({
-    super.key,
-    required this.store,
-    this.initialIndex = 0,
-  });
-
+  const HomeShell({super.key, required this.store});
   final MachineStore store;
-  final int initialIndex;
-
   @override
   State<HomeShell> createState() => _HomeShellState();
 }
 
 class _HomeShellState extends State<HomeShell> {
-  late int index;
+  int index = 0;
 
-  @override
-  void initState() {
-    super.initState();
-    index = widget.initialIndex.clamp(0, 3).toInt();
+  void _openRecipe(Recipe recipe, String fallbackAsset) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => RecipeDetailPage(
+          store: widget.store,
+          recipe: recipe,
+          fallbackAsset: fallbackAsset,
+          selectedNavigationIndex: index,
+          onNavigate: (targetIndex) {
+            Navigator.of(context).pop();
+            if (!mounted) return;
+            setState(() => index = targetIndex.clamp(0, 3).toInt());
+          },
+        ),
+      ),
+    );
   }
 
   @override
@@ -3803,16 +3888,19 @@ class _HomeShellState extends State<HomeShell> {
         store: widget.store,
         category: DrinkCategory.cocktail,
         title: widget.store.t('titleAlcoholicCocktails'),
+        onOpenRecipe: _openRecipe,
       ),
       RecipeOverview(
         store: widget.store,
         category: DrinkCategory.mocktail,
         title: widget.store.t('titleMocktails'),
+        onOpenRecipe: _openRecipe,
       ),
       RecipeOverview(
         store: widget.store,
         category: DrinkCategory.shot,
         title: widget.store.t('navShots'),
+        onOpenRecipe: _openRecipe,
       ),
       SettingsLockGate(
         store: widget.store,
@@ -3824,7 +3912,6 @@ class _HomeShellState extends State<HomeShell> {
       builder: (context, c) {
         final responsive =
             CocktailBotResponsive.fromSize(c.maxWidth, c.maxHeight);
-
         if (responsive.useSideNavigation) {
           return Scaffold(
             body: Row(
@@ -3834,7 +3921,6 @@ class _HomeShellState extends State<HomeShell> {
                   store: widget.store,
                   selectedIndex: index,
                   onSelected: (value) => setState(() => index = value),
-                  availableWidth: c.maxWidth,
                 ),
                 Expanded(child: pages[index]),
               ],
@@ -3842,13 +3928,7 @@ class _HomeShellState extends State<HomeShell> {
           );
         }
 
-        final nav = [
-          (Icons.local_bar_outlined, Icons.local_bar, widget.store.t('navCocktails')),
-          (Icons.local_drink_outlined, Icons.local_drink, widget.store.t('navMocktails')),
-          (Icons.liquor_outlined, Icons.liquor, widget.store.t('navShots')),
-          (Icons.settings_outlined, Icons.settings, widget.store.t('navSettings')),
-        ];
-
+        final nav = cocktailBotNavigationItems(widget.store);
         return Scaffold(
           body: pages[index],
           bottomNavigationBar: Container(
@@ -3903,147 +3983,149 @@ class _HomeShellState extends State<HomeShell> {
   }
 }
 
+List<(IconData, IconData, String)> cocktailBotNavigationItems(
+  MachineStore store,
+) =>
+    [
+      (
+        Icons.local_bar_outlined,
+        Icons.local_bar,
+        store.t('navCocktails'),
+      ),
+      (
+        Icons.local_drink_outlined,
+        Icons.local_drink,
+        store.t('navMocktails'),
+      ),
+      (
+        Icons.liquor_outlined,
+        Icons.liquor,
+        store.t('navShots'),
+      ),
+      (
+        Icons.settings_outlined,
+        Icons.settings,
+        store.t('navSettings'),
+      ),
+    ];
+
 class CocktailBotSideNavigation extends StatelessWidget {
   const CocktailBotSideNavigation({
     super.key,
     required this.store,
     required this.selectedIndex,
     required this.onSelected,
-    required this.availableWidth,
   });
 
   final MachineStore store;
   final int selectedIndex;
   final ValueChanged<int> onSelected;
-  final double availableWidth;
 
   @override
   Widget build(BuildContext context) {
-    final extended = availableWidth >= 1100;
-    final width = extended ? 225.0 : 112.0;
+    final nav = cocktailBotNavigationItems(store);
+    final wide = MediaQuery.sizeOf(context).width >= 1180;
+    final width = wide ? 210.0 : 112.0;
 
-    final nav = [
-      (Icons.local_bar_outlined, Icons.local_bar, store.t('navCocktails')),
-      (Icons.local_drink_outlined, Icons.local_drink, store.t('navMocktails')),
-      (Icons.liquor_outlined, Icons.liquor, store.t('navShots')),
-      (Icons.settings_outlined, Icons.settings, store.t('navSettings')),
-    ];
-
-    return SizedBox(
+    return Container(
       width: width,
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: store.appColors.navigationColor,
-          border: Border(
-            right: BorderSide(color: store.appColors.borderColor),
-          ),
+      decoration: BoxDecoration(
+        color: store.appColors.navigationColor,
+        border: Border(
+          right: BorderSide(color: store.appColors.borderColor),
         ),
-        child: SafeArea(
-          top: false,
-          bottom: false,
-          child: Align(
-            alignment: Alignment.topCenter,
-            child: Column(
-              mainAxisSize: MainAxisSize.max,
-              mainAxisAlignment: MainAxisAlignment.start,
-              children: [
-                Padding(
-                  padding: EdgeInsets.fromLTRB(
-                    extended ? 14 : 8,
-                    6,
-                    extended ? 14 : 8,
-                    8,
-                  ),
-                  child: LogoMark(extended: extended),
-                ),
-                ...List.generate(
-                  nav.length,
-                  (i) => Padding(
-                    padding: EdgeInsets.symmetric(
-                      horizontal: extended ? 12 : 8,
-                      vertical: 3,
-                    ),
-                    child: Material(
-                      color: selectedIndex == i
-                          ? store.appColors.accentColor.withValues(alpha: .18)
-                          : Colors.transparent,
-                      borderRadius: BorderRadius.circular(12),
-                      child: InkWell(
-                        borderRadius: BorderRadius.circular(12),
-                        onTap: () => onSelected(i),
-                        child: SizedBox(
-                          width: double.infinity,
-                          child: Padding(
-                            padding: EdgeInsets.symmetric(
-                              horizontal: extended ? 14 : 6,
-                              vertical: extended ? 13 : 9,
-                            ),
-                            child: extended
-                                ? Row(
-                                    children: [
-                                      Icon(
-                                        selectedIndex == i ? nav[i].$2 : nav[i].$1,
-                                        color: selectedIndex == i
-                                            ? store.appColors.accentColor
-                                            : store.appColors.textSecondaryColor,
-                                      ),
-                                      const SizedBox(width: 13),
-                                      Expanded(
-                                        child: Text(
-                                          nav[i].$3,
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                          style: TextStyle(
-                                            color: selectedIndex == i
-                                                ? store.appColors.accentColor
-                                                : store.appColors.textPrimaryColor,
-                                            fontWeight: FontWeight.w600,
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  )
-                                : Column(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Icon(
-                                        selectedIndex == i ? nav[i].$2 : nav[i].$1,
-                                        color: selectedIndex == i
-                                            ? store.appColors.accentColor
-                                            : store.appColors.textSecondaryColor,
-                                      ),
-                                      const SizedBox(height: 4),
-                                      Text(
-                                        nav[i].$3,
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                        textAlign: TextAlign.center,
-                                        style: TextStyle(
-                                          fontSize: 10,
-                                          color: selectedIndex == i
-                                              ? store.appColors.accentColor
-                                              : store.appColors.textSecondaryColor,
-                                          fontWeight: selectedIndex == i
-                                              ? FontWeight.w700
-                                              : FontWeight.w500,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-                if (extended) ...[
-                  const SizedBox(height: 10),
-                  MachineStatusCard(store: store),
-                ],
-              ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: EdgeInsets.fromLTRB(wide ? 16 : 8, 8, wide ? 16 : 8, 8),
+            child: Align(
+              alignment: Alignment.topCenter,
+              child: LogoMark(extended: wide),
             ),
           ),
-        ),
+          ...List.generate(nav.length, (i) {
+            final selected = selectedIndex == i;
+            return Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              child: Material(
+                color: selected
+                    ? store.appColors.accentColor.withValues(alpha: .18)
+                    : Colors.transparent,
+                borderRadius: BorderRadius.circular(11),
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(11),
+                  onTap: () => onSelected(i),
+                  child: Padding(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: wide ? 12 : 6,
+                      vertical: wide ? 11 : 8,
+                    ),
+                    child: wide
+                        ? Row(
+                            children: [
+                              Icon(
+                                selected ? nav[i].$2 : nav[i].$1,
+                                color: selected
+                                    ? store.appColors.accentColor
+                                    : store.appColors.textSecondaryColor,
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Text(
+                                  nav[i].$3,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    color: selected
+                                        ? store.appColors.accentColor
+                                        : store.appColors.textPrimaryColor,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          )
+                        : Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                selected ? nav[i].$2 : nav[i].$1,
+                                size: 27,
+                                color: selected
+                                    ? store.appColors.accentColor
+                                    : store.appColors.textSecondaryColor,
+                              ),
+                              const SizedBox(height: 5),
+                              Text(
+                                nav[i].$3,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  fontSize: 10.5,
+                                  height: 1.05,
+                                  color: selected
+                                      ? store.appColors.accentColor
+                                      : store.appColors.textPrimaryColor,
+                                  fontWeight:
+                                      selected ? FontWeight.w700 : FontWeight.w500,
+                                ),
+                              ),
+                            ],
+                          ),
+                  ),
+                ),
+              ),
+            );
+          }),
+          const Spacer(),
+          if (wide) ...[
+            MachineStatusCard(store: store),
+            const SizedBox(height: 10),
+          ],
+        ],
       ),
     );
   }
@@ -4231,11 +4313,13 @@ class RecipeOverview extends StatefulWidget {
     required this.store,
     required this.category,
     required this.title,
+    required this.onOpenRecipe,
   });
 
   final MachineStore store;
   final DrinkCategory category;
   final String title;
+  final void Function(Recipe recipe, String fallbackAsset) onOpenRecipe;
 
   @override
   State<RecipeOverview> createState() => _RecipeOverviewState();
@@ -4331,6 +4415,7 @@ class _RecipeOverviewState extends State<RecipeOverview> {
                         store: store,
                         recipe: visible[i],
                         index: start + i,
+                        onOpenRecipe: widget.onOpenRecipe,
                       ),
                       childCount: visible.length,
                     ),
@@ -4430,11 +4515,13 @@ class RecipeCard extends StatelessWidget {
     required this.store,
     required this.recipe,
     required this.index,
+    required this.onOpenRecipe,
   });
 
   final MachineStore store;
   final Recipe recipe;
   final int index;
+  final void Function(Recipe recipe, String fallbackAsset) onOpenRecipe;
 
   @override
   Widget build(BuildContext context) {
@@ -4451,15 +4538,9 @@ class RecipeCard extends StatelessWidget {
       borderRadius: BorderRadius.circular(10),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
-        onTap: () => Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => RecipeDetailPage(
-              store: store,
-              recipe: recipe,
-              fallbackAsset: drinkAssets[index % drinkAssets.length],
-            ),
-          ),
+        onTap: () => onOpenRecipe(
+          recipe,
+          drinkAssets[index % drinkAssets.length],
         ),
         child: Stack(
           children: [
@@ -4606,11 +4687,15 @@ class RecipeDetailPage extends StatefulWidget {
     required this.store,
     required this.recipe,
     required this.fallbackAsset,
+    this.selectedNavigationIndex = 0,
+    this.onNavigate,
   });
 
   final MachineStore store;
   final Recipe recipe;
   final String fallbackAsset;
+  final int selectedNavigationIndex;
+  final ValueChanged<int>? onNavigate;
 
   @override
   State<RecipeDetailPage> createState() => _RecipeDetailPageState();
@@ -4642,10 +4727,20 @@ class _RecipeDetailPageState extends State<RecipeDetailPage> {
       widget.recipe,
       targetVolumeMl: selectedSizeMl,
     );
-    if (recipePercent <= 0) {
-      return null;
-    }
+    if (recipePercent <= 0) return null;
     return selectedAlcoholPercent.clamp(0, 25).toDouble();
+  }
+
+  void _navigateFromRail(int targetIndex) {
+    if (targetIndex == widget.selectedNavigationIndex) {
+      Navigator.of(context).pop();
+      return;
+    }
+    if (widget.onNavigate != null) {
+      widget.onNavigate!(targetIndex);
+    } else {
+      Navigator.of(context).pop();
+    }
   }
 
   @override
@@ -4653,11 +4748,10 @@ class _RecipeDetailPageState extends State<RecipeDetailPage> {
     final r = widget.recipe;
     final image = r.imagePath ?? widget.fallbackAsset;
     final responsive = CocktailBotResponsive.of(context);
-    final heroHeight = responsive.height <= 620
-        ? 180.0
-        : responsive.height <= 760
-            ? 220.0
-            : 285.0;
+    final kioskLandscape = responsive.useSideNavigation &&
+        responsive.isLandscape &&
+        responsive.height <= 800;
+
     final recipeAlcoholPercent = widget.store.recipeAlcoholPercent(
       r,
       targetVolumeMl: selectedSizeMl,
@@ -4673,8 +4767,7 @@ class _RecipeDetailPageState extends State<RecipeDetailPage> {
       targetAlcoholPercent: targetAlcoholPercent,
     );
     final unavailable = availability == RecipeAvailability.unavailable;
-    final uncalibrated =
-        availability == RecipeAvailability.uncalibrated;
+    final uncalibrated = availability == RecipeAvailability.uncalibrated;
     final low = availability == RecipeAvailability.low;
     final affectedIngredient = widget.store.availabilityIngredientName(
       r,
@@ -4692,437 +4785,412 @@ class _RecipeDetailPageState extends State<RecipeDetailPage> {
       targetAlcoholPercent: targetAlcoholPercent,
     );
 
-    final detailScaffold = Scaffold(
-      appBar: AppBar(
-        title: Text(widget.store.displayRecipeName(r)),
-        backgroundColor: const Color(0xFF080D12),
-      ),
-      body: SafeArea(
-        child: Column(
-          children: [
-            Expanded(
-              child: ListView(
-                children: [
-                  Container(
-                    height: heroHeight,
-                    width: double.infinity,
-                    color: const Color(0xFF0B1015),
-                    padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
-                    alignment: Alignment.center,
-                    child: cocktailImage(
-                      image,
-                      fallbackAsset: widget.fallbackAsset,
-                      fit: BoxFit.contain,
+    Widget prepareButton() {
+      return SizedBox(
+        width: double.infinity,
+        height: 50,
+        child: FilledButton.icon(
+          onPressed: working || unavailable || uncalibrated
+              ? null
+              : widget.store.paypalPaymentEnabled
+                  ? _startPayment
+                  : _make,
+          icon: working
+              ? const SizedBox.square(
+                  dimension: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : Icon(
+                  (widget.store.paypalPaymentEnabled &&
+                          widget.store.commercialLicenseActive)
+                      ? Icons.qr_code_2
+                      : Icons.play_arrow,
+                ),
+          label: Text(
+            working
+                ? tr('Wird gestartet …')
+                : (widget.store.paypalPaymentEnabled &&
+                        widget.store.commercialLicenseActive)
+                    ? '${widget.store.priceForRecipe(r).toStringAsFixed(2).replaceAll('.', ',')} € ${tr('bezahlen')}'
+                    : '${selectedSizeMl.toStringAsFixed(0)} ml ${tr('zubereiten')}',
+            style: const TextStyle(fontWeight: FontWeight.w800),
+          ),
+        ),
+      );
+    }
+
+    List<Widget> detailWidgets() => [
+          Text(
+            tr('Beschreibung'),
+            style: const TextStyle(
+              color: Color(0xFF16E0D0),
+              fontWeight: FontWeight.w900,
+              fontSize: 15,
+            ),
+          ),
+          const SizedBox(height: 5),
+          Text(
+            widget.store.displayRecipeDescription(r),
+            style: TextStyle(
+              color: widget.store.appColors.textSecondaryColor,
+              height: 1.3,
+            ),
+          ),
+          const SizedBox(height: 14),
+          Text(
+            tr('Größe des Cocktails'),
+            style: const TextStyle(
+              color: Color(0xFF16E0D0),
+              fontWeight: FontWeight.w900,
+              fontSize: 15,
+            ),
+          ),
+          const SizedBox(height: 7),
+          DropdownButtonFormField<double>(
+            initialValue: widget.store.sizesFor(r.category).contains(selectedSizeMl)
+                ? selectedSizeMl
+                : null,
+            decoration: InputDecoration(
+              labelText: tr('Zielgröße'),
+              suffixText: tr('ml'),
+              isDense: true,
+            ),
+            items: widget.store
+                .sizesFor(r.category)
+                .map(
+                  (size) => DropdownMenuItem(
+                    value: size,
+                    child: Text(
+                      '${size.toStringAsFixed(size % 1 == 0 ? 0 : 1)} ml',
                     ),
                   ),
-                  Transform.translate(
-                    offset: const Offset(0, -20),
-                    child: Container(
-                      padding: const EdgeInsets.fromLTRB(20, 22, 20, 26),
-                      decoration: const BoxDecoration(
-                        color: Color(0xFF121920),
-                        borderRadius:
-                            BorderRadius.vertical(top: Radius.circular(22)),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const T('Beschreibung',
-                            style: TextStyle(
-                              fontWeight: FontWeight.w800,
-                              fontSize: 17,
-                            ),
-                          ),
-                          const SizedBox(height: 7),
-                          Text(
-                            widget.store.displayRecipeDescription(r),
-                            style: const TextStyle(
-                              color: Color(0xFFB0BAC3),
-                              height: 1.4,
-                            ),
-                          ),
-                          const SizedBox(height: 22),
-                          const T('Größe des Cocktails',
-                            style: TextStyle(
-                              fontWeight: FontWeight.w800,
-                              fontSize: 17,
-                            ),
-                          ),
-                          const SizedBox(height: 10),
-                          Row(
-                            children: [
-                              Expanded(
-                                child: DropdownButtonFormField<double>(
-                                  initialValue: widget.store.sizesFor(r.category)
-                                          .contains(selectedSizeMl)
-                                      ? selectedSizeMl
-                                      : null,
-                                  decoration: InputDecoration(
-                                    labelText: tr('Zielgröße'),
-                                    suffixText: tr('ml'),
-                                  ),
-                                  items: widget.store.sizesFor(r.category)
-                                      .map(
-                                        (size) => DropdownMenuItem(
-                                          value: size,
-                                          child: T('${size.toStringAsFixed(size % 1 == 0 ? 0 : 1)} ml',
-                                          ),
-                                        ),
-                                      )
-                                      .toList(),
-                                  onChanged: (value) {
-                                    if (value != null) {
-                                      setState(() {
-                                        selectedSizeMl = value;
-                                        selectedAlcoholPercent =
-                                            selectedAlcoholPercent
-                                                .clamp(0, 25)
-                                                .toDouble();
-                                      });
-                                    }
-                                  },
-                                ),
-                              ),
-
-                            ],
-                          ),
-                          const SizedBox(height: 8),
-                          T('Rezeptbasis: ${r.baseVolumeMl.toStringAsFixed(0)} ml · Faktor ${scale.toStringAsFixed(2)}',
-                            style: const TextStyle(
-                              color: Color(0xFF97A3AE),
-                              fontSize: 12,
-                            ),
-                          ),
-                          const SizedBox(height: 10),
-                          Container(
-                            width: double.infinity,
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF0F1720),
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(
-                                color: const Color(0xFF26313B),
-                              ),
-                            ),
-                            child: Row(
-                              children: [
-                                Icon(
-                                  alcoholPercent > 0
-                                      ? Icons.local_bar
-                                      : Icons.no_drinks_outlined,
-                                  color: alcoholPercent > 0
-                                      ? const Color(0xFFFFC857)
-                                      : const Color(0xFF65D77B),
-                                ),
-                                const SizedBox(width: 10),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        '${tr('Alkoholgehalt')}: ${formatAlcoholPercent(alcoholPercent)} % vol',
-                                        style: const TextStyle(
-                                          fontWeight: FontWeight.w900,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 2),
-                                      Text(
-                                        '${tr('Reiner Alkohol')}: ${pureAlcoholMl.toStringAsFixed(1).replaceAll('.', ',')} ml · ${tr('Automatisch aus Zutaten und Zielgröße berechnet')}',
-                                        style: const TextStyle(
-                                          color: Color(0xFF97A3AE),
-                                          fontSize: 12,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          if (strengthSliderVisible) ...[
-                            const SizedBox(height: 14),
-                            Card(
-                              color: const Color(0xFF0F1720),
-                              child: Padding(
-                                padding: const EdgeInsets.all(14),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Row(
-                                      children: [
-                                        const Icon(Icons.tune, size: 20),
-                                        const SizedBox(width: 8),
-                                        Expanded(
-                                          child: Text(
-                                            tr('Stärke einstellen'),
-                                            style: const TextStyle(
-                                              fontWeight: FontWeight.w900,
-                                            ),
-                                          ),
-                                        ),
-                                        Text(
-                                          '${formatAlcoholPercent(selectedAlcoholPercent)} % vol',
-                                          style: const TextStyle(
-                                            fontWeight: FontWeight.w900,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                    Slider(
-                                      min: 0,
-                                      max: 25,
-                                      divisions: 50,
-                                      value: selectedAlcoholPercent
-                                          .clamp(0, 25)
-                                          .toDouble(),
-                                      label:
-                                          '${formatAlcoholPercent(selectedAlcoholPercent)} %',
-                                      onChanged: working
-                                          ? null
-                                          : (value) => setState(
-                                                () => selectedAlcoholPercent = value,
-                                              ),
-                                    ),
-                                    Row(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.spaceBetween,
-                                      children: [
-                                        const Text('0 %'),
-                                        Text(
-                                          '${tr('Rezept')}: ${formatAlcoholPercent(recipeAlcoholPercent)} %',
-                                          style: const TextStyle(
-                                            color: Color(0xFF97A3AE),
-                                            fontSize: 12,
-                                          ),
-                                        ),
-                                        const Text('25 %'),
-                                      ],
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ],
-                          if (unavailable || uncalibrated || low) ...[
-                            const SizedBox(height: 16),
-                            Container(
-                              width: double.infinity,
-                              padding: const EdgeInsets.all(12),
-                              decoration: BoxDecoration(
-                                color: unavailable
-                                    ? const Color(0xFF4A1717)
-                                    : const Color(0xFF4A3510),
-                                borderRadius: BorderRadius.circular(10),
-                                border: Border.all(
-                                  color: unavailable
-                                      ? const Color(0xFFE05252)
-                                      : const Color(0xFFF59E0B),
-                                ),
-                              ),
-                              child: Row(
-                                children: [
-                                  Icon(
-                                    unavailable
-                                        ? Icons.block
-                                        : Icons.warning_amber_rounded,
-                                    color: unavailable
-                                        ? const Color(0xFFFF6B6B)
-                                        : const Color(0xFFFFB020),
-                                  ),
-                                  const SizedBox(width: 10),
-                                  Expanded(
-                                    child: Text(
-                                      unavailable
-                                          ? '${tr('Nicht verfügbar')}${affectedIngredient == null ? '' : ': $affectedIngredient ${tr('ist keiner aktiven Pumpe zugeordnet oder reicht nicht aus.')}'}'
-                                          : uncalibrated
-                                              ? '${tr('Kalibrierung erforderlich')}${affectedIngredient == null ? '' : ': ${tr('Die Pumpe für')} $affectedIngredient ${tr('muss zuerst kalibriert werden.')}'}'
-                                              : '${tr('Niedriger Füllstand')}${affectedIngredient == null ? '' : ': $affectedIngredient ${tr('reicht nur noch für ungefähr zwei Portionen.')}'}',
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                          const SizedBox(height: 22),
-                          const T('Zutaten',
-                            style: TextStyle(
-                              fontWeight: FontWeight.w800,
-                              fontSize: 17,
-                            ),
-                          ),
-                          const SizedBox(height: 10),
-                          ...r.parts.map((p) {
-                            final scaledAmount =
-                                widget.store.recipePartAmountMl(
-                              r,
-                              p,
-                              targetVolumeMl: selectedSizeMl,
-                              targetAlcoholPercent: targetAlcoholPercent,
-                            );
-                            return Padding(
-                              padding:
-                                  const EdgeInsets.symmetric(vertical: 7),
-                              child: Row(
-                                children: [
-                                  Icon(
-                                    p.automatic
-                                        ? Icons.science_outlined
-                                        : Icons.pan_tool_alt_outlined,
-                                    size: 18,
-                                    color: p.delayed
-                                        ? const Color(0xFFFFA726)
-                                        : const Color(0xFF15D6CA),
-                                  ),
-                                  const SizedBox(width: 10),
-                                  Expanded(
-                                    child: Text(
-                                      widget.store.displayIngredientNameById(p.ingredientId),
-                                    ),
-                                  ),
-                                  T('${scaledAmount.toStringAsFixed(scaledAmount < 10 ? 1 : 0)} ml',
-                                    style: const TextStyle(
-                                      color: Color(0xFFC2CAD1),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 14),
-                                  Text(
-                                    p.automatic
-                                        ? (p.delayed
-                                            ? tr('Zum Schluss')
-                                            : tr('Automatisch'))
-                                        : tr('Manuell'),
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      color: p.delayed
-                                          ? const Color(0xFFFFA726)
-                                          : p.automatic
-                                              ? const Color(0xFF65D77B)
-                                              : const Color(0xFF9CA8B3),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            );
-                          }),
-                          if (r.manualNotes.isNotEmpty) ...[
-                            const SizedBox(height: 20),
-                            const T('Hinweise',
-                              style: TextStyle(
-                                fontWeight: FontWeight.w800,
-                                fontSize: 17,
-                              ),
-                            ),
-                            const SizedBox(height: 10),
-                            ...r.manualNotes.map(
-                              (note) => Padding(
-                                padding:
-                                    const EdgeInsets.symmetric(vertical: 6),
-                                child: Row(
-                                  crossAxisAlignment:
-                                      CrossAxisAlignment.start,
-                                  children: [
-                                    const Icon(
-                                      Icons.info_outline,
-                                      size: 18,
-                                      color: Color(0xFFFFA726),
-                                    ),
-                                    const SizedBox(width: 10),
-                                    Expanded(
-                                      child: Text(
-                                        note,
-                                        style: const TextStyle(
-                                          color: Color(0xFFC2CAD1),
-                                          height: 1.35,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ],
-                        ],
-                      ),
+                )
+                .toList(),
+            onChanged: working
+                ? null
+                : (value) {
+                    if (value == null) return;
+                    setState(() {
+                      selectedSizeMl = value;
+                      selectedAlcoholPercent =
+                          selectedAlcoholPercent.clamp(0, 25).toDouble();
+                    });
+                  },
+          ),
+          const SizedBox(height: 6),
+          Text(
+            '${tr('Rezeptbasis')}: ${r.baseVolumeMl.toStringAsFixed(0)} ml · ${tr('Faktor')} ${scale.toStringAsFixed(2)}',
+            style: TextStyle(
+              color: widget.store.appColors.textSecondaryColor,
+              fontSize: 11.5,
+            ),
+          ),
+          if (alcoholPercent > 0) ...[
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                const Icon(Icons.local_bar, size: 17, color: Color(0xFFFFC857)),
+                const SizedBox(width: 7),
+                Expanded(
+                  child: Text(
+                    '${tr('Alkoholgehalt')}: ${formatAlcoholPercent(alcoholPercent)} % vol · ${tr('Reiner Alkohol')}: ${pureAlcoholMl.toStringAsFixed(1).replaceAll('.', ',')} ml',
+                    style: const TextStyle(fontSize: 11.5),
+                  ),
+                ),
+              ],
+            ),
+          ],
+          if (strengthSliderVisible) ...[
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    '${tr('Stärke einstellen')}: ${formatAlcoholPercent(selectedAlcoholPercent)} % vol',
+                    style: const TextStyle(fontWeight: FontWeight.w800),
+                  ),
+                ),
+              ],
+            ),
+            Slider(
+              min: 0,
+              max: 25,
+              divisions: 50,
+              value: selectedAlcoholPercent.clamp(0, 25).toDouble(),
+              label: '${formatAlcoholPercent(selectedAlcoholPercent)} %',
+              onChanged: working
+                  ? null
+                  : (value) =>
+                      setState(() => selectedAlcoholPercent = value),
+            ),
+          ],
+          if (unavailable || uncalibrated || low) ...[
+            const SizedBox(height: 10),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              decoration: BoxDecoration(
+                color: unavailable
+                    ? const Color(0xFF4A1717)
+                    : const Color(0xFF4A3510),
+                borderRadius: BorderRadius.circular(9),
+                border: Border.all(
+                  color: unavailable
+                      ? const Color(0xFFE05252)
+                      : const Color(0xFFF59E0B),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    unavailable
+                        ? Icons.block
+                        : Icons.warning_amber_rounded,
+                    size: 19,
+                    color: unavailable
+                        ? const Color(0xFFFF6B6B)
+                        : const Color(0xFFFFB020),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      unavailable
+                          ? '${tr('Nicht verfügbar')}${affectedIngredient == null ? '' : ': $affectedIngredient'}'
+                          : uncalibrated
+                              ? '${tr('Kalibrierung erforderlich')}${affectedIngredient == null ? '' : ': $affectedIngredient'}'
+                              : '${tr('Niedriger Füllstand')}${affectedIngredient == null ? '' : ': $affectedIngredient'}',
+                      style: const TextStyle(fontSize: 11.5),
                     ),
                   ),
                 ],
               ),
             ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(18, 8, 18, 16),
-              child: SizedBox(
-                width: double.infinity,
-                height: 54,
-                child: FilledButton.icon(
-                  onPressed: working || unavailable || uncalibrated
-                      ? null
-                      : widget.store.paypalPaymentEnabled
-                          ? _startPayment
-                          : _make,
-                  icon: working
-                      ? const SizedBox.square(
-                          dimension: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : Icon((widget.store.paypalPaymentEnabled && widget.store.commercialLicenseActive)
-                          ? Icons.qr_code_2
-                          : Icons.play_arrow),
-                  label: Text(
-                    working
-                        ? 'Wird gestartet …'
-                        : (widget.store.paypalPaymentEnabled && widget.store.commercialLicenseActive)
-                            ? '${widget.store.priceForRecipe(r).toStringAsFixed(2).replaceAll('.', ',')} € bezahlen'
-                            : '${selectedSizeMl.toStringAsFixed(0)} ml zubereiten',
+          ],
+          const SizedBox(height: 12),
+          Text(
+            tr('Zutaten'),
+            style: const TextStyle(
+              color: Color(0xFF16E0D0),
+              fontWeight: FontWeight.w900,
+              fontSize: 15,
+            ),
+          ),
+          const SizedBox(height: 4),
+          ...r.parts.map((p) {
+            final scaledAmount = widget.store.recipePartAmountMl(
+              r,
+              p,
+              targetVolumeMl: selectedSizeMl,
+              targetAlcoholPercent: targetAlcoholPercent,
+            );
+            return Container(
+              padding: const EdgeInsets.symmetric(vertical: 6),
+              decoration: BoxDecoration(
+                border: Border(
+                  bottom: BorderSide(
+                    color: widget.store.appColors.borderColor,
+                    width: .7,
                   ),
                 ),
               ),
+              child: Row(
+                children: [
+                  Icon(
+                    p.automatic
+                        ? Icons.science_outlined
+                        : Icons.pan_tool_alt_outlined,
+                    size: 17,
+                    color: p.delayed
+                        ? const Color(0xFFFFA726)
+                        : const Color(0xFF15D6CA),
+                  ),
+                  const SizedBox(width: 9),
+                  Expanded(
+                    child: Text(
+                      widget.store.displayIngredientNameById(p.ingredientId),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  Text(
+                    '${scaledAmount.toStringAsFixed(scaledAmount < 10 ? 1 : 0)} ml',
+                    style: const TextStyle(
+                      color: Color(0xFF16E0D0),
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }),
+          if (r.manualNotes.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Text(
+              tr('Hinweise'),
+              style: const TextStyle(
+                color: Color(0xFF16E0D0),
+                fontWeight: FontWeight.w900,
+                fontSize: 15,
+              ),
+            ),
+            ...r.manualNotes.map(
+              (note) => Padding(
+                padding: const EdgeInsets.only(top: 6),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Icon(
+                      Icons.info_outline,
+                      size: 17,
+                      color: Color(0xFFFFA726),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        note,
+                        style: const TextStyle(fontSize: 11.5, height: 1.3),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ];
+
+    final content = SafeArea(
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(
+          kioskLandscape ? 12 : 18,
+          kioskLandscape ? 6 : 12,
+          kioskLandscape ? 14 : 18,
+          kioskLandscape ? 8 : 12,
+        ),
+        child: Column(
+          children: [
+            SizedBox(
+              height: kioskLandscape ? 44 : 52,
+              child: Row(
+                children: [
+                  IconButton(
+                    tooltip: tr('Zurück'),
+                    onPressed: () => Navigator.of(context).pop(),
+                    icon: const Icon(Icons.arrow_back, color: Color(0xFF16E0D0)),
+                  ),
+                  const SizedBox(width: 4),
+                  Expanded(
+                    child: Text(
+                      widget.store.displayRecipeName(r),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontWeight: FontWeight.w900,
+                        fontSize: kioskLandscape ? 20 : 23,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: tr('Favorit'),
+                    onPressed: () {},
+                    icon: const Icon(Icons.favorite_border),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 6),
+            Expanded(
+              child: kioskLandscape
+                  ? Row(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Expanded(
+                          flex: 44,
+                          child: Column(
+                            children: [
+                              Expanded(
+                                child: Container(
+                                  width: double.infinity,
+                                  clipBehavior: Clip.antiAlias,
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF090E13),
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(
+                                      color: widget.store.appColors.borderColor,
+                                    ),
+                                  ),
+                                  padding: const EdgeInsets.all(6),
+                                  child: cocktailImage(
+                                    image,
+                                    fallbackAsset: widget.fallbackAsset,
+                                    fit: BoxFit.contain,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              prepareButton(),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          flex: 56,
+                          child: Container(
+                            decoration: BoxDecoration(
+                              color: widget.store.appColors.surfaceColor,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: widget.store.appColors.borderColor,
+                              ),
+                            ),
+                            child: ListView(
+                              padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
+                              children: detailWidgets(),
+                            ),
+                          ),
+                        ),
+                      ],
+                    )
+                  : ListView(
+                      children: [
+                        Container(
+                          height: responsive.height <= 760 ? 240 : 320,
+                          width: double.infinity,
+                          color: const Color(0xFF090E13),
+                          padding: const EdgeInsets.all(10),
+                          child: cocktailImage(
+                            image,
+                            fallbackAsset: widget.fallbackAsset,
+                            fit: BoxFit.contain,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        ...detailWidgets(),
+                        const SizedBox(height: 16),
+                        prepareButton(),
+                      ],
+                    ),
             ),
           ],
         ),
       ),
     );
 
-    if (!responsive.useSideNavigation) {
-      return detailScaffold;
-    }
-
-    final selectedSection = switch (r.category) {
-      DrinkCategory.cocktail => 0,
-      DrinkCategory.mocktail => 1,
-      DrinkCategory.shot => 2,
-    };
-
     return Scaffold(
-      body: Row(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          CocktailBotSideNavigation(
-            store: widget.store,
-            selectedIndex: selectedSection,
-            availableWidth: MediaQuery.sizeOf(context).width,
-            onSelected: (section) {
-              if (section == selectedSection) {
-                Navigator.of(context).maybePop();
-                return;
-              }
-              Navigator.of(context).pushAndRemoveUntil(
-                MaterialPageRoute(
-                  builder: (_) => HomeShell(
-                    store: widget.store,
-                    initialIndex: section,
-                  ),
+      body: responsive.useSideNavigation
+          ? Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                CocktailBotSideNavigation(
+                  store: widget.store,
+                  selectedIndex: widget.selectedNavigationIndex,
+                  onSelected: _navigateFromRail,
                 ),
-                (route) => false,
-              );
-            },
-          ),
-          Expanded(child: detailScaffold),
-        ],
-      ),
+                Expanded(child: content),
+              ],
+            )
+          : content,
     );
   }
-
 
   Future<void> _startPayment() async {
     await Navigator.push(
@@ -5588,6 +5656,54 @@ class SettingsPage extends StatelessWidget {
               ),
               const SizedBox(height: 18),
               MachineStatusCard(store: store),
+              const SizedBox(height: 18),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton.icon(
+                  style: FilledButton.styleFrom(
+                    backgroundColor: const Color(0xFFD62F2F),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                  ),
+                  onPressed: () async {
+                    final close = await showDialog<bool>(
+                      context: context,
+                      builder: (dialogContext) => AlertDialog(
+                        title: Text(tr('App schließen')),
+                        content: Text(tr(
+                          'CocktailBot wirklich schließen und zum Raspberry-Desktop zurückkehren?',
+                        )),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(dialogContext, false),
+                            child: Text(tr('Abbrechen')),
+                          ),
+                          FilledButton(
+                            style: FilledButton.styleFrom(
+                              backgroundColor: const Color(0xFFD62F2F),
+                            ),
+                            onPressed: () => Navigator.pop(dialogContext, true),
+                            child: Text(tr('App schließen')),
+                          ),
+                        ],
+                      ),
+                    );
+                    if (close != true) return;
+                    final ok = await store.closeKioskApp();
+                    if (!context.mounted || ok) return;
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(tr('App konnte nicht geschlossen werden.')),
+                      ),
+                    );
+                  },
+                  icon: const Icon(Icons.power_settings_new),
+                  label: Text(
+                    tr('App schließen'),
+                    style: const TextStyle(fontWeight: FontWeight.w900),
+                  ),
+                ),
+              ),
             ],
           );
         },
