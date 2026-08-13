@@ -5,6 +5,7 @@ import 'dart:convert';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
 import 'package:qr_flutter/qr_flutter.dart';
@@ -4470,6 +4471,8 @@ class MachineStore extends ChangeNotifier {
 
   Future<void> waitUntilMachineIdle({
     Duration timeout = const Duration(minutes: 10),
+    Duration pollInterval = const Duration(milliseconds: 200),
+    void Function(Map<String, dynamic> status)? onStatus,
   }) async {
     if (!connected || connectionMode == ConnectionMode.bluetooth) {
       return;
@@ -4479,13 +4482,14 @@ class MachineStore extends ChangeNotifier {
 
     while (DateTime.now().difference(started) < timeout) {
       final statusData = await fetchMachineStatus();
-      final busy = statusData['busy'] == true;
+      onStatus?.call(statusData);
 
+      final busy = statusData['busy'] == true;
       if (!busy) {
         return;
       }
 
-      await Future.delayed(const Duration(milliseconds: 700));
+      await Future.delayed(pollInterval);
     }
 
     throw Exception('Zeitüberschreitung beim Warten auf die Maschine');
@@ -4570,6 +4574,7 @@ class MachineStore extends ChangeNotifier {
     Recipe recipe, {
     double? targetVolumeMl,
     double? targetAlcoholPercent,
+    void Function(Map<String, dynamic> status)? onStatus,
   }) async {
     final target = targetVolumeMl ?? defaultSizeFor(recipe.category);
     if (target <= 0 || recipe.baseVolumeMl <= 0) {
@@ -4624,7 +4629,10 @@ class MachineStore extends ChangeNotifier {
       'pumps': commands,
     });
 
-    await waitUntilMachineIdle();
+    await waitUntilMachineIdle(
+      pollInterval: const Duration(milliseconds: 180),
+      onStatus: onStatus,
+    );
 
     for (final part in recipe.parts.where((e) => e.automatic)) {
       final scaledAmount = amounts[part] ?? part.amountMl * scale;
@@ -6087,7 +6095,7 @@ class _RecipeDetailPageState extends State<RecipeDetailPage> {
   }
 
   Future<void> _startPayment() async {
-    await Navigator.push(
+    final shouldPrepare = await Navigator.push<bool>(
       context,
       MaterialPageRoute(
         builder: (_) => PaymentCheckoutPage(
@@ -6098,6 +6106,9 @@ class _RecipeDetailPageState extends State<RecipeDetailPage> {
         ),
       ),
     );
+
+    if (!mounted || shouldPrepare != true) return;
+    await _make();
   }
 
   Future<void> _make() async {
@@ -6162,39 +6173,26 @@ class _RecipeDetailPageState extends State<RecipeDetailPage> {
         recipe,
         targetVolumeMl: selectedSizeMl,
         targetAlcoholPercent: selectedAlcoholPercentForPreparation,
+        onStatus: (status) {
+          if (!mounted) return;
+
+          final busy = status['busy'] == true;
+          final statusProgress =
+              (status['progress'] as num?)?.toDouble() ?? 0;
+          final rawActivePumps = status['activePumps'];
+          final runningPumps = rawActivePumps is List
+              ? rawActivePumps
+                  .whereType<num>()
+                  .map((number) => number.toInt())
+                  .toList()
+              : <int>[];
+
+          progress.value = busy
+              ? statusProgress.clamp(0, 1).toDouble()
+              : 1.0;
+          activePumps.value = runningPumps;
+        },
       );
-
-      for (var attempt = 0; attempt < 3000; attempt++) {
-        await Future.delayed(const Duration(milliseconds: 200));
-        if (!mounted) return;
-
-        final status = await widget.store.fetchMachineStatus();
-        if (!mounted) return;
-
-        final busy = status['busy'] == true;
-        final statusProgress =
-            (status['progress'] as num?)?.toDouble() ?? 0;
-
-        final rawActivePumps = status['activePumps'];
-        final runningPumps = rawActivePumps is List
-            ? rawActivePumps
-                .whereType<num>()
-                .map((number) => number.toInt())
-                .toList()
-            : <int>[];
-
-        progress.value =
-            busy ? statusProgress.clamp(0, 1).toDouble() : 1;
-        activePumps.value = runningPumps;
-
-        if (!busy) break;
-
-        if (attempt == 2999) {
-          throw Exception(
-            'Zeitüberschreitung bei der Cocktailzubereitung',
-          );
-        }
-      }
 
       if (!mounted) return;
 
@@ -10285,8 +10283,8 @@ class CommercialLicensePage extends StatefulWidget {
 }
 
 class _CommercialLicensePageState extends State<CommercialLicensePage> {
-  final codeController = TextEditingController();
   bool busy = false;
+  String? importedFileName;
 
   @override
   void initState() {
@@ -10297,36 +10295,15 @@ class _CommercialLicensePageState extends State<CommercialLicensePage> {
     });
   }
 
-  @override
-  void dispose() {
-    codeController.dispose();
-    super.dispose();
-  }
-
-  Future<void> _activate() async {
-    if (busy) return;
-    setState(() => busy = true);
-    final ok = await widget.store.activateCommercialLicense(codeController.text);
-    if (!mounted) return;
-    setState(() => busy = false);
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          ok
-              ? tr('Gewerbelizenz wurde aktiviert')
-              : widget.store.commercialLicenseMessage,
-        ),
-      ),
-    );
-  }
-
   Future<void> _deactivate() async {
     if (busy) return;
     setState(() => busy = true);
     await widget.store.deactivateCommercialLicense();
     if (!mounted) return;
-    codeController.clear();
-    setState(() => busy = false);
+    setState(() {
+      busy = false;
+      importedFileName = null;
+    });
   }
 
   Future<void> _refresh() async {
@@ -10346,19 +10323,73 @@ class _CommercialLicensePageState extends State<CommercialLicensePage> {
     );
   }
 
-  Future<void> _pasteLicenseCode() async {
-    final data = await Clipboard.getData(Clipboard.kTextPlain);
-    final value = data?.text?.trim() ?? '';
-    if (value.isEmpty) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(tr('Zwischenablage enthält keinen Lizenzcode'))),
+  String? _licenseCodeFromText(String text) {
+    final labelled = RegExp(
+      r'Lizenzcode\s*:\s*(CBL1-[A-Za-z0-9_-]+)',
+      caseSensitive: false,
+    ).firstMatch(text);
+    if (labelled != null) return labelled.group(1);
+
+    final plain = RegExp(
+      r'CBL1-[A-Za-z0-9_-]+',
+      caseSensitive: false,
+    ).firstMatch(text);
+    return plain?.group(0);
+  }
+
+  Future<void> _importLicenseFile() async {
+    if (busy) return;
+    setState(() => busy = true);
+    try {
+      final result = await FilePicker.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: const ['txt'],
+        allowMultiple: false,
+        withData: true,
+        dialogTitle: tr('CocktailBot Lizenzdatei auswählen'),
       );
-      return;
+      if (result == null || result.files.isEmpty) {
+        if (mounted) setState(() => busy = false);
+        return;
+      }
+
+      final file = result.files.single;
+      final bytes = file.bytes ?? await file.xFile.readAsBytes();
+      if (bytes.isEmpty) {
+        throw Exception(tr('Die Lizenzdatei ist leer.'));
+      }
+      if (bytes.length > 64 * 1024) {
+        throw Exception(tr('Die ausgewählte Datei ist keine gültige CocktailBot-Lizenzdatei.'));
+      }
+
+      final text = utf8.decode(bytes, allowMalformed: true);
+      final code = _licenseCodeFromText(text);
+      if (code == null || code.isEmpty) {
+        throw Exception(tr('In der Datei wurde kein CocktailBot-Lizenzcode gefunden.'));
+      }
+
+      final ok = await widget.store.activateCommercialLicense(code);
+      if (!mounted) return;
+      setState(() {
+        busy = false;
+        importedFileName = file.name;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            ok
+                ? tr('Gewerbelizenz wurde erfolgreich importiert und aktiviert.')
+                : widget.store.commercialLicenseMessage,
+          ),
+        ),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => busy = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('${tr('Lizenzimport fehlgeschlagen')}: $error')),
+      );
     }
-    codeController.text = value;
-    codeController.selection = TextSelection.collapsed(offset: value.length);
-    if (mounted) setState(() {});
   }
 
   String _date(DateTime? value) {
@@ -10449,7 +10480,7 @@ class _CommercialLicensePageState extends State<CommercialLicensePage> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    tr('Sende diese Geräte-ID an deinen CocktailBot-Anbieter. Du erhältst einen Lizenzcode, der ausschließlich auf diesem Raspberry funktioniert. Eine Internetverbindung ist für die Aktivierung nicht erforderlich.'),
+                    tr('Sende diese Geräte-ID an deinen CocktailBot-Anbieter. Du erhältst eine TXT-Lizenzdatei, die ausschließlich auf diesem Raspberry funktioniert. Speichere die Datei z. B. auf einem USB-Stick und importiere sie hier. Eine Internetverbindung ist nicht erforderlich.'),
                     style: TextStyle(
                       color: widget.store.appColors.textSecondaryColor,
                       height: 1.4,
@@ -10503,28 +10534,68 @@ class _CommercialLicensePageState extends State<CommercialLicensePage> {
                   ),
                   const SizedBox(height: 14),
                   if (!active) ...[
-                    TextField(
-                      controller: codeController,
-                      autocorrect: false,
-                      enableSuggestions: false,
-                      keyboardType: TextInputType.text,
-                      decoration: InputDecoration(
-                        labelText: tr('Lizenzcode'),
-                        helperText: tr('Code beginnt mit CBL1-. Groß-/Kleinschreibung beibehalten.'),
-                        suffixIcon: IconButton(
-                          tooltip: tr('Aus Zwischenablage einfügen'),
-                          onPressed: _pasteLicenseCode,
-                          icon: const Icon(Icons.content_paste),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: Theme.of(context).colorScheme.outlineVariant,
                         ),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.description_outlined, size: 30),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  tr('Lizenzdatei vom CocktailBot-Anbieter'),
+                                  style: const TextStyle(fontWeight: FontWeight.w800),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  importedFileName == null
+                                      ? tr('TXT-Datei auswählen. Geräte-ID und Signatur werden automatisch geprüft.')
+                                      : '${tr('Ausgewählt')}: $importedFileName',
+                                  style: TextStyle(
+                                    color: widget.store.appColors.textSecondaryColor,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                     const SizedBox(height: 14),
                     SizedBox(
                       width: double.infinity,
                       child: FilledButton.icon(
-                        onPressed: busy ? null : _activate,
-                        icon: const Icon(Icons.verified_user_outlined),
-                        label: Text(tr('Gewerbelizenz aktivieren')),
+                        onPressed: busy ? null : _importLicenseFile,
+                        icon: busy
+                            ? const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(strokeWidth: 2),
+                              )
+                            : const Icon(Icons.file_open_outlined),
+                        label: Text(
+                          busy
+                              ? tr('Lizenz wird geprüft …')
+                              : tr('Lizenzdatei importieren'),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      tr('Der Raspberry installiert die Lizenz nach erfolgreicher Prüfung automatisch. Es sind keine Terminal- oder sudo-Befehle nötig.'),
+                      style: TextStyle(
+                        color: widget.store.appColors.textSecondaryColor,
+                        fontSize: 12,
+                        height: 1.35,
                       ),
                     ),
                   ] else ...[
@@ -11247,7 +11318,9 @@ class _PaymentCheckoutPageState extends State<PaymentCheckoutPage> {
   String message = 'Bestellung wird erstellt …';
   bool loading = true;
   bool preparing = false;
-  bool finished = false;
+  bool checkingPayment = false;
+  bool paymentConfirmed = false;
+  bool paymentUsed = false;
 
   @override
   void initState() {
@@ -11274,7 +11347,7 @@ class _PaymentCheckoutPageState extends State<PaymentCheckoutPage> {
         message = tr('QR-Code scannen und mit PayPal bezahlen');
       });
       timer = Timer.periodic(
-        const Duration(seconds: 4),
+        const Duration(seconds: 2),
         (_) => _checkPayment(),
       );
     } catch (error) {
@@ -11287,52 +11360,57 @@ class _PaymentCheckoutPageState extends State<PaymentCheckoutPage> {
   }
 
   Future<void> _checkPayment() async {
-    if (order == null || preparing || finished) return;
+    if (order == null || preparing || checkingPayment || paymentConfirmed || paymentUsed) {
+      return;
+    }
+
+    checkingPayment = true;
     try {
       final status = await widget.store.paymentStatus(order!.orderId);
       if (!mounted) return;
-      setState(() {
-        message = status.paid
-            ? tr('Zahlung bestätigt - Cocktail wird vorbereitet')
-            : '${tr('Warte auf Zahlung')} (${status.status})';
-      });
-      if (status.paid && !status.used) {
-        await _prepareAfterPayment();
-      } else if (status.used) {
-        setState(() => message = tr('Diese Zahlung wurde bereits verwendet'));
+
+      if (status.used) {
+        timer?.cancel();
+        setState(() {
+          paymentUsed = true;
+          message = tr('Diese Zahlung wurde bereits verwendet');
+        });
+        return;
       }
+
+      if (status.paid) {
+        timer?.cancel();
+        setState(() {
+          paymentConfirmed = true;
+          message = tr('Zahlung bestätigt – Cocktail kann zubereitet werden');
+        });
+        return;
+      }
+
+      setState(() {
+        message = '${tr('Warte auf Zahlung')} (${status.status})';
+      });
     } catch (error) {
       if (!mounted) return;
       setState(() => message = '${tr('Zahlungsstatus konnte nicht geprüft werden')}: $error');
+    } finally {
+      checkingPayment = false;
     }
   }
 
-  Future<void> _prepareAfterPayment() async {
-    timer?.cancel();
-    if (order == null) return;
+  Future<void> _continueToPreparation() async {
+    if (order == null || !paymentConfirmed || preparing) return;
     setState(() => preparing = true);
 
     try {
       await widget.store.markPaymentUsed(order!.orderId);
-      await widget.store.makeRecipe(
-        widget.recipe,
-        targetVolumeMl: widget.targetVolumeMl,
-        targetAlcoholPercent: widget.targetAlcoholPercent,
-      );
       if (!mounted) return;
-      setState(() {
-        preparing = false;
-        finished = true;
-        message = tr('Zubereitung abgeschlossen');
-      });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(tr('Zubereitung abgeschlossen'))),
-      );
+      Navigator.of(context).pop(true);
     } catch (error) {
       if (!mounted) return;
       setState(() {
         preparing = false;
-        message = '${tr('Fehler bei der Zubereitung')}: $error';
+        message = '${tr('Zahlung konnte nicht freigegeben werden')}: $error';
       });
     }
   }
@@ -11369,11 +11447,30 @@ class _PaymentCheckoutPageState extends State<PaymentCheckoutPage> {
                   const SizedBox(height: 22),
                   if (loading)
                     const CircularProgressIndicator()
-                  else if (order == null)
+                  else if (order == null || paymentUsed)
                     Icon(
                       Icons.error_outline,
                       color: widget.store.appColors.errorColor,
                       size: 52,
+                    )
+                  else if (paymentConfirmed)
+                    Column(
+                      children: [
+                        Icon(
+                          Icons.check_circle,
+                          color: widget.store.appColors.successColor,
+                          size: 74,
+                        ),
+                        const SizedBox(height: 10),
+                        Text(
+                          tr('Bezahlung erfolgreich'),
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w900,
+                            fontSize: 20,
+                          ),
+                        ),
+                      ],
                     )
                   else
                     Container(
@@ -11422,19 +11519,27 @@ class _PaymentCheckoutPageState extends State<PaymentCheckoutPage> {
                       const SizedBox(width: 10),
                       Expanded(
                         child: FilledButton.icon(
-                          onPressed: order == null || preparing || finished
+                          onPressed: order == null || preparing || paymentUsed
                               ? null
-                              : _checkPayment,
+                              : paymentConfirmed
+                                  ? _continueToPreparation
+                                  : _checkPayment,
                           icon: preparing
                               ? const SizedBox.square(
                                   dimension: 18,
                                   child: CircularProgressIndicator(strokeWidth: 2),
                                 )
-                              : const Icon(Icons.refresh),
+                              : Icon(
+                                  paymentConfirmed
+                                      ? Icons.play_arrow
+                                      : Icons.refresh,
+                                ),
                           label: Text(
                             preparing
-                                ? tr('Zubereitung läuft')
-                                : tr('Zahlung prüfen'),
+                                ? tr('Wird freigegeben …')
+                                : paymentConfirmed
+                                    ? tr('Cocktail zubereiten')
+                                    : tr('Zahlung prüfen'),
                           ),
                         ),
                       ),
