@@ -66,7 +66,7 @@ MAX_JOB_DURATION_MS = 600_000
 DEFAULT_START_SPACING_MS = 100
 MAX_START_SPACING_MS = 2_000
 
-ACTIVE_HIGH = os.getenv("COCKTAILBOT_ACTIVE_HIGH", "1") not in {"0", "false", "False"}
+ACTIVE_HIGH = os.getenv("COCKTAILBOT_ACTIVE_HIGH", "0") not in {"0", "false", "False"}
 MOCK_GPIO = os.getenv("COCKTAILBOT_GPIO_MOCK", "0") in {"1", "true", "True"}
 STATE_FILE = Path(
     os.getenv("COCKTAILBOT_STATE_FILE", "/var/lib/cocktailbot/machine_state.json")

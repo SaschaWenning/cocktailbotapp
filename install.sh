@@ -9,7 +9,7 @@ WEB_DIR="$INSTALL_ROOT/web"
 RUNTIME_DIR="$INSTALL_ROOT/raspberry"
 VENV_DIR="$INSTALL_ROOT/venv"
 FLUTTER_DIR="${COCKTAILBOT_FLUTTER_DIR:-/opt/flutter}"
-ACTIVE_HIGH="${COCKTAILBOT_ACTIVE_HIGH:-1}"
+ACTIVE_HIGH="${COCKTAILBOT_ACTIVE_HIGH:-0}"
 KIOSK_DELAY="${COCKTAILBOT_KIOSK_DELAY_SECONDS:-30}"
 BUILD_MODE="${COCKTAILBOT_BUILD_MODE:-auto}"
 SKIP_APT="${COCKTAILBOT_SKIP_APT:-0}"
@@ -31,7 +31,7 @@ Verwendung:
 Optionen:
   --reboot                  Raspberry Pi nach der Installation neu starten
   --local-source            den aktuellen Repository-Ordner statt GitHub verwenden
-  --active-high 0|1         Relaislogik; Standard: 1 (HIGH = EIN)
+  --active-high 0|1         Relaislogik; Standard: 0 (LOW = EIN, HIGH = AUS)
   --kiosk-delay SEKUNDEN    Wartezeit bis Chromium startet; Standard: 30
   --build-mode auto|release|source
                             auto: web-release bevorzugen, sonst lokal bauen
@@ -343,6 +343,78 @@ configure_display_and_boot() {
   fi
 }
 
+configure_pump_boot_safety() {
+  # CocktailBot uses these BCM GPIOs exclusively for pumps.  The installed
+  # relay boards are LOW-active by default, so HIGH is the safe/off level.
+  # Keep this separate from display boot optimisation: pump safety must also
+  # be applied during updates that use --skip-boot-opt.
+  local config_file=""
+  local cmdline_file=""
+  local safe_drive="dh"
+  local pins="17,18,27,22,23,24,25,4,5,6,13,19,26,16,20,21,12,15"
+
+  if [[ "$ACTIVE_HIGH" == "1" ]]; then
+    # HIGH-active relays are off at LOW.
+    safe_drive="dl"
+  fi
+
+  if [[ -f /boot/firmware/config.txt ]]; then
+    config_file=/boot/firmware/config.txt
+  elif [[ -f /boot/config.txt ]]; then
+    config_file=/boot/config.txt
+  fi
+  if [[ -f /boot/firmware/cmdline.txt ]]; then
+    cmdline_file=/boot/firmware/cmdline.txt
+  elif [[ -f /boot/cmdline.txt ]]; then
+    cmdline_file=/boot/cmdline.txt
+  fi
+
+  if [[ -n "$config_file" ]]; then
+    log "Setze alle Pumpen-GPIOs bereits im Bootloader auf AUS"
+    cp -a "$config_file" "${config_file}.cocktailbot-pumps.bak" || true
+
+    # Remove an older CocktailBot safety block and legacy exact pump line so
+    # reinstallations stay idempotent. The block is appended at the end,
+    # because gpio= directives are applied in order and the last one wins.
+    sed -i \
+      '/^# BEGIN COCKTAILBOT PUMP SAFETY$/,/^# END COCKTAILBOT PUMP SAFETY$/d' \
+      "$config_file"
+    sed -i -E \
+      "/^[[:space:]]*gpio=${pins//,/\\,}=op,d[hl][[:space:]]*$/d; \
+       /^[[:space:]]*enable_uart=/d" \
+      "$config_file"
+
+    cat >> "$config_file" <<EOF
+
+# BEGIN COCKTAILBOT PUMP SAFETY
+# These BCM pins drive the 18 pump relays. Keep them at the relay OFF level
+# from the earliest firmware/boot stage. GPIO15 is reserved for pump 18, so
+# the on-board UART is disabled; the Pico LED controller uses USB serial.
+[all]
+enable_uart=0
+gpio=$pins=op,$safe_drive
+# END COCKTAILBOT PUMP SAFETY
+EOF
+  else
+    warn "Keine config.txt gefunden; Pumpen-GPIOs konnten nicht frueh auf AUS gesetzt werden."
+  fi
+
+  if [[ -n "$cmdline_file" ]]; then
+    # GPIO15 is pump 18. A serial console would claim GPIO14/15 again when
+    # Linux starts, so remove only UART console entries (keep console=tty1).
+    cp -a "$cmdline_file" "${cmdline_file}.cocktailbot-pumps.bak" || true
+    sed -i -E \
+      's/(^|[[:space:]])console=(serial0|ttyAMA[0-9]*|ttyS[0-9]*),[^[:space:]]+([[:space:]]|$)/ /g; \
+       s/[[:space:]]+/ /g; s/^ //; s/ $//' \
+      "$cmdline_file"
+  fi
+
+  # Do not allow a previously enabled serial getty to reclaim pump GPIO15.
+  systemctl disable --now serial-getty@serial0.service >/dev/null 2>&1 || true
+  systemctl disable --now serial-getty@ttyAMA0.service >/dev/null 2>&1 || true
+  systemctl disable --now serial-getty@ttyS0.service >/dev/null 2>&1 || true
+}
+
 configure_kiosk() {
   log "Konfiguriere Desktop-Autostart und Kioskstart nach ${KIOSK_DELAY} Sekunden"
   install -d -o "$TARGET_USER" -g "$TARGET_GROUP" -m 0755 \
@@ -439,6 +511,7 @@ fix_web_permissions
 install_runtime
 install_lcd_driver
 configure_display_and_boot
+configure_pump_boot_safety
 configure_kiosk
 start_services
 
@@ -453,6 +526,7 @@ Kioskbenutzer:    $TARGET_USER
 Kioskstart:       nach $KIOSK_DELAY Sekunden
 Web/API:          http://127.0.0.1:8080
 Relaislogik:      COCKTAILBOT_ACTIVE_HIGH=$ACTIVE_HIGH
+Pumpen-Bootschutz: aktiv (GPIOs frueh auf AUS)
 LCD7C/GoodTFT:    $INSTALL_LCD
 Bootoptimierung:  $BOOT_OPTIMIZE
 Pico LED-Port:     $PICO_PORT
