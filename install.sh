@@ -302,15 +302,15 @@ configure_display_and_boot() {
     log "Aktiviere KMS und entferne alte 1920x1080-/Framebuffer-Zwangseinstellungen"
     cp -a "$config_file" "${config_file}.cocktailbot.bak" || true
     sed -i -E \
-      '/^[[:space:]]*#?[[:space:]]*dtoverlay=vc4-fkms-v3d/d; \
-       /^[[:space:]]*#?[[:space:]]*dtoverlay=vc4-kms-v3d/d; \
-       /^[[:space:]]*hdmi_force_hotplug=/d; \
-       /^[[:space:]]*hdmi_group=/d; \
-       /^[[:space:]]*hdmi_mode=/d; \
-       /^[[:space:]]*hdmi_cvt([=[:space:]])/d; \
-       /^[[:space:]]*framebuffer_width=/d; \
-       /^[[:space:]]*framebuffer_height=/d; \
-       /^[[:space:]]*disable_fw_kms_setup=/d' \
+      -e '/^[[:space:]]*#?[[:space:]]*dtoverlay=vc4-fkms-v3d/d' \
+      -e '/^[[:space:]]*#?[[:space:]]*dtoverlay=vc4-kms-v3d/d' \
+      -e '/^[[:space:]]*hdmi_force_hotplug=/d' \
+      -e '/^[[:space:]]*hdmi_group=/d' \
+      -e '/^[[:space:]]*hdmi_mode=/d' \
+      -e '/^[[:space:]]*hdmi_cvt([=[:space:]])/d' \
+      -e '/^[[:space:]]*framebuffer_width=/d' \
+      -e '/^[[:space:]]*framebuffer_height=/d' \
+      -e '/^[[:space:]]*disable_fw_kms_setup=/d' \
       "$config_file"
     printf '\n# CocktailBot Display\ndtoverlay=vc4-kms-v3d\n' >> "$config_file"
   else
@@ -321,10 +321,12 @@ configure_display_and_boot() {
     log "Setze KMS-Ausgabe auf 1024x600@60"
     cp -a "$cmdline_file" "${cmdline_file}.cocktailbot.bak" || true
     sed -i -E \
-      's/(^|[[:space:]])quiet([[:space:]]|$)/ /g; \
-       s/(^|[[:space:]])splash([[:space:]]|$)/ /g; \
-       s/(^|[[:space:]])video=[^[:space:]]+([[:space:]]|$)/ /g; \
-       s/[[:space:]]+/ /g; s/^ //; s/ $//' \
+      -e 's/(^|[[:space:]])quiet([[:space:]]|$)/ /g' \
+      -e 's/(^|[[:space:]])splash([[:space:]]|$)/ /g' \
+      -e 's/(^|[[:space:]])video=[^[:space:]]+([[:space:]]|$)/ /g' \
+      -e 's/[[:space:]]+/ /g' \
+      -e 's/^ //' \
+      -e 's/ $//' \
       "$cmdline_file"
     sed -i 's/$/ video=HDMI-A-1:1024x600M@60/' "$cmdline_file"
   else
