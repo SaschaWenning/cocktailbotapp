@@ -811,6 +811,7 @@ ThemeData buildTheme(
     cardTheme: CardThemeData(
       color: colors.cardColor.withValues(
         alpha: switch (colors.visualStyle) {
+          AppVisualStyle.custom => .96,
           AppVisualStyle.modern => .96,
           AppVisualStyle.tropical => .94,
           AppVisualStyle.vintage => .95,
@@ -957,6 +958,9 @@ class _CocktailBotThemeBackgroundPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final rect = Offset.zero & size;
     switch (colors.visualStyle) {
+      case AppVisualStyle.custom:
+        canvas.drawRect(rect, Paint()..color = colors.backgroundColor);
+        break;
       case AppVisualStyle.elegant:
         _paintElegant(canvas, rect);
         break;
@@ -1221,6 +1225,7 @@ BoxDecoration cocktailBotNavigationDecoration(AppColorThemeConfig colors) {
   return BoxDecoration(
     color: colors.navigationColor.withValues(alpha: .94),
     gradient: switch (colors.visualStyle) {
+      AppVisualStyle.custom => null,
       AppVisualStyle.elegant => LinearGradient(
           colors: [const Color(0xFF080808), colors.navigationColor, const Color(0xFF151006)],
         ),
@@ -1321,7 +1326,7 @@ extension AppColorSlotMeta on AppColorSlot {
 }
 
 
-enum AppVisualStyle { elegant, modern, neon, tropical, industrial, vintage }
+enum AppVisualStyle { custom, elegant, modern, neon, tropical, industrial, vintage }
 
 extension AppVisualStyleMeta on AppVisualStyle {
   String get storageValue => name;
@@ -1330,12 +1335,13 @@ extension AppVisualStyleMeta on AppVisualStyle {
 AppVisualStyle _appVisualStyleFromStorage(String? value) {
   return AppVisualStyle.values.firstWhere(
     (style) => style.name == value,
-    orElse: () => AppVisualStyle.elegant,
+    orElse: () => AppVisualStyle.custom,
   );
 }
 
 AppVisualStyle _inferVisualStyle(int background, int accent) {
   const signatures = <(int, int), AppVisualStyle>{
+    (0xFF070907, 0xFFB7FF00): AppVisualStyle.custom,
     (0xFF070707, 0xFFD8A62A): AppVisualStyle.elegant,
     (0xFFF3F6FA, 0xFF1976F3): AppVisualStyle.modern,
     (0xFF020817, 0xFF00E7FF): AppVisualStyle.neon,
@@ -1343,7 +1349,7 @@ AppVisualStyle _inferVisualStyle(int background, int accent) {
     (0xFF171513, 0xFFE88719): AppVisualStyle.industrial,
     (0xFFF0DFC0, 0xFF7A3F12): AppVisualStyle.vintage,
   };
-  return signatures[(background, accent)] ?? AppVisualStyle.elegant;
+  return signatures[(background, accent)] ?? AppVisualStyle.custom;
 }
 
 class AppColorThemeConfig {
@@ -1361,7 +1367,7 @@ class AppColorThemeConfig {
     required this.success,
     required this.warning,
     required this.error,
-    this.visualStyle = AppVisualStyle.elegant,
+    this.visualStyle = AppVisualStyle.custom,
   });
 
   final int background;
@@ -1380,21 +1386,22 @@ class AppColorThemeConfig {
   final AppVisualStyle visualStyle;
 
   factory AppColorThemeConfig.defaults() => const AppColorThemeConfig(
-        // V18 Standard: Edel / Exklusiv
-        background: 0xFF070707,
-        surface: 0xFF0D0D0D,
-        card: 0xFF14120E,
-        navigation: 0xFF090909,
-        accent: 0xFFD8A62A,
-        secondaryAccent: 0xFFFFD76A,
-        border: 0xFF5A4618,
-        textPrimary: 0xFFFFF8E7,
-        textSecondary: 0xFFC8B98F,
-        progressTrack: 0xFF2A2417,
-        success: 0xFF54D68B,
-        warning: 0xFFFFB84D,
-        error: 0xFFFF6565,
-        visualStyle: AppVisualStyle.elegant,
+        // V20 Standard / Benutzerdefiniert: Black / Lime
+        // Bewusst ohne speziellen Hintergrund oder Textur.
+        background: 0xFF070907,
+        surface: 0xFF0B0E0B,
+        card: 0xFF101410,
+        navigation: 0xFF050705,
+        accent: 0xFFB7FF00,
+        secondaryAccent: 0xFF7DFF00,
+        border: 0xFF33451F,
+        textPrimary: 0xFFF4F7F2,
+        textSecondary: 0xFFAEB7AA,
+        progressTrack: 0xFF1E2A17,
+        success: 0xFF68E28D,
+        warning: 0xFFFFB300,
+        error: 0xFFFF3B30,
+        visualStyle: AppVisualStyle.custom,
       );
 
   factory AppColorThemeConfig.fromJson(Map<String, dynamic> json) {
@@ -2393,6 +2400,7 @@ String appText(AppLanguage language, String key) {
     'Deaktivieren': 'Disable',
     'Der Raspberry installiert die Lizenz nach erfolgreicher Prüfung automatisch. Es sind keine Terminal- oder sudo-Befehle nötig.': 'The Raspberry installs the license automatically after successful verification. No terminal or sudo commands are required.',
     'Design wurde gespeichert': 'Design saved',
+    'Standard / Benutzerdefiniert': 'Default / Custom',
     'Edel / Exklusiv': 'Elegant / Exclusive',
     'Modern / Clean': 'Modern / Clean',
     'Futuristisch / Neon': 'Futuristic / Neon',
@@ -8411,6 +8419,25 @@ class _ThemeSettingsPageState extends State<ThemeSettingsPage> {
   bool saving = false;
 
   static const presets = <(String, AppColorThemeConfig)>[
+    (
+      'Standard / Benutzerdefiniert',
+      AppColorThemeConfig(
+        visualStyle: AppVisualStyle.custom,
+        background: 0xFF070907,
+        surface: 0xFF0B0E0B,
+        card: 0xFF101410,
+        navigation: 0xFF050705,
+        accent: 0xFFB7FF00,
+        secondaryAccent: 0xFF7DFF00,
+        border: 0xFF33451F,
+        textPrimary: 0xFFF4F7F2,
+        textSecondary: 0xFFAEB7AA,
+        progressTrack: 0xFF1E2A17,
+        success: 0xFF68E28D,
+        warning: 0xFFFFB300,
+        error: 0xFFFF3B30,
+      ),
+    ),
     (
       'Edel / Exklusiv',
       AppColorThemeConfig(

@@ -1,4 +1,14 @@
-# CocktailBot – Changelog
+# CocktailBot Changelog
+
+## V20 – Black/Lime Standarddesign (2026-08-14)
+
+- Neues Standarddesign **Standard / Benutzerdefiniert**.
+- Standardfarben: Schwarz/Anthrazit mit Limegreen-Akzenten.
+- Kein spezieller Hintergrund, keine Textur und kein Theme-Muster im Standarddesign.
+- Hintergrund, Karten, Navigation, Akzente, Texte, Rahmen, Fortschritt und Statusfarben bleiben über Design/Farben frei einstellbar.
+- Die sechs Spezialdesigns aus V19 bleiben zusätzlich auswählbar.
+- „Standarddesign wiederherstellen“ setzt jetzt auf Black/Lime zurück.
+
 
 ## V19 – Vollständige Designwelten
 
