@@ -1812,6 +1812,7 @@ String appText(AppLanguage language, String key) {
     'Bild hinzufügen': {AppLanguage.de: 'Bild hinzufügen', AppLanguage.en: 'Add image', AppLanguage.es: 'Añadir imagen', AppLanguage.it: 'Aggiungi immagine', AppLanguage.nl: 'Afbeelding toevoegen', AppLanguage.fr: 'Ajouter une image', AppLanguage.pt: 'Adicionar imagem', AppLanguage.pl: 'Dodaj obraz', AppLanguage.tr: 'Resim ekle', AppLanguage.ru: 'Добавить изображение'},
     'Bild ausgewählt': {AppLanguage.de: 'Bild ausgewählt', AppLanguage.en: 'Image selected', AppLanguage.es: 'Imagen seleccionada', AppLanguage.it: 'Immagine selezionata', AppLanguage.nl: 'Afbeelding geselecteerd', AppLanguage.fr: 'Image sélectionnée', AppLanguage.pt: 'Imagem selecionada', AppLanguage.pl: 'Wybrano obraz', AppLanguage.tr: 'Resim seçildi', AppLanguage.ru: 'Изображение выбрано'},
     'Bild auswählen': {AppLanguage.de: 'Bild auswählen', AppLanguage.en: 'Select image', AppLanguage.es: 'Seleccionar imagen', AppLanguage.it: 'Seleziona immagine', AppLanguage.nl: 'Afbeelding kiezen', AppLanguage.fr: 'Choisir une image', AppLanguage.pt: 'Selecionar imagem', AppLanguage.pl: 'Wybierz obraz', AppLanguage.tr: 'Resim seç', AppLanguage.ru: 'Выбрать изображение'},
+    'Bild im Dateibrowser auswählen': {AppLanguage.de: 'Bild im Dateibrowser auswählen', AppLanguage.en: 'Select image in file browser', AppLanguage.es: 'Seleccionar imagen en el explorador de archivos', AppLanguage.it: 'Seleziona immagine nel file manager', AppLanguage.nl: 'Afbeelding kiezen in bestandsbrowser', AppLanguage.fr: 'Choisir une image dans le navigateur de fichiers', AppLanguage.pt: 'Selecionar imagem no navegador de arquivos', AppLanguage.pl: 'Wybierz obraz w przeglądarce plików', AppLanguage.tr: 'Dosya tarayıcısında resim seç', AppLanguage.ru: 'Выбрать изображение в файловом браузере'},
     'Bild vom USB-Stick auswählen': {AppLanguage.de: 'Bild vom USB-Stick auswählen', AppLanguage.en: 'Select image from USB drive', AppLanguage.es: 'Seleccionar imagen del USB', AppLanguage.it: 'Seleziona immagine da USB', AppLanguage.nl: 'Afbeelding van USB kiezen', AppLanguage.fr: 'Choisir une image sur la clé USB', AppLanguage.pt: 'Selecionar imagem do USB', AppLanguage.pl: 'Wybierz obraz z USB', AppLanguage.tr: 'USB bellekte resim seç', AppLanguage.ru: 'Выбрать изображение с USB'},
     'USB-Bilder': {AppLanguage.de: 'USB-Bilder', AppLanguage.en: 'USB images', AppLanguage.es: 'Imágenes USB', AppLanguage.it: 'Immagini USB', AppLanguage.nl: 'USB-afbeeldingen', AppLanguage.fr: 'Images USB', AppLanguage.pt: 'Imagens USB', AppLanguage.pl: 'Obrazy USB', AppLanguage.tr: 'USB resimleri', AppLanguage.ru: 'Изображения USB'},
     'USB-Stick einstecken und neu laden.': {AppLanguage.de: 'USB-Stick einstecken und neu laden.', AppLanguage.en: 'Insert a USB drive and refresh.', AppLanguage.es: 'Inserta una memoria USB y actualiza.', AppLanguage.it: 'Inserisci una chiavetta USB e aggiorna.', AppLanguage.nl: 'Plaats een USB-stick en vernieuw.', AppLanguage.fr: 'Insérez une clé USB puis actualisez.', AppLanguage.pt: 'Insira um dispositivo USB e atualize.', AppLanguage.pl: 'Włóż pamięć USB i odśwież.', AppLanguage.tr: 'USB belleği takın ve yenileyin.', AppLanguage.ru: 'Вставьте USB-накопитель и обновите.'},
@@ -14501,22 +14502,51 @@ class _RecipeEditorPageState extends State<RecipeEditorPage> {
     super.dispose();
   }
 
-  Future<void> _pickImageFromUsb() async {
-    final selected = await showDialog<UsbImageChoice>(
-      context: context,
-      barrierDismissible: false,
-      builder: (_) => UsbImagePickerDialog(store: widget.store),
-    );
-    if (selected == null || !mounted) return;
-
+  Future<void> _pickImageFromFileBrowser() async {
     try {
-      final uri = widget.store._apiUri('/api/images/usb/file').replace(
-        queryParameters: {'id': selected.id},
+      final result = await FilePicker.pickFiles(
+        type: FileType.image,
+        allowMultiple: false,
+        withData: true,
+        dialogTitle: tr('Bild auswählen'),
       );
-      final response = await http.get(uri).timeout(const Duration(seconds: 12));
-      if (response.statusCode < 200 || response.statusCode >= 300) {
-        throw Exception('HTTP ${response.statusCode}');
+      if (result == null || result.files.isEmpty || !mounted) return;
+
+      final file = result.files.single;
+      final bytes = file.bytes ?? await file.xFile.readAsBytes();
+      if (bytes.isEmpty) {
+        throw Exception(tr('Bild konnte nicht geladen werden'));
       }
+      if (bytes.length > 25 * 1024 * 1024) {
+        throw Exception('Bild ist größer als 25 MB');
+      }
+
+      // Browser-Dateien haben aus Sicherheitsgründen keinen direkt nutzbaren
+      // Linux-Pfad. Deshalb werden die Bytes an den lokalen Raspberry-Dienst
+      // geschickt, dort mit Pillow gedreht/verkleinert und als JPEG
+      // zurückgegeben.
+      final response = await http
+          .post(
+            widget.store._apiUri('/api/images/optimize'),
+            headers: {
+              'Content-Type': 'application/octet-stream',
+              'X-File-Name': Uri.encodeComponent(file.name),
+            },
+            body: bytes,
+          )
+          .timeout(const Duration(seconds: 20));
+
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        var message = 'HTTP ${response.statusCode}';
+        try {
+          final decoded = jsonDecode(response.body);
+          if (decoded is Map && decoded['error'] != null) {
+            message = decoded['error'].toString();
+          }
+        } catch (_) {}
+        throw Exception(message);
+      }
+
       if (!mounted) return;
       setState(() {
         imagePath = 'data:image/jpeg;base64,${base64Encode(response.bodyBytes)}';
@@ -14588,11 +14618,11 @@ class _RecipeEditorPageState extends State<RecipeEditorPage> {
           ),
           const SizedBox(height: 12),
           OutlinedButton.icon(
-            onPressed: _pickImageFromUsb,
-            icon: const Icon(Icons.usb_rounded),
+            onPressed: _pickImageFromFileBrowser,
+            icon: const Icon(Icons.folder_open_rounded),
             label: Text(
               imagePath == null
-                  ? tr('Bild vom USB-Stick auswählen')
+                  ? tr('Bild im Dateibrowser auswählen')
                   : tr('Bild ausgewählt'),
             ),
           ),

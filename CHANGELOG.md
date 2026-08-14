@@ -1,5 +1,11 @@
 # CocktailBot Changelog
 
+## V21 – Raspberry-Dateibrowser für Rezeptbilder
+- Rezeptbilder werden wieder über den nativen Chromium/Raspberry-Dateidialog ausgewählt.
+- Ordner, USB-Sticks und andere eingebundene Laufwerke können im Dateidialog durchsucht werden.
+- Die bisherige USB-Kachelansicht wird im Rezepteditor nicht mehr verwendet.
+- Ausgewählte Bilder werden über den lokalen Raspberry-Dienst mit Pillow automatisch gedreht, auf maximal 1200 px verkleinert und als optimiertes JPEG übernommen.
+
 ## V20 – Black/Lime Standarddesign (2026-08-14)
 
 - Neues Standarddesign **Standard / Benutzerdefiniert**.

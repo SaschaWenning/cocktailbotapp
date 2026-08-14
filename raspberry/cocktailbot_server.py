@@ -1501,6 +1501,45 @@ def create_app(controller: PumpController, web_root: Path) -> Flask:
     def api_status():
         return jsonify(controller.status())
 
+    @app.post("/api/images/optimize")
+    def api_optimize_uploaded_image():
+        """Optimize an image selected with Chromium's native file chooser.
+
+        The browser cannot expose an arbitrary Linux path to Flutter Web, so
+        the selected file is posted as raw bytes. Keep this endpoint local and
+        deliberately small: it accepts images only, limits payload size and
+        returns an EXIF-corrected, resized JPEG.
+        """
+        raw = request.get_data(cache=False, as_text=False)
+        if not raw:
+            return jsonify(ok=False, error="Leere Bilddatei"), 400
+        if len(raw) > 25 * 1024 * 1024:
+            return jsonify(ok=False, error="Bild ist größer als 25 MB"), 413
+        try:
+            image = Image.open(io.BytesIO(raw))
+            image = ImageOps.exif_transpose(image)
+            if image.mode not in ("RGB", "L"):
+                background = Image.new("RGB", image.size, (10, 10, 10))
+                if "A" in image.getbands():
+                    background.paste(image.convert("RGBA"), mask=image.getchannel("A"))
+                    image = background
+                else:
+                    image = image.convert("RGB")
+            elif image.mode == "L":
+                image = image.convert("RGB")
+            image.thumbnail((1200, 1200), Image.Resampling.LANCZOS)
+            out = io.BytesIO()
+            image.save(out, format="JPEG", quality=88, optimize=True)
+            out.seek(0)
+            return send_file(
+                out,
+                mimetype="image/jpeg",
+                download_name="cocktail-image.jpg",
+                max_age=0,
+            )
+        except Exception as exc:
+            return jsonify(ok=False, error=f"Bild konnte nicht verarbeitet werden: {exc}"), 400
+
     @app.get("/api/images/usb")
     def api_usb_images():
         images = scan_usb_images()
