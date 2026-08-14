@@ -7,7 +7,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:http/http.dart' as http;
-import 'package:image_picker/image_picker.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -1367,6 +1366,13 @@ String appText(AppLanguage language, String key) {
     'Bild hinzufügen': {AppLanguage.de: 'Bild hinzufügen', AppLanguage.en: 'Add image', AppLanguage.es: 'Añadir imagen', AppLanguage.it: 'Aggiungi immagine', AppLanguage.nl: 'Afbeelding toevoegen', AppLanguage.fr: 'Ajouter une image', AppLanguage.pt: 'Adicionar imagem', AppLanguage.pl: 'Dodaj obraz', AppLanguage.tr: 'Resim ekle', AppLanguage.ru: 'Добавить изображение'},
     'Bild ausgewählt': {AppLanguage.de: 'Bild ausgewählt', AppLanguage.en: 'Image selected', AppLanguage.es: 'Imagen seleccionada', AppLanguage.it: 'Immagine selezionata', AppLanguage.nl: 'Afbeelding geselecteerd', AppLanguage.fr: 'Image sélectionnée', AppLanguage.pt: 'Imagem selecionada', AppLanguage.pl: 'Wybrano obraz', AppLanguage.tr: 'Resim seçildi', AppLanguage.ru: 'Изображение выбрано'},
     'Bild auswählen': {AppLanguage.de: 'Bild auswählen', AppLanguage.en: 'Select image', AppLanguage.es: 'Seleccionar imagen', AppLanguage.it: 'Seleziona immagine', AppLanguage.nl: 'Afbeelding kiezen', AppLanguage.fr: 'Choisir une image', AppLanguage.pt: 'Selecionar imagem', AppLanguage.pl: 'Wybierz obraz', AppLanguage.tr: 'Resim seç', AppLanguage.ru: 'Выбрать изображение'},
+    'Bild vom USB-Stick auswählen': {AppLanguage.de: 'Bild vom USB-Stick auswählen', AppLanguage.en: 'Select image from USB drive', AppLanguage.es: 'Seleccionar imagen del USB', AppLanguage.it: 'Seleziona immagine da USB', AppLanguage.nl: 'Afbeelding van USB kiezen', AppLanguage.fr: 'Choisir une image sur la clé USB', AppLanguage.pt: 'Selecionar imagem do USB', AppLanguage.pl: 'Wybierz obraz z USB', AppLanguage.tr: 'USB bellekte resim seç', AppLanguage.ru: 'Выбрать изображение с USB'},
+    'USB-Bilder': {AppLanguage.de: 'USB-Bilder', AppLanguage.en: 'USB images', AppLanguage.es: 'Imágenes USB', AppLanguage.it: 'Immagini USB', AppLanguage.nl: 'USB-afbeeldingen', AppLanguage.fr: 'Images USB', AppLanguage.pt: 'Imagens USB', AppLanguage.pl: 'Obrazy USB', AppLanguage.tr: 'USB resimleri', AppLanguage.ru: 'Изображения USB'},
+    'USB-Stick einstecken und neu laden.': {AppLanguage.de: 'USB-Stick einstecken und neu laden.', AppLanguage.en: 'Insert a USB drive and refresh.', AppLanguage.es: 'Inserta una memoria USB y actualiza.', AppLanguage.it: 'Inserisci una chiavetta USB e aggiorna.', AppLanguage.nl: 'Plaats een USB-stick en vernieuw.', AppLanguage.fr: 'Insérez une clé USB puis actualisez.', AppLanguage.pt: 'Insira um dispositivo USB e atualize.', AppLanguage.pl: 'Włóż pamięć USB i odśwież.', AppLanguage.tr: 'USB belleği takın ve yenileyin.', AppLanguage.ru: 'Вставьте USB-накопитель и обновите.'},
+    'Keine Bilder auf dem USB-Stick gefunden.': {AppLanguage.de: 'Keine Bilder auf dem USB-Stick gefunden.', AppLanguage.en: 'No images found on the USB drive.', AppLanguage.es: 'No se encontraron imágenes en el USB.', AppLanguage.it: 'Nessuna immagine trovata sull’USB.', AppLanguage.nl: 'Geen afbeeldingen op de USB-stick gevonden.', AppLanguage.fr: 'Aucune image trouvée sur la clé USB.', AppLanguage.pt: 'Nenhuma imagem encontrada no USB.', AppLanguage.pl: 'Nie znaleziono obrazów na USB.', AppLanguage.tr: 'USB bellekte resim bulunamadı.', AppLanguage.ru: 'На USB-накопителе нет изображений.'},
+    'Unterstützt werden JPG, PNG und WebP.': {AppLanguage.de: 'Unterstützt werden JPG, PNG und WebP.', AppLanguage.en: 'JPG, PNG and WebP are supported.', AppLanguage.es: 'Se admiten JPG, PNG y WebP.', AppLanguage.it: 'Sono supportati JPG, PNG e WebP.', AppLanguage.nl: 'JPG, PNG en WebP worden ondersteund.', AppLanguage.fr: 'JPG, PNG et WebP sont pris en charge.', AppLanguage.pt: 'JPG, PNG e WebP são suportados.', AppLanguage.pl: 'Obsługiwane są JPG, PNG i WebP.', AppLanguage.tr: 'JPG, PNG ve WebP desteklenir.', AppLanguage.ru: 'Поддерживаются JPG, PNG и WebP.'},
+    'Neu laden': {AppLanguage.de: 'Neu laden', AppLanguage.en: 'Refresh', AppLanguage.es: 'Actualizar', AppLanguage.it: 'Aggiorna', AppLanguage.nl: 'Vernieuwen', AppLanguage.fr: 'Actualiser', AppLanguage.pt: 'Atualizar', AppLanguage.pl: 'Odśwież', AppLanguage.tr: 'Yenile', AppLanguage.ru: 'Обновить'},
+    'Bild konnte nicht geladen werden': {AppLanguage.de: 'Bild konnte nicht geladen werden', AppLanguage.en: 'Image could not be loaded', AppLanguage.es: 'No se pudo cargar la imagen', AppLanguage.it: 'Impossibile caricare l’immagine', AppLanguage.nl: 'Afbeelding kon niet worden geladen', AppLanguage.fr: 'Impossible de charger l’image', AppLanguage.pt: 'Não foi possível carregar a imagem', AppLanguage.pl: 'Nie udało się wczytać obrazu', AppLanguage.tr: 'Resim yüklenemedi', AppLanguage.ru: 'Не удалось загрузить изображение'},
     'Zum Beispiel: Mit Ananas dekorieren': {AppLanguage.de: 'Zum Beispiel: Mit Ananas dekorieren', AppLanguage.en: 'For example: Garnish with pineapple', AppLanguage.es: 'Por ejemplo: decorar con piña', AppLanguage.it: 'Ad esempio: guarnire con ananas', AppLanguage.nl: 'Bijvoorbeeld: garneren met ananas', AppLanguage.fr: 'Par exemple : garnir avec de l’ananas', AppLanguage.pt: 'Por exemplo: decorar com abacaxi', AppLanguage.pl: 'Na przykład: udekoruj ananasem', AppLanguage.tr: 'Örneğin: ananas ile süsle', AppLanguage.ru: 'Например: украсить ананасом'},
     'Alkoholgehalt': {AppLanguage.de: 'Alkoholgehalt', AppLanguage.en: 'Alcohol content', AppLanguage.es: 'Contenido de alcohol', AppLanguage.it: 'Gradazione alcolica', AppLanguage.nl: 'Alcoholpercentage', AppLanguage.fr: 'Teneur en alcool', AppLanguage.pt: 'Teor alcoólico', AppLanguage.pl: 'Zawartość alkoholu', AppLanguage.tr: 'Alkol oranı', AppLanguage.ru: 'Содержание алкоголя'},
     'Alkoholgehalt in % vol': {AppLanguage.de: 'Alkoholgehalt in % vol', AppLanguage.en: 'Alcohol content in % vol', AppLanguage.es: 'Contenido de alcohol en % vol', AppLanguage.it: 'Gradazione alcolica in % vol', AppLanguage.nl: 'Alcoholpercentage in % vol', AppLanguage.fr: 'Teneur en alcool en % vol', AppLanguage.pt: 'Teor alcoólico em % vol', AppLanguage.pl: 'Zawartość alkoholu w % obj.', AppLanguage.tr: '% hacim alkol oranı', AppLanguage.ru: 'Содержание алкоголя в % об.'},
@@ -2189,13 +2195,6 @@ Widget cocktailImage(
   );
 }
 
-String imageMimeType(String filename) {
-  final lower = filename.toLowerCase();
-  if (lower.endsWith('.png')) return 'image/png';
-  if (lower.endsWith('.webp')) return 'image/webp';
-  if (lower.endsWith('.gif')) return 'image/gif';
-  return 'image/jpeg';
-}
 
 double defaultAlcoholPercentForIngredient(
   String id, [
@@ -6632,6 +6631,42 @@ class _RecipeDetailPageState extends State<RecipeDetailPage> {
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
+                  if (!p.automatic) ...[
+                    const SizedBox(width: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 7,
+                        vertical: 3,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFFA726).withValues(alpha: .14),
+                        borderRadius: BorderRadius.circular(7),
+                        border: Border.all(
+                          color: const Color(0xFFFFA726).withValues(alpha: .75),
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(
+                            Icons.pan_tool_alt_outlined,
+                            size: 12,
+                            color: Color(0xFFFFA726),
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            tr('Manuell'),
+                            style: const TextStyle(
+                              color: Color(0xFFFFB74D),
+                              fontSize: 10.5,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                  const SizedBox(width: 8),
                   Text(
                     '${scaledAmount.toStringAsFixed(scaledAmount < 10 ? 1 : 0)} ml',
                     style: const TextStyle(
@@ -13589,6 +13624,237 @@ class _RecipeManagementPageState extends State<RecipeManagementPage> {
   }
 }
 
+
+class UsbImageChoice {
+  const UsbImageChoice({
+    required this.id,
+    required this.name,
+    required this.source,
+    required this.sizeBytes,
+  });
+
+  final String id;
+  final String name;
+  final String source;
+  final int sizeBytes;
+
+  factory UsbImageChoice.fromJson(Map<String, dynamic> json) => UsbImageChoice(
+        id: json['id']?.toString() ?? '',
+        name: json['name']?.toString() ?? '',
+        source: json['source']?.toString() ?? 'USB',
+        sizeBytes: (json['sizeBytes'] as num?)?.toInt() ?? 0,
+      );
+}
+
+class UsbImagePickerDialog extends StatefulWidget {
+  const UsbImagePickerDialog({super.key, required this.store});
+
+  final MachineStore store;
+
+  @override
+  State<UsbImagePickerDialog> createState() => _UsbImagePickerDialogState();
+}
+
+class _UsbImagePickerDialogState extends State<UsbImagePickerDialog> {
+  late Future<List<UsbImageChoice>> _future;
+  bool _hasUsbRoot = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _future = _loadImages();
+  }
+
+  Future<List<UsbImageChoice>> _loadImages() async {
+    final response = await http
+        .get(widget.store._apiUri('/api/images/usb'))
+        .timeout(const Duration(seconds: 8));
+    final decoded = jsonDecode(response.body);
+    if (decoded is! Map) throw Exception('Ungültige Serverantwort');
+    final data = Map<String, dynamic>.from(decoded);
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw Exception(data['error']?.toString() ?? 'USB-Bilder nicht verfügbar');
+    }
+    final roots = data['roots'];
+    _hasUsbRoot = roots is List && roots.isNotEmpty;
+    final raw = data['images'];
+    if (raw is! List) return const [];
+    return raw
+        .whereType<Map>()
+        .map((item) => UsbImageChoice.fromJson(Map<String, dynamic>.from(item)))
+        .where((item) => item.id.isNotEmpty)
+        .toList();
+  }
+
+  void _reload() {
+    setState(() {
+      _future = _loadImages();
+    });
+  }
+
+  Uri _imageUri(UsbImageChoice image, {bool thumbnail = false}) =>
+      widget.store._apiUri('/api/images/usb/file').replace(
+        queryParameters: {
+          'id': image.id,
+          if (thumbnail) 'thumb': '1',
+        },
+      );
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 18),
+      titlePadding: const EdgeInsets.fromLTRB(22, 16, 12, 8),
+      contentPadding: const EdgeInsets.fromLTRB(18, 4, 18, 10),
+      title: Row(
+        children: [
+          const Icon(Icons.usb_rounded),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              tr('USB-Bilder'),
+              style: const TextStyle(fontWeight: FontWeight.w800),
+            ),
+          ),
+          IconButton(
+            tooltip: tr('Neu laden'),
+            onPressed: _reload,
+            icon: const Icon(Icons.refresh_rounded),
+          ),
+        ],
+      ),
+      content: SizedBox(
+        width: 880,
+        height: 410,
+        child: FutureBuilder<List<UsbImageChoice>>(
+          future: _future,
+          builder: (context, snapshot) {
+            if (snapshot.connectionState != ConnectionState.done) {
+              return const Center(child: CircularProgressIndicator());
+            }
+            if (snapshot.hasError) {
+              return Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.usb_off_rounded, size: 54),
+                    const SizedBox(height: 12),
+                    Text(
+                      '${tr('Bild konnte nicht geladen werden')}: ${snapshot.error}',
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 14),
+                    FilledButton.tonalIcon(
+                      onPressed: _reload,
+                      icon: const Icon(Icons.refresh_rounded),
+                      label: Text(tr('Neu laden')),
+                    ),
+                  ],
+                ),
+              );
+            }
+
+            final images = snapshot.data ?? const <UsbImageChoice>[];
+            if (images.isEmpty) {
+              return Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      _hasUsbRoot ? Icons.image_not_supported_outlined : Icons.usb_off_rounded,
+                      size: 58,
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      _hasUsbRoot
+                          ? tr('Keine Bilder auf dem USB-Stick gefunden.')
+                          : tr('USB-Stick einstecken und neu laden.'),
+                      textAlign: TextAlign.center,
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      tr('Unterstützt werden JPG, PNG und WebP.'),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 14),
+                    FilledButton.tonalIcon(
+                      onPressed: _reload,
+                      icon: const Icon(Icons.refresh_rounded),
+                      label: Text(tr('Neu laden')),
+                    ),
+                  ],
+                ),
+              );
+            }
+
+            return GridView.builder(
+              itemCount: images.length,
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 4,
+                crossAxisSpacing: 10,
+                mainAxisSpacing: 10,
+                childAspectRatio: 1.16,
+              ),
+              itemBuilder: (context, index) {
+                final image = images[index];
+                return Material(
+                  color: Theme.of(context).colorScheme.surfaceContainerHigh,
+                  borderRadius: BorderRadius.circular(14),
+                  clipBehavior: Clip.antiAlias,
+                  child: InkWell(
+                    onTap: () => Navigator.pop(context, image),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Expanded(
+                          child: Image.network(
+                            _imageUri(image, thumbnail: true).toString(),
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => const Center(
+                              child: Icon(Icons.broken_image_outlined, size: 40),
+                            ),
+                          ),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(9, 7, 9, 8),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                image.name,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(fontWeight: FontWeight.w700),
+                              ),
+                              Text(
+                                image.source,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: Theme.of(context).textTheme.bodySmall,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            );
+          },
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: Text(tr('Abbrechen')),
+        ),
+      ],
+    );
+  }
+}
+
 class RecipeEditorPage extends StatefulWidget {
   const RecipeEditorPage({
     super.key,
@@ -13652,6 +13918,34 @@ class _RecipeEditorPageState extends State<RecipeEditorPage> {
     super.dispose();
   }
 
+  Future<void> _pickImageFromUsb() async {
+    final selected = await showDialog<UsbImageChoice>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => UsbImagePickerDialog(store: widget.store),
+    );
+    if (selected == null || !mounted) return;
+
+    try {
+      final uri = widget.store._apiUri('/api/images/usb/file').replace(
+        queryParameters: {'id': selected.id},
+      );
+      final response = await http.get(uri).timeout(const Duration(seconds: 12));
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        throw Exception('HTTP ${response.statusCode}');
+      }
+      if (!mounted) return;
+      setState(() {
+        imagePath = 'data:image/jpeg;base64,${base64Encode(response.bodyBytes)}';
+      });
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('${tr('Bild konnte nicht geladen werden')}: $error')),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return PageFrame(
@@ -13711,23 +14005,12 @@ class _RecipeEditorPageState extends State<RecipeEditorPage> {
           ),
           const SizedBox(height: 12),
           OutlinedButton.icon(
-            onPressed: () async {
-              final x = await ImagePicker().pickImage(
-                source: ImageSource.gallery,
-                imageQuality: 80,
-                maxWidth: 1600,
-              );
-              if (x == null) return;
-              final bytes = await x.readAsBytes();
-              if (!mounted) return;
-              final mime = imageMimeType(x.name);
-              setState(
-                () => imagePath = 'data:$mime;base64,${base64Encode(bytes)}',
-              );
-            },
-            icon: const Icon(Icons.image),
+            onPressed: _pickImageFromUsb,
+            icon: const Icon(Icons.usb_rounded),
             label: Text(
-              imagePath == null ? tr('Bild hinzufügen') : tr('Bild ausgewählt'),
+              imagePath == null
+                  ? tr('Bild vom USB-Stick auswählen')
+                  : tr('Bild ausgewählt'),
             ),
           ),
           const SizedBox(height: 18),

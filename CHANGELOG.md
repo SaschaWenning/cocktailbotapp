@@ -1,5 +1,24 @@
 # CocktailBot – Changelog
 
+## V17 – Manuelle Zutaten in der Cocktailkarte
+
+- Zutaten, die im Rezept als **nicht automatisch / manuell** eingestellt sind, werden in der Cocktail-Detailkarte direkt gekennzeichnet.
+- Neben der jeweiligen Zutat erscheint ein kompaktes orangefarbenes **„Manuell“**-Badge mit Hand-Symbol.
+- Automatisch über Pumpen dosierte Zutaten bleiben unverändert ohne Badge.
+- Die Kennzeichnung verwendet die vorhandene Übersetzung für „Manuell“ und funktioniert damit in allen App-Sprachen.
+
+
+## V16 – Touchfreundlicher Bildimport vom USB-Stick
+
+- Der native Chromium/Linux-Dateidialog wird beim Anlegen/Bearbeiten eigener Cocktails nicht mehr verwendet.
+- Neuer CocktailBot-eigener USB-Bildbrowser als großes Touch-Popup mit Vorschaubildern.
+- Unterstützt JPG, JPEG, PNG und WebP auf automatisch eingehängten USB-Sticks unter `/media/<user>` bzw. `/run/media/<user>`.
+- Neu laden im Popup ermöglicht das Einstecken eines USB-Sticks, ohne die App zu verlassen.
+- Bilder werden serverseitig gedreht, auf maximal 1200 px verkleinert und als JPEG optimiert, bevor sie in das Rezept übernommen werden.
+- Neue lokale API: `GET /api/images/usb` und `GET /api/images/usb/file?id=...`.
+- Pillow wird als Raspberry-Abhängigkeit installiert.
+
+
 ## V15 – Mehrfachauswahl bei Getränkegrößen (14.08.2026)
 
 - Cocktailgrößen und Shotgrößen können in den Einstellungen jetzt unabhängig voneinander per Checkbox aktiviert oder deaktiviert werden.

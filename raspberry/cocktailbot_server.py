@@ -22,6 +22,7 @@ import glob
 import hashlib
 import json
 import os
+import io
 import signal
 import sqlite3
 import subprocess
@@ -40,7 +41,13 @@ from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 
-from flask import Flask, jsonify, request, send_from_directory
+try:
+    from PIL import Image, ImageOps
+except ImportError:  # installed by requirements; keep a clear runtime error
+    Image = None  # type: ignore[assignment]
+    ImageOps = None  # type: ignore[assignment]
+
+from flask import Flask, jsonify, request, send_file, send_from_directory
 
 try:
     import serial
@@ -65,6 +72,11 @@ MAX_PUMP_DURATION_MS = 120_000
 MAX_JOB_DURATION_MS = 600_000
 DEFAULT_START_SPACING_MS = 100
 MAX_START_SPACING_MS = 2_000
+
+USB_IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp"}
+USB_IMAGE_MAX_COUNT = 240
+USB_IMAGE_MAX_BYTES = 25 * 1024 * 1024
+USB_IMAGE_SCAN_DEPTH = 4
 
 ACTIVE_HIGH = os.getenv("COCKTAILBOT_ACTIVE_HIGH", "0") not in {"0", "false", "False"}
 MOCK_GPIO = os.getenv("COCKTAILBOT_GPIO_MOCK", "0") in {"1", "true", "True"}
@@ -1361,6 +1373,108 @@ def create_app(controller: PumpController, web_root: Path) -> Flask:
     app = Flask(__name__, static_folder=None)
     payment = PaypalPaymentBackend()
     licensing = LicenseManager()
+    usb_image_cache: dict[str, Path] = {}
+
+    def usb_scan_roots() -> list[Path]:
+        user_name = os.getenv("USER", "pi").strip() or "pi"
+        configured = os.getenv("COCKTAILBOT_USB_ROOTS", "").strip()
+        candidates: list[Path] = []
+        if configured:
+            candidates.extend(Path(item.strip()) for item in configured.split(":") if item.strip())
+        candidates.extend([
+            Path("/media") / user_name,
+            Path("/run/media") / user_name,
+            Path("/media/pi"),
+            Path("/run/media/pi"),
+            Path("/mnt/usb"),
+        ])
+
+        roots: list[Path] = []
+        seen: set[str] = set()
+        for candidate in candidates:
+            try:
+                resolved = candidate.resolve()
+            except OSError:
+                continue
+            key = str(resolved)
+            if key in seen or not resolved.is_dir():
+                continue
+            seen.add(key)
+            roots.append(resolved)
+        return roots
+
+    def scan_usb_images() -> list[dict[str, Any]]:
+        usb_image_cache.clear()
+        results: list[dict[str, Any]] = []
+
+        for root in usb_scan_roots():
+            root_parts = len(root.parts)
+            try:
+                walker = os.walk(root, followlinks=False)
+                for dir_path, dir_names, file_names in walker:
+                    current = Path(dir_path)
+                    depth = len(current.parts) - root_parts
+                    if depth >= USB_IMAGE_SCAN_DEPTH:
+                        dir_names[:] = []
+
+                    # Hidden/system folders are not useful in the touch picker.
+                    dir_names[:] = [name for name in dir_names if not name.startswith(".")]
+
+                    for file_name in sorted(file_names, key=str.casefold):
+                        if len(results) >= USB_IMAGE_MAX_COUNT:
+                            return results
+                        if file_name.startswith("."):
+                            continue
+                        path = current / file_name
+                        if path.suffix.lower() not in USB_IMAGE_EXTENSIONS:
+                            continue
+                        try:
+                            if not path.is_file():
+                                continue
+                            size = path.stat().st_size
+                        except OSError:
+                            continue
+                        if size <= 0 or size > USB_IMAGE_MAX_BYTES:
+                            continue
+
+                        try:
+                            relative = path.relative_to(root)
+                        except ValueError:
+                            continue
+                        token = hashlib.sha256(str(path).encode("utf-8")).hexdigest()[:32]
+                        usb_image_cache[token] = path
+                        source = relative.parts[0] if len(relative.parts) > 1 else root.name
+                        results.append({
+                            "id": token,
+                            "name": file_name,
+                            "source": source or "USB",
+                            "sizeBytes": size,
+                        })
+            except OSError:
+                continue
+
+        return results
+
+    def usb_image_bytes(path: Path, *, thumbnail: bool) -> io.BytesIO:
+        if Image is None or ImageOps is None:
+            raise RuntimeError("Pillow ist nicht installiert")
+
+        max_size = (360, 260) if thumbnail else (1200, 1200)
+        quality = 72 if thumbnail else 80
+        output = io.BytesIO()
+        with Image.open(path) as source:
+            image = ImageOps.exif_transpose(source)
+            image.thumbnail(max_size)
+            if image.mode in {"RGBA", "LA"}:
+                rgba = image.convert("RGBA")
+                background = Image.new("RGB", rgba.size, (11, 16, 21))
+                background.paste(rgba, mask=rgba.getchannel("A"))
+                image = background
+            elif image.mode != "RGB":
+                image = image.convert("RGB")
+            image.save(output, format="JPEG", quality=quality, optimize=True)
+        output.seek(0)
+        return output
 
     def require_commercial_license():
         status = licensing.status()
@@ -1386,6 +1500,38 @@ def create_app(controller: PumpController, web_root: Path) -> Flask:
     @app.get("/api/status")
     def api_status():
         return jsonify(controller.status())
+
+    @app.get("/api/images/usb")
+    def api_usb_images():
+        images = scan_usb_images()
+        return jsonify(
+            ok=True,
+            images=images,
+            count=len(images),
+            roots=[str(root) for root in usb_scan_roots()],
+        )
+
+    @app.get("/api/images/usb/file")
+    def api_usb_image_file():
+        token = request.args.get("id", "").strip()
+        thumbnail = request.args.get("thumb", "0") in {"1", "true", "True"}
+        path = usb_image_cache.get(token)
+        if path is None:
+            # The server may have restarted after the list was displayed.
+            scan_usb_images()
+            path = usb_image_cache.get(token)
+        if path is None:
+            return jsonify(ok=False, error="USB-Bild nicht gefunden"), 404
+        try:
+            payload = usb_image_bytes(path, thumbnail=thumbnail)
+        except (OSError, ValueError, RuntimeError) as exc:
+            return jsonify(ok=False, error=f"Bild konnte nicht gelesen werden: {exc}"), 400
+        return send_file(
+            payload,
+            mimetype="image/jpeg",
+            download_name="cocktail.jpg",
+            max_age=0,
+        )
 
     @app.get("/api/license/status")
     def api_license_status():
