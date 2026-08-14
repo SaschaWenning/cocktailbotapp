@@ -1,5 +1,21 @@
 # CocktailBot – Changelog
 
+## V19 – Vollständige Designwelten
+
+- Die sechs Designs sind nicht mehr nur Farb-Presets, sondern vollständige visuelle Stile.
+- **Edel / Exklusiv:** schwarzer Luxus-Hintergrund mit Goldglanz und feinen diagonalen Linien.
+- **Modern / Clean:** heller Weiß-/Hellgrau-Verlauf mit dezenten blauen Flächen.
+- **Futuristisch / Neon:** dunkler Navy-Hintergrund mit Cyan-/Magenta-Glow und Neon-Raster.
+- **Tropisch / Sommer:** Türkis-/Sand-Verlauf mit Sonne, Wellen und abstrahierten Palmblättern.
+- **Industrial / Loft:** dunkle Metallflächen mit Plattennähten, Nieten und technischer Struktur.
+- **Vintage / Klassisch:** warmer Pergament-Hintergrund mit Papierkorn und klassischem Doppelrahmen.
+- Der gewählte visuelle Stil wird jetzt zusammen mit den Farben gespeichert und bei vorhandenen V18-Presets automatisch erkannt.
+- Globale fest eingebaute Türkis-Akzente in Cocktail-Detailseite, Kalibrierung, Rezeptverwaltung und weiteren Einstellungsbereichen wurden entfernt. Diese Elemente verwenden nun die Akzent-, Sekundär-, Warn- und Fehlerfarben des aktiven Designs.
+- Navigationstext erhält automatisch eine zum Navigationshintergrund passende helle oder dunkle Kontrastfarbe.
+- Cocktailkarten verwenden Rahmen und Kartenfarben des aktiven Designs.
+- Material-Karten, Chips, Buttons, Eingabefelder, Fortschrittsanzeigen und AppBar reagieren stärker auf die aktive Designwelt.
+- Statusfarben bleiben semantisch (Erfolg/Warnung/Fehler), stammen aber aus dem jeweiligen Theme.
+
 ## V18 – Neue Designkollektion
 
 - Die bisherigen sechs Preset-Designs wurden vollständig aus der Auswahl entfernt.

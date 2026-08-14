@@ -290,7 +290,12 @@ class _CocktailMachineAppState extends State<CocktailMachineApp> {
         builder: (context, child) {
           return Stack(
             children: [
-              child ?? const SizedBox.shrink(),
+              Positioned.fill(
+                child: CocktailBotThemeBackground(colors: store.appColors),
+              ),
+              Positioned.fill(
+                child: child ?? const SizedBox.shrink(),
+              ),
               if (_virtualKeyboardVisible)
                 Positioned(
                   left: 0,
@@ -792,23 +797,49 @@ ThemeData buildTheme(
   );
 
   return base.copyWith(
-    scaffoldBackgroundColor: colors.backgroundColor,
+    scaffoldBackgroundColor: Colors.transparent,
     textTheme: base.textTheme.apply(
       bodyColor: colors.textPrimaryColor,
       displayColor: colors.textPrimaryColor,
     ),
     appBarTheme: AppBarTheme(
-      backgroundColor: colors.backgroundColor,
+      backgroundColor: colors.navigationColor.withValues(alpha: .96),
       foregroundColor: colors.textPrimaryColor,
       surfaceTintColor: Colors.transparent,
       elevation: 0,
     ),
     cardTheme: CardThemeData(
-      color: colors.cardColor,
-      elevation: 0,
+      color: colors.cardColor.withValues(
+        alpha: switch (colors.visualStyle) {
+          AppVisualStyle.modern => .96,
+          AppVisualStyle.tropical => .94,
+          AppVisualStyle.vintage => .95,
+          _ => .92,
+        },
+      ),
+      elevation: switch (colors.visualStyle) {
+        AppVisualStyle.modern => 4,
+        AppVisualStyle.tropical => 3,
+        AppVisualStyle.neon => 1,
+        _ => 0,
+      },
+      shadowColor: colors.accentColor.withValues(
+        alpha: colors.visualStyle == AppVisualStyle.neon ? .28 : .12,
+      ),
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: colors.borderColor),
+        borderRadius: BorderRadius.circular(
+          switch (colors.visualStyle) {
+            AppVisualStyle.tropical => 16,
+            AppVisualStyle.modern => 14,
+            AppVisualStyle.industrial => 5,
+            AppVisualStyle.vintage => 7,
+            _ => 10,
+          },
+        ),
+        side: BorderSide(
+          color: colors.borderColor,
+          width: colors.visualStyle == AppVisualStyle.neon ? 1.3 : 1,
+        ),
       ),
     ),
     filledButtonTheme: FilledButtonThemeData(
@@ -817,7 +848,15 @@ ThemeData buildTheme(
         foregroundColor:
             accent.computeLuminance() > .48 ? Colors.black : Colors.white,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(9),
+          borderRadius: BorderRadius.circular(
+            switch (colors.visualStyle) {
+              AppVisualStyle.tropical => 22,
+              AppVisualStyle.modern => 12,
+              AppVisualStyle.industrial => 4,
+              AppVisualStyle.vintage => 6,
+              _ => 9,
+            },
+          ),
         ),
         textStyle: const TextStyle(fontWeight: FontWeight.w800),
       ),
@@ -847,6 +886,23 @@ ThemeData buildTheme(
       ),
     ),
     dividerColor: colors.borderColor,
+    chipTheme: base.chipTheme.copyWith(
+      backgroundColor: colors.surfaceColor.withValues(alpha: .88),
+      selectedColor: accent,
+      disabledColor: colors.progressTrackColor,
+      side: BorderSide(color: colors.borderColor),
+      labelStyle: TextStyle(color: colors.textPrimaryColor),
+      secondaryLabelStyle: TextStyle(
+        color: accent.computeLuminance() > .48 ? Colors.black : Colors.white,
+        fontWeight: FontWeight.w800,
+      ),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(
+          colors.visualStyle == AppVisualStyle.tropical ? 16 : 9,
+        ),
+      ),
+    ),
+    iconTheme: IconThemeData(color: colors.textSecondaryColor),
     progressIndicatorTheme: ProgressIndicatorThemeData(
       color: accent,
       linearTrackColor: colors.progressTrackColor,
@@ -868,6 +924,327 @@ ThemeData buildTheme(
             : colors.progressTrackColor,
       ),
     ),
+  );
+}
+
+
+
+class CocktailBotThemeBackground extends StatelessWidget {
+  const CocktailBotThemeBackground({
+    super.key,
+    required this.colors,
+  });
+
+  final AppColorThemeConfig colors;
+
+  @override
+  Widget build(BuildContext context) {
+    return IgnorePointer(
+      child: CustomPaint(
+        painter: _CocktailBotThemeBackgroundPainter(colors),
+        child: const SizedBox.expand(),
+      ),
+    );
+  }
+}
+
+class _CocktailBotThemeBackgroundPainter extends CustomPainter {
+  const _CocktailBotThemeBackgroundPainter(this.colors);
+
+  final AppColorThemeConfig colors;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final rect = Offset.zero & size;
+    switch (colors.visualStyle) {
+      case AppVisualStyle.elegant:
+        _paintElegant(canvas, rect);
+        break;
+      case AppVisualStyle.modern:
+        _paintModern(canvas, rect);
+        break;
+      case AppVisualStyle.neon:
+        _paintNeon(canvas, rect);
+        break;
+      case AppVisualStyle.tropical:
+        _paintTropical(canvas, rect);
+        break;
+      case AppVisualStyle.industrial:
+        _paintIndustrial(canvas, rect);
+        break;
+      case AppVisualStyle.vintage:
+        _paintVintage(canvas, rect);
+        break;
+    }
+  }
+
+  void _paintElegant(Canvas canvas, Rect rect) {
+    final paint = Paint()
+      ..shader = LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [
+          const Color(0xFF030303),
+          colors.backgroundColor,
+          const Color(0xFF171006),
+          const Color(0xFF050505),
+        ],
+        stops: const [0, .34, .72, 1],
+      ).createShader(rect);
+    canvas.drawRect(rect, paint);
+
+    final glow = Paint()
+      ..shader = RadialGradient(
+        center: const Alignment(.75, -.7),
+        radius: 1.2,
+        colors: [
+          colors.accentColor.withValues(alpha: .16),
+          Colors.transparent,
+        ],
+      ).createShader(rect);
+    canvas.drawRect(rect, glow);
+
+    final line = Paint()
+      ..color = colors.accentColor.withValues(alpha: .07)
+      ..strokeWidth = 1;
+    for (double x = -rect.height; x < rect.width; x += 62) {
+      canvas.drawLine(
+        Offset(x, rect.height),
+        Offset(x + rect.height, 0),
+        line,
+      );
+    }
+  }
+
+  void _paintModern(Canvas canvas, Rect rect) {
+    final paint = Paint()
+      ..shader = LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: [
+          const Color(0xFFFDFEFF),
+          colors.backgroundColor,
+          const Color(0xFFE6EEF7),
+        ],
+      ).createShader(rect);
+    canvas.drawRect(rect, paint);
+    final bubble = Paint()..color = colors.accentColor.withValues(alpha: .055);
+    canvas.drawCircle(Offset(rect.width * .86, rect.height * .12), rect.width * .18, bubble);
+    canvas.drawCircle(Offset(rect.width * .08, rect.height * .76), rect.width * .14, bubble);
+    bubble.color = colors.secondaryAccentColor.withValues(alpha: .05);
+    canvas.drawCircle(Offset(rect.width * .55, rect.height * .92), rect.width * .22, bubble);
+  }
+
+  void _paintNeon(Canvas canvas, Rect rect) {
+    final base = Paint()
+      ..shader = const LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [Color(0xFF01040C), Color(0xFF03112B), Color(0xFF080016)],
+      ).createShader(rect);
+    canvas.drawRect(rect, base);
+
+    final cyanGlow = Paint()
+      ..shader = RadialGradient(
+        center: const Alignment(-.8, -.65),
+        radius: .9,
+        colors: [colors.accentColor.withValues(alpha: .18), Colors.transparent],
+      ).createShader(rect);
+    canvas.drawRect(rect, cyanGlow);
+    final magentaGlow = Paint()
+      ..shader = RadialGradient(
+        center: const Alignment(.85, .7),
+        radius: 1,
+        colors: [colors.secondaryAccentColor.withValues(alpha: .16), Colors.transparent],
+      ).createShader(rect);
+    canvas.drawRect(rect, magentaGlow);
+
+    final grid = Paint()
+      ..color = colors.accentColor.withValues(alpha: .075)
+      ..strokeWidth = .7;
+    const step = 36.0;
+    for (double x = 0; x <= rect.width; x += step) {
+      canvas.drawLine(Offset(x, 0), Offset(x, rect.height), grid);
+    }
+    for (double y = 0; y <= rect.height; y += step) {
+      canvas.drawLine(Offset(0, y), Offset(rect.width, y), grid);
+    }
+  }
+
+  void _paintTropical(Canvas canvas, Rect rect) {
+    final base = Paint()
+      ..shader = const LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: [
+          Color(0xFF5ED3D6),
+          Color(0xFFB8F0E7),
+          Color(0xFFF6E1B5),
+          Color(0xFFECCB8C),
+        ],
+        stops: [0, .56, .76, 1],
+      ).createShader(rect);
+    canvas.drawRect(rect, base);
+
+    final sun = Paint()..color = const Color(0xFFFFC45C).withValues(alpha: .36);
+    canvas.drawCircle(Offset(rect.width * .84, rect.height * .17), rect.height * .12, sun);
+
+    final wave = Paint()
+      ..color = const Color(0xFFFFFFFF).withValues(alpha: .28)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.4;
+    for (var i = 0; i < 4; i++) {
+      final path = Path()..moveTo(0, rect.height * (.60 + i * .035));
+      for (double x = 0; x <= rect.width; x += 28) {
+        path.quadraticBezierTo(
+          x + 7,
+          rect.height * (.60 + i * .035) - 5,
+          x + 14,
+          rect.height * (.60 + i * .035),
+        );
+        path.quadraticBezierTo(
+          x + 21,
+          rect.height * (.60 + i * .035) + 5,
+          x + 28,
+          rect.height * (.60 + i * .035),
+        );
+      }
+      canvas.drawPath(path, wave);
+    }
+
+    final leaf = Paint()
+      ..color = const Color(0xFF087E68).withValues(alpha: .22)
+      ..strokeWidth = 5
+      ..strokeCap = StrokeCap.round;
+    _drawPalm(canvas, Offset(8, 18), 1, leaf);
+    _drawPalm(canvas, Offset(rect.width - 8, 24), -1, leaf);
+  }
+
+  void _drawPalm(Canvas canvas, Offset origin, double direction, Paint paint) {
+    final stem = Path()
+      ..moveTo(origin.dx, origin.dy)
+      ..quadraticBezierTo(
+        origin.dx + 34 * direction,
+        origin.dy + 28,
+        origin.dx + 54 * direction,
+        origin.dy + 74,
+      );
+    canvas.drawPath(stem, paint);
+    for (var i = 0; i < 5; i++) {
+      final y = origin.dy + 12 + i * 11;
+      canvas.drawLine(
+        Offset(origin.dx + (12 + i * 7) * direction, y),
+        Offset(origin.dx + (58 + i * 8) * direction, y - 22 + i * 2),
+        paint..strokeWidth = 3,
+      );
+    }
+  }
+
+  void _paintIndustrial(Canvas canvas, Rect rect) {
+    final base = Paint()
+      ..shader = const LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [Color(0xFF11100F), Color(0xFF292521), Color(0xFF171513)],
+      ).createShader(rect);
+    canvas.drawRect(rect, base);
+
+    final seam = Paint()
+      ..color = const Color(0xFF8A7C6B).withValues(alpha: .12)
+      ..strokeWidth = 1.2;
+    const plateW = 180.0;
+    const plateH = 120.0;
+    for (double x = 0; x < rect.width; x += plateW) {
+      canvas.drawLine(Offset(x, 0), Offset(x, rect.height), seam);
+    }
+    for (double y = 0; y < rect.height; y += plateH) {
+      canvas.drawLine(Offset(0, y), Offset(rect.width, y), seam);
+    }
+    final rivet = Paint()..color = const Color(0xFFB7AA98).withValues(alpha: .18);
+    for (double x = 12; x < rect.width; x += plateW) {
+      for (double y = 12; y < rect.height; y += plateH) {
+        canvas.drawCircle(Offset(x, y), 2.2, rivet);
+      }
+    }
+    final slash = Paint()
+      ..color = colors.accentColor.withValues(alpha: .035)
+      ..strokeWidth = 9;
+    for (double x = -rect.height; x < rect.width; x += 76) {
+      canvas.drawLine(Offset(x, rect.height), Offset(x + rect.height, 0), slash);
+    }
+  }
+
+  void _paintVintage(Canvas canvas, Rect rect) {
+    final base = Paint()
+      ..shader = const LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [Color(0xFFFFEDC7), Color(0xFFEAD0A0), Color(0xFFF7E5BF)],
+      ).createShader(rect);
+    canvas.drawRect(rect, base);
+
+    final grain = Paint()..color = const Color(0xFF5D351B).withValues(alpha: .055);
+    var seed = 17;
+    for (var i = 0; i < 460; i++) {
+      seed = (seed * 1103515245 + 12345) & 0x7fffffff;
+      final x = (seed % 10000) / 10000 * rect.width;
+      seed = (seed * 1103515245 + 12345) & 0x7fffffff;
+      final y = (seed % 10000) / 10000 * rect.height;
+      canvas.drawCircle(Offset(x, y), .55 + (seed % 3) * .25, grain);
+    }
+    final frame = Paint()
+      ..color = colors.accentColor.withValues(alpha: .28)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.3;
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(rect.deflate(8), const Radius.circular(12)),
+      frame,
+    );
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(rect.deflate(13), const Radius.circular(9)),
+      frame..color = colors.accentColor.withValues(alpha: .13),
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _CocktailBotThemeBackgroundPainter oldDelegate) {
+    return oldDelegate.colors.toJson().toString() != colors.toJson().toString();
+  }
+}
+
+BoxDecoration cocktailBotNavigationDecoration(AppColorThemeConfig colors) {
+  final radius = switch (colors.visualStyle) {
+    AppVisualStyle.industrial => 0.0,
+    AppVisualStyle.vintage => 0.0,
+    _ => 0.0,
+  };
+  return BoxDecoration(
+    color: colors.navigationColor.withValues(alpha: .94),
+    gradient: switch (colors.visualStyle) {
+      AppVisualStyle.elegant => LinearGradient(
+          colors: [const Color(0xFF080808), colors.navigationColor, const Color(0xFF151006)],
+        ),
+      AppVisualStyle.neon => LinearGradient(
+          colors: [const Color(0xFF02091A), colors.navigationColor, const Color(0xFF09031A)],
+        ),
+      AppVisualStyle.tropical => LinearGradient(
+          colors: [const Color(0xFF078C9A), colors.navigationColor, const Color(0xFF0BB9B0)],
+        ),
+      AppVisualStyle.industrial => LinearGradient(
+          colors: [const Color(0xFF161310), colors.navigationColor, const Color(0xFF27211B)],
+        ),
+      AppVisualStyle.vintage => LinearGradient(
+          colors: [const Color(0xFFE0BD84), colors.navigationColor, const Color(0xFFF0D7A6)],
+        ),
+      AppVisualStyle.modern => LinearGradient(
+          colors: [const Color(0xFFFFFFFF), colors.navigationColor, const Color(0xFFF0F5FA)],
+        ),
+    },
+    borderRadius: BorderRadius.circular(radius),
+    border: Border(bottom: BorderSide(color: colors.borderColor, width: 1)),
+    boxShadow: colors.visualStyle == AppVisualStyle.neon
+        ? [BoxShadow(color: colors.accentColor.withValues(alpha: .16), blurRadius: 16)]
+        : null,
   );
 }
 
@@ -943,6 +1320,32 @@ extension AppColorSlotMeta on AppColorSlot {
       };
 }
 
+
+enum AppVisualStyle { elegant, modern, neon, tropical, industrial, vintage }
+
+extension AppVisualStyleMeta on AppVisualStyle {
+  String get storageValue => name;
+}
+
+AppVisualStyle _appVisualStyleFromStorage(String? value) {
+  return AppVisualStyle.values.firstWhere(
+    (style) => style.name == value,
+    orElse: () => AppVisualStyle.elegant,
+  );
+}
+
+AppVisualStyle _inferVisualStyle(int background, int accent) {
+  const signatures = <(int, int), AppVisualStyle>{
+    (0xFF070707, 0xFFD8A62A): AppVisualStyle.elegant,
+    (0xFFF3F6FA, 0xFF1976F3): AppVisualStyle.modern,
+    (0xFF020817, 0xFF00E7FF): AppVisualStyle.neon,
+    (0xFFE8F8F4, 0xFFFF7A1A): AppVisualStyle.tropical,
+    (0xFF171513, 0xFFE88719): AppVisualStyle.industrial,
+    (0xFFF0DFC0, 0xFF7A3F12): AppVisualStyle.vintage,
+  };
+  return signatures[(background, accent)] ?? AppVisualStyle.elegant;
+}
+
 class AppColorThemeConfig {
   const AppColorThemeConfig({
     required this.background,
@@ -958,6 +1361,7 @@ class AppColorThemeConfig {
     required this.success,
     required this.warning,
     required this.error,
+    this.visualStyle = AppVisualStyle.elegant,
   });
 
   final int background;
@@ -973,6 +1377,7 @@ class AppColorThemeConfig {
   final int success;
   final int warning;
   final int error;
+  final AppVisualStyle visualStyle;
 
   factory AppColorThemeConfig.defaults() => const AppColorThemeConfig(
         // V18 Standard: Edel / Exklusiv
@@ -989,6 +1394,7 @@ class AppColorThemeConfig {
         success: 0xFF54D68B,
         warning: 0xFFFFB84D,
         error: 0xFFFF6565,
+        visualStyle: AppVisualStyle.elegant,
       );
 
   factory AppColorThemeConfig.fromJson(Map<String, dynamic> json) {
@@ -997,12 +1403,19 @@ class AppColorThemeConfig {
     int value(String key, int fallback) =>
         (json[key] as num?)?.toInt() ?? fallback;
 
+    final background = value('background', defaults.background);
+    final accent = value('accent', defaults.accent);
+    final savedStyle = json['visualStyle'] as String?;
+    final visualStyle = savedStyle == null
+        ? _inferVisualStyle(background, accent)
+        : _appVisualStyleFromStorage(savedStyle);
+
     return AppColorThemeConfig(
-      background: value('background', defaults.background),
+      background: background,
       surface: value('surface', defaults.surface),
       card: value('card', defaults.card),
       navigation: value('navigation', defaults.navigation),
-      accent: value('accent', defaults.accent),
+      accent: accent,
       secondaryAccent:
           value('secondaryAccent', defaults.secondaryAccent),
       border: value('border', defaults.border),
@@ -1012,6 +1425,7 @@ class AppColorThemeConfig {
       success: value('success', defaults.success),
       warning: value('warning', defaults.warning),
       error: value('error', defaults.error),
+      visualStyle: visualStyle,
     );
   }
 
@@ -1029,6 +1443,7 @@ class AppColorThemeConfig {
         'success': success,
         'warning': warning,
         'error': error,
+        'visualStyle': visualStyle.storageValue,
       };
 
   Color get backgroundColor => Color(background);
@@ -1044,6 +1459,11 @@ class AppColorThemeConfig {
   Color get successColor => Color(success);
   Color get warningColor => Color(warning);
   Color get errorColor => Color(error);
+  Color get navigationTextColor => navigationColor.computeLuminance() > .48
+      ? const Color(0xFF17202A)
+      : const Color(0xFFF7FAFC);
+  Color get navigationSecondaryTextColor =>
+      Color.lerp(navigationTextColor, navigationColor, .34)!;
 
   int valueOf(AppColorSlot slot) => switch (slot) {
         AppColorSlot.background => background,
@@ -1085,6 +1505,7 @@ class AppColorThemeConfig {
       success: slot == AppColorSlot.success ? value : success,
       warning: slot == AppColorSlot.warning ? value : warning,
       error: slot == AppColorSlot.error ? value : error,
+      visualStyle: visualStyle,
     );
   }
 }
@@ -5502,10 +5923,18 @@ class _HomeShellState extends State<HomeShell> {
           body: pages[index],
           bottomNavigationBar: Container(
             decoration: BoxDecoration(
-              color: widget.store.appColors.navigationColor,
+              color: widget.store.appColors.navigationColor.withValues(alpha: .96),
               border: Border(
                 top: BorderSide(color: widget.store.appColors.borderColor),
               ),
+              boxShadow: widget.store.appColors.visualStyle == AppVisualStyle.neon
+                  ? [
+                      BoxShadow(
+                        color: widget.store.appColors.accentColor.withValues(alpha: .16),
+                        blurRadius: 16,
+                      ),
+                    ]
+                  : null,
             ),
             child: SafeArea(
               top: false,
@@ -5524,7 +5953,7 @@ class _HomeShellState extends State<HomeShell> {
                               index == i ? nav[i].$2 : nav[i].$1,
                               color: index == i
                                   ? widget.store.appColors.accentColor
-                                  : widget.store.appColors.textSecondaryColor,
+                                  : widget.store.appColors.navigationSecondaryTextColor,
                             ),
                             const SizedBox(height: 4),
                             Text(
@@ -5534,7 +5963,7 @@ class _HomeShellState extends State<HomeShell> {
                                 fontSize: 11,
                                 color: index == i
                                     ? widget.store.appColors.accentColor
-                                    : widget.store.appColors.textSecondaryColor,
+                                    : widget.store.appColors.navigationSecondaryTextColor,
                               ),
                             ),
                           ],
@@ -5601,12 +6030,7 @@ class CocktailBotTopNavigation extends StatelessWidget {
       child: Container(
         height: 66,
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-        decoration: BoxDecoration(
-          color: store.appColors.navigationColor,
-          border: Border(
-            bottom: BorderSide(color: store.appColors.borderColor),
-          ),
-        ),
+        decoration: cocktailBotNavigationDecoration(store.appColors),
         child: Row(
           children: [
             Padding(
@@ -5642,7 +6066,7 @@ class CocktailBotTopNavigation extends StatelessWidget {
                                   size: 23,
                                   color: selected
                                       ? store.appColors.accentColor
-                                      : store.appColors.textSecondaryColor,
+                                      : store.appColors.navigationSecondaryTextColor,
                                 ),
                                 const SizedBox(width: 7),
                                 Flexible(
@@ -5654,7 +6078,7 @@ class CocktailBotTopNavigation extends StatelessWidget {
                                       fontSize: width <= 1050 ? 12.5 : 14,
                                       color: selected
                                           ? store.appColors.accentColor
-                                          : store.appColors.textPrimaryColor,
+                                          : store.appColors.navigationTextColor,
                                       fontWeight: selected
                                           ? FontWeight.w800
                                           : FontWeight.w600,
@@ -5738,7 +6162,7 @@ class CocktailBotSideNavigation extends StatelessWidget {
                                 selected ? nav[i].$2 : nav[i].$1,
                                 color: selected
                                     ? store.appColors.accentColor
-                                    : store.appColors.textSecondaryColor,
+                                    : store.appColors.navigationSecondaryTextColor,
                               ),
                               const SizedBox(width: 12),
                               Expanded(
@@ -5749,7 +6173,7 @@ class CocktailBotSideNavigation extends StatelessWidget {
                                   style: TextStyle(
                                     color: selected
                                         ? store.appColors.accentColor
-                                        : store.appColors.textPrimaryColor,
+                                        : store.appColors.navigationTextColor,
                                     fontWeight: FontWeight.w700,
                                   ),
                                 ),
@@ -5764,7 +6188,7 @@ class CocktailBotSideNavigation extends StatelessWidget {
                                 size: 27,
                                 color: selected
                                     ? store.appColors.accentColor
-                                    : store.appColors.textSecondaryColor,
+                                    : store.appColors.navigationSecondaryTextColor,
                               ),
                               const SizedBox(height: 5),
                               Text(
@@ -5777,7 +6201,7 @@ class CocktailBotSideNavigation extends StatelessWidget {
                                   height: 1.05,
                                   color: selected
                                       ? store.appColors.accentColor
-                                      : store.appColors.textPrimaryColor,
+                                      : store.appColors.navigationTextColor,
                                   fontWeight:
                                       selected ? FontWeight.w700 : FontWeight.w500,
                                 ),
@@ -6274,8 +6698,15 @@ class RecipeCard extends StatelessWidget {
     final alcoholPercent = store.recipeAlcoholPercent(recipe);
 
     return Material(
-      color: const Color(0xFF151B21),
+      color: store.appColors.cardColor,
       borderRadius: BorderRadius.circular(10),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(10),
+        side: BorderSide(
+          color: store.appColors.borderColor,
+          width: store.appColors.visualStyle == AppVisualStyle.neon ? 1.4 : 1,
+        ),
+      ),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: () => onOpenRecipe(
@@ -6317,8 +6748,8 @@ class RecipeCard extends StatelessWidget {
                         const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
                     decoration: BoxDecoration(
                       color: unavailable
-                          ? const Color(0xFFD32F2F)
-                          : const Color(0xFFF59E0B),
+                          ? store.appColors.errorColor
+                          : store.appColors.warningColor,
                       borderRadius: BorderRadius.circular(7),
                       boxShadow: const [
                         BoxShadow(
@@ -6546,8 +6977,8 @@ class _RecipeDetailPageState extends State<RecipeDetailPage> {
     List<Widget> detailWidgets() => [
           Text(
             tr('Beschreibung'),
-            style: const TextStyle(
-              color: Color(0xFF16E0D0),
+            style: TextStyle(
+              color: widget.store.appColors.accentColor,
               fontWeight: FontWeight.w900,
               fontSize: 15,
             ),
@@ -6563,8 +6994,8 @@ class _RecipeDetailPageState extends State<RecipeDetailPage> {
           const SizedBox(height: 14),
           Text(
             tr('Größe des Cocktails'),
-            style: const TextStyle(
-              color: Color(0xFF16E0D0),
+            style: TextStyle(
+              color: widget.store.appColors.accentColor,
               fontWeight: FontWeight.w900,
               fontSize: 15,
             ),
@@ -6608,7 +7039,7 @@ class _RecipeDetailPageState extends State<RecipeDetailPage> {
             const SizedBox(height: 8),
             Row(
               children: [
-                const Icon(Icons.local_bar, size: 17, color: Color(0xFFFFC857)),
+                Icon(Icons.local_bar, size: 17, color: widget.store.appColors.secondaryAccentColor),
                 const SizedBox(width: 7),
                 Expanded(
                   child: Text(
@@ -6649,14 +7080,15 @@ class _RecipeDetailPageState extends State<RecipeDetailPage> {
               width: double.infinity,
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
               decoration: BoxDecoration(
-                color: unavailable
-                    ? const Color(0xFF4A1717)
-                    : const Color(0xFF4A3510),
+                color: (unavailable
+                        ? widget.store.appColors.errorColor
+                        : widget.store.appColors.warningColor)
+                    .withValues(alpha: .14),
                 borderRadius: BorderRadius.circular(9),
                 border: Border.all(
                   color: unavailable
-                      ? const Color(0xFFE05252)
-                      : const Color(0xFFF59E0B),
+                      ? widget.store.appColors.errorColor
+                      : widget.store.appColors.warningColor,
                 ),
               ),
               child: Row(
@@ -6667,8 +7099,8 @@ class _RecipeDetailPageState extends State<RecipeDetailPage> {
                         : Icons.warning_amber_rounded,
                     size: 19,
                     color: unavailable
-                        ? const Color(0xFFFF6B6B)
-                        : const Color(0xFFFFB020),
+                        ? widget.store.appColors.errorColor
+                        : widget.store.appColors.warningColor,
                   ),
                   const SizedBox(width: 8),
                   Expanded(
@@ -6688,8 +7120,8 @@ class _RecipeDetailPageState extends State<RecipeDetailPage> {
           const SizedBox(height: 12),
           Text(
             tr('Zutaten'),
-            style: const TextStyle(
-              color: Color(0xFF16E0D0),
+            style: TextStyle(
+              color: widget.store.appColors.accentColor,
               fontWeight: FontWeight.w900,
               fontSize: 15,
             ),
@@ -6720,8 +7152,8 @@ class _RecipeDetailPageState extends State<RecipeDetailPage> {
                         : Icons.pan_tool_alt_outlined,
                     size: 17,
                     color: p.delayed
-                        ? const Color(0xFFFFA726)
-                        : const Color(0xFF15D6CA),
+                        ? widget.store.appColors.warningColor
+                        : widget.store.appColors.accentColor,
                   ),
                   const SizedBox(width: 9),
                   Expanded(
@@ -6739,25 +7171,25 @@ class _RecipeDetailPageState extends State<RecipeDetailPage> {
                         vertical: 3,
                       ),
                       decoration: BoxDecoration(
-                        color: const Color(0xFFFFA726).withValues(alpha: .14),
+                        color: widget.store.appColors.warningColor.withValues(alpha: .14),
                         borderRadius: BorderRadius.circular(7),
                         border: Border.all(
-                          color: const Color(0xFFFFA726).withValues(alpha: .75),
+                          color: widget.store.appColors.warningColor.withValues(alpha: .75),
                         ),
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Icon(
+                          Icon(
                             Icons.pan_tool_alt_outlined,
                             size: 12,
-                            color: Color(0xFFFFA726),
+                            color: widget.store.appColors.warningColor,
                           ),
                           const SizedBox(width: 4),
                           Text(
                             tr('Manuell'),
-                            style: const TextStyle(
-                              color: Color(0xFFFFB74D),
+                            style: TextStyle(
+                              color: widget.store.appColors.warningColor,
                               fontSize: 10.5,
                               fontWeight: FontWeight.w800,
                             ),
@@ -6769,8 +7201,8 @@ class _RecipeDetailPageState extends State<RecipeDetailPage> {
                   const SizedBox(width: 8),
                   Text(
                     '${scaledAmount.toStringAsFixed(scaledAmount < 10 ? 1 : 0)} ml',
-                    style: const TextStyle(
-                      color: Color(0xFF16E0D0),
+                    style: TextStyle(
+                      color: widget.store.appColors.accentColor,
                       fontWeight: FontWeight.w700,
                     ),
                   ),
@@ -6782,8 +7214,8 @@ class _RecipeDetailPageState extends State<RecipeDetailPage> {
             const SizedBox(height: 12),
             Text(
               tr('Hinweise'),
-              style: const TextStyle(
-                color: Color(0xFF16E0D0),
+              style: TextStyle(
+                color: widget.store.appColors.accentColor,
                 fontWeight: FontWeight.w900,
                 fontSize: 15,
               ),
@@ -6794,10 +7226,10 @@ class _RecipeDetailPageState extends State<RecipeDetailPage> {
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Icon(
+                    Icon(
                       Icons.info_outline,
                       size: 17,
-                      color: Color(0xFFFFA726),
+                      color: widget.store.appColors.warningColor,
                     ),
                     const SizedBox(width: 8),
                     Expanded(
@@ -6830,7 +7262,7 @@ class _RecipeDetailPageState extends State<RecipeDetailPage> {
                   IconButton(
                     tooltip: tr('Zurück'),
                     onPressed: () => Navigator.of(context).pop(),
-                    icon: const Icon(Icons.arrow_back, color: Color(0xFF16E0D0)),
+                    icon: Icon(Icons.arrow_back, color: widget.store.appColors.accentColor),
                   ),
                   const SizedBox(width: 4),
                   Expanded(
@@ -6862,7 +7294,7 @@ class _RecipeDetailPageState extends State<RecipeDetailPage> {
                                   width: double.infinity,
                                   clipBehavior: Clip.antiAlias,
                                   decoration: BoxDecoration(
-                                    color: const Color(0xFF090E13),
+                                    color: widget.store.appColors.cardColor,
                                     borderRadius: BorderRadius.circular(12),
                                     border: Border.all(
                                       color: widget.store.appColors.borderColor,
@@ -6905,7 +7337,7 @@ class _RecipeDetailPageState extends State<RecipeDetailPage> {
                         Container(
                           height: responsive.height <= 760 ? 240 : 320,
                           width: double.infinity,
-                          color: const Color(0xFF090E13),
+                          color: widget.store.appColors.cardColor,
                           padding: const EdgeInsets.all(10),
                           child: cocktailImage(
                             image,
@@ -7261,30 +7693,38 @@ class SettingsPage extends StatelessWidget {
         ? text
         : '${store.t('Gewerbelizenz erforderlich')} · $text';
 
+    final accent = store.appColors.accentColor;
+    final secondary = store.appColors.secondaryAccentColor;
+    final success = store.appColors.successColor;
+    final warning = store.appColors.warningColor;
+    final error = store.appColors.errorColor;
+    final mixed = Color.lerp(accent, secondary, .5)!;
+    final softAccent = Color.lerp(accent, store.appColors.textPrimaryColor, .28)!;
+
     final items = [
-      (store.t('settingsConnection'), store.connected ? tr('Raspberry Pi verbunden') : tr('Lokale GPIO-Steuerung'), Icons.wifi, const Color(0xFF12DDD0), ConnectionPage(store: store)),
-      (store.t('settingsLanguage'), '${store.t('settingsLanguageSub')}: ${store.appLanguage.nativeName}', Icons.language, const Color(0xFF8B5CF6), LanguageSettingsPage(store: store)),
-      (store.t('settingsDesign'), store.t('settingsDesignSub'), Icons.palette_outlined, store.appColors.accentColor, ThemeSettingsPage(store: store)),
-      (store.t('Anzeige'), store.t('Sortierung und Cocktails pro Seite einstellen'), Icons.grid_view_outlined, const Color(0xFF38BDF8), CocktailDisplaySettingsPage(store: store)),
-      (store.t('Sicherheit & Freigaben'), store.t('Stärkeregler und Einstellungs-Passwort'), Icons.admin_panel_settings_outlined, const Color(0xFF22C55E), SecuritySettingsPage(store: store)),
-      (store.t('settingsLed'), store.t('settingsLedSub'), Icons.light_mode_outlined, const Color(0xFFFFC857), LedSettingsPage(store: store)),
-      (store.t('settingsCalibration'), store.t('settingsCalibrationSub'), Icons.science_outlined, const Color(0xFFB05CFF), CalibrationPage(store: store)),
-      (store.t('settingsSizes'), store.t('settingsSizesSub'), Icons.straighten, const Color(0xFF38BDF8), ServingSizesPage(store: store)),
-      (store.t('settingsFill'), store.t('settingsFillSub'), Icons.inventory_2_outlined, const Color(0xFFFFB000), FillLevelsPage(store: store)),
-      (store.t('settingsCleaning'), store.t('settingsCleaningSub'), Icons.cleaning_services_outlined, const Color(0xFFFF5449), SequencePage(store: store, cleaning: true)),
-      (store.t('settingsPriming'), store.t('settingsPrimingSub'), Icons.air, const Color(0xFFFF493F), SequencePage(store: store, cleaning: false)),
-      (store.t('settingsIngredients'), store.t('settingsIngredientsSub'), Icons.local_drink_outlined, const Color(0xFF8DDD28), IngredientPage(store: store)),
-      (store.t('settingsRecipes'), store.t('settingsRecipesSub'), Icons.receipt_long_outlined, const Color(0xFFFF2B86), RecipeManagementPage(store: store)),
+      (store.t('settingsConnection'), store.connected ? tr('Raspberry Pi verbunden') : tr('Lokale GPIO-Steuerung'), Icons.wifi, accent, ConnectionPage(store: store)),
+      (store.t('settingsLanguage'), '${store.t('settingsLanguageSub')}: ${store.appLanguage.nativeName}', Icons.language, secondary, LanguageSettingsPage(store: store)),
+      (store.t('settingsDesign'), store.t('settingsDesignSub'), Icons.palette_outlined, accent, ThemeSettingsPage(store: store)),
+      (store.t('Anzeige'), store.t('Sortierung und Cocktails pro Seite einstellen'), Icons.grid_view_outlined, mixed, CocktailDisplaySettingsPage(store: store)),
+      (store.t('Sicherheit & Freigaben'), store.t('Stärkeregler und Einstellungs-Passwort'), Icons.admin_panel_settings_outlined, success, SecuritySettingsPage(store: store)),
+      (store.t('settingsLed'), store.t('settingsLedSub'), Icons.light_mode_outlined, warning, LedSettingsPage(store: store)),
+      (store.t('settingsCalibration'), store.t('settingsCalibrationSub'), Icons.science_outlined, secondary, CalibrationPage(store: store)),
+      (store.t('settingsSizes'), store.t('settingsSizesSub'), Icons.straighten, mixed, ServingSizesPage(store: store)),
+      (store.t('settingsFill'), store.t('settingsFillSub'), Icons.inventory_2_outlined, warning, FillLevelsPage(store: store)),
+      (store.t('settingsCleaning'), store.t('settingsCleaningSub'), Icons.cleaning_services_outlined, error, SequencePage(store: store, cleaning: true)),
+      (store.t('settingsPriming'), store.t('settingsPrimingSub'), Icons.air, error, SequencePage(store: store, cleaning: false)),
+      (store.t('settingsIngredients'), store.t('settingsIngredientsSub'), Icons.local_drink_outlined, success, IngredientPage(store: store)),
+      (store.t('settingsRecipes'), store.t('settingsRecipesSub'), Icons.receipt_long_outlined, secondary, RecipeManagementPage(store: store)),
 
       // Lizenzbereich: alle lizenzpflichtigen Funktionen stehen gesammelt unten.
-      (store.t('Gewerbelizenz'), store.commercialLicenseStatusText, Icons.verified_user_outlined, store.commercialLicenseActive ? const Color(0xFF22C55E) : const Color(0xFFFFB454), CommercialLicensePage(store: store)),
-      (store.t('Verbrauchsstatistik'), commercialSubtitle(store.t('Cocktail-Ranking, Kosten und Zutatenverbrauch')), Icons.bar_chart_outlined, const Color(0xFF22C55E), commercialPage(store.t('Verbrauchsstatistik'), ConsumptionStatisticsPage(store: store))),
-      (store.t('Partykarten'), commercialSubtitle(store.t('Auswahl und Beliebtheit für Veranstaltungen')), Icons.fact_check_outlined, const Color(0xFF38BDF8), commercialPage(store.t('Partykarten'), PartyCardsPage(store: store))),
-      (store.t('Partyplaner'), commercialSubtitle(store.t('Prognose aus vergangenen Partys')), Icons.event_available_outlined, const Color(0xFFB05CFF), commercialPage(store.t('Partyplaner'), PartyPlannerPage(store: store))),
-      (store.t('Einkaufsliste'), commercialSubtitle(store.t('Zutatenbedarf und fehlende Mengen planen')), Icons.shopping_cart_outlined, const Color(0xFFFFB454), commercialPage(store.t('Einkaufsliste'), PartyPlannerPage(store: store))),
-      (store.t('PayPal Kassenmodus'), commercialSubtitle(store.t('Lokale PayPal-Zahlung über den Raspberry Pi')), Icons.payments_outlined, const Color(0xFF14B8A6), commercialPage(store.t('PayPal Kassenmodus'), PaymentSettingsPage(store: store))),
-      (store.t('Cocktailpreise'), commercialSubtitle(store.t('Einzelpreise pro Cocktail festlegen')), Icons.euro_outlined, const Color(0xFF22C55E), commercialPage(store.t('Cocktailpreise'), CocktailPricesPage(store: store))),
-      (store.t('Branding'), commercialSubtitle(store.t('Barname und Gewerbehinweis')), Icons.storefront_outlined, const Color(0xFFCB9B3E), commercialPage(store.t('Branding'), CommercialBrandingPage(store: store))),
+      (store.t('Gewerbelizenz'), store.commercialLicenseStatusText, Icons.verified_user_outlined, store.commercialLicenseActive ? success : warning, CommercialLicensePage(store: store)),
+      (store.t('Verbrauchsstatistik'), commercialSubtitle(store.t('Cocktail-Ranking, Kosten und Zutatenverbrauch')), Icons.bar_chart_outlined, success, commercialPage(store.t('Verbrauchsstatistik'), ConsumptionStatisticsPage(store: store))),
+      (store.t('Partykarten'), commercialSubtitle(store.t('Auswahl und Beliebtheit für Veranstaltungen')), Icons.fact_check_outlined, mixed, commercialPage(store.t('Partykarten'), PartyCardsPage(store: store))),
+      (store.t('Partyplaner'), commercialSubtitle(store.t('Prognose aus vergangenen Partys')), Icons.event_available_outlined, secondary, commercialPage(store.t('Partyplaner'), PartyPlannerPage(store: store))),
+      (store.t('Einkaufsliste'), commercialSubtitle(store.t('Zutatenbedarf und fehlende Mengen planen')), Icons.shopping_cart_outlined, warning, commercialPage(store.t('Einkaufsliste'), PartyPlannerPage(store: store))),
+      (store.t('PayPal Kassenmodus'), commercialSubtitle(store.t('Lokale PayPal-Zahlung über den Raspberry Pi')), Icons.payments_outlined, accent, commercialPage(store.t('PayPal Kassenmodus'), PaymentSettingsPage(store: store))),
+      (store.t('Cocktailpreise'), commercialSubtitle(store.t('Einzelpreise pro Cocktail festlegen')), Icons.euro_outlined, success, commercialPage(store.t('Cocktailpreise'), CocktailPricesPage(store: store))),
+      (store.t('Branding'), commercialSubtitle(store.t('Barname und Gewerbehinweis')), Icons.storefront_outlined, softAccent, commercialPage(store.t('Branding'), CommercialBrandingPage(store: store))),
     ];
 
     return SafeArea(
@@ -7400,7 +7840,7 @@ class SettingsPage extends StatelessWidget {
                 width: double.infinity,
                 child: FilledButton.icon(
                   style: FilledButton.styleFrom(
-                    backgroundColor: const Color(0xFFD62F2F),
+                    backgroundColor: store.appColors.errorColor,
                     foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(vertical: 16),
                   ),
@@ -7419,7 +7859,7 @@ class SettingsPage extends StatelessWidget {
                           ),
                           FilledButton(
                             style: FilledButton.styleFrom(
-                              backgroundColor: const Color(0xFFD62F2F),
+                              backgroundColor: store.appColors.errorColor,
                             ),
                             onPressed: () => Navigator.pop(dialogContext, true),
                             child: Text(tr('App schließen')),
@@ -7974,6 +8414,7 @@ class _ThemeSettingsPageState extends State<ThemeSettingsPage> {
     (
       'Edel / Exklusiv',
       AppColorThemeConfig(
+        visualStyle: AppVisualStyle.elegant,
         background: 0xFF070707,
         surface: 0xFF0D0D0D,
         card: 0xFF14120E,
@@ -7992,6 +8433,7 @@ class _ThemeSettingsPageState extends State<ThemeSettingsPage> {
     (
       'Modern / Clean',
       AppColorThemeConfig(
+        visualStyle: AppVisualStyle.modern,
         background: 0xFFF3F6FA,
         surface: 0xFFFFFFFF,
         card: 0xFFFFFFFF,
@@ -8010,6 +8452,7 @@ class _ThemeSettingsPageState extends State<ThemeSettingsPage> {
     (
       'Futuristisch / Neon',
       AppColorThemeConfig(
+        visualStyle: AppVisualStyle.neon,
         background: 0xFF020817,
         surface: 0xFF071127,
         card: 0xFF0A1530,
@@ -8028,6 +8471,7 @@ class _ThemeSettingsPageState extends State<ThemeSettingsPage> {
     (
       'Tropisch / Sommer',
       AppColorThemeConfig(
+        visualStyle: AppVisualStyle.tropical,
         background: 0xFFE8F8F4,
         surface: 0xFFD7F4EE,
         card: 0xFFFFFEF8,
@@ -8046,6 +8490,7 @@ class _ThemeSettingsPageState extends State<ThemeSettingsPage> {
     (
       'Industrial / Loft',
       AppColorThemeConfig(
+        visualStyle: AppVisualStyle.industrial,
         background: 0xFF171513,
         surface: 0xFF24211E,
         card: 0xFF302B26,
@@ -8064,6 +8509,7 @@ class _ThemeSettingsPageState extends State<ThemeSettingsPage> {
     (
       'Vintage / Klassisch',
       AppColorThemeConfig(
+        visualStyle: AppVisualStyle.vintage,
         background: 0xFFF0DFC0,
         surface: 0xFFF8E8C9,
         card: 0xFFFFF1D2,
@@ -8201,7 +8647,8 @@ class _ThemeSettingsPageState extends State<ThemeSettingsPage> {
         a.progressTrack == b.progressTrack &&
         a.success == b.success &&
         a.warning == b.warning &&
-        a.error == b.error;
+        a.error == b.error &&
+        a.visualStyle == b.visualStyle;
   }
 
   Widget _themeDot(Color color) {
@@ -8320,16 +8767,22 @@ class _ThemeSettingsPageState extends State<ThemeSettingsPage> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Container(
-                padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: theme.backgroundColor,
                   borderRadius: BorderRadius.circular(16),
                   border: Border.all(color: theme.borderColor),
                 ),
-                child: Column(
+                clipBehavior: Clip.antiAlias,
+                child: Stack(
                   children: [
-                    Row(
-                      children: [
+                    Positioned.fill(
+                      child: CocktailBotThemeBackground(colors: theme),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.all(10),
+                      child: Column(
+                        children: [
+                          Row(
+                            children: [
                         Icon(Icons.local_bar, color: theme.accentColor, size: 18),
                         const SizedBox(width: 8),
                         Expanded(
@@ -8351,8 +8804,11 @@ class _ThemeSettingsPageState extends State<ThemeSettingsPage> {
                         ],
                       ],
                     ),
-                    const SizedBox(height: 10),
-                    _miniCocktailCard(theme),
+                          const SizedBox(height: 10),
+                          _miniCocktailCard(theme),
+                        ],
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -9188,12 +9644,12 @@ class CalibrationPage extends StatelessWidget {
                   padding: const EdgeInsets.all(16),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
-                    children: const [
+                    children: [
                       Row(
                         children: [
                           Icon(
                             Icons.info_outline,
-                            color: Color(0xFF16D9CC),
+                            color: store.appColors.accentColor,
                           ),
                           SizedBox(width: 10),
                           Expanded(
@@ -9219,7 +9675,7 @@ class CalibrationPage extends StatelessWidget {
                         'automatisch verwendeten Zutaten einer aktiven Pumpe '
                         'zugeordnet und diese Pumpen kalibriert wurden.',
                         style: TextStyle(
-                          color: Color(0xFFB5C0C9),
+                          color: store.appColors.textSecondaryColor,
                           height: 1.45,
                         ),
                       ),
@@ -9846,10 +10302,10 @@ class _SequencePageState extends State<SequencePage> {
             padding: const EdgeInsets.all(16),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              children: const [
+              children: [
                 Row(
                   children: [
-                    Icon(Icons.info_outline, color: Color(0xFF16D9CC)),
+                    Icon(Icons.info_outline, color: widget.store.appColors.accentColor),
                     SizedBox(width: 10),
                     Expanded(
                       child: T('Hinweis zum Entlüften',
@@ -9869,7 +10325,7 @@ class _SequencePageState extends State<SequencePage> {
                   'Pumpe benötigt. Die eingestellten Zeiten werden dauerhaft '
                   'gespeichert und beim nächsten Entlüften erneut verwendet.',
                   style: TextStyle(
-                    color: Color(0xFFB5C0C9),
+                    color: widget.store.appColors.textSecondaryColor,
                     height: 1.45,
                   ),
                 ),
@@ -9975,10 +10431,10 @@ class _SequencePageState extends State<SequencePage> {
             padding: const EdgeInsets.all(16),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              children: const [
+              children: [
                 Row(
                   children: [
-                    Icon(Icons.info_outline, color: Color(0xFFFF6257)),
+                    Icon(Icons.info_outline, color: widget.store.appColors.errorColor),
                     SizedBox(width: 10),
                     Expanded(
                       child: T('Anleitung zur Reinigung',
@@ -10004,7 +10460,7 @@ class _SequencePageState extends State<SequencePage> {
                   'vorher ein Handtuch unter die Pumpen. Dieser Schritt ist '
                   'wichtig, um Schimmel in den Pumpen zu verhindern.',
                   style: TextStyle(
-                    color: Color(0xFFB5C0C9),
+                    color: widget.store.appColors.textSecondaryColor,
                     height: 1.45,
                   ),
                 ),
@@ -11041,11 +11497,11 @@ class _IngredientPageState extends State<IngredientPage> {
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(14),
-                        border: Border.all(color: const Color(0x33FFFFFF)),
+                        border: Border.all(color: widget.store.appColors.borderColor),
                       ),
                       child: Text(
                         tr('Literpreise und Kostenberechnung sind nur in der Lizenzversion verfügbar.'),
-                        style: const TextStyle(color: Color(0xFFB5C0C9)),
+                        style: TextStyle(color: widget.store.appColors.textSecondaryColor),
                       ),
                     ),
                     const SizedBox(height: 12),
@@ -13633,7 +14089,7 @@ class _RecipeManagementPageState extends State<RecipeManagementPage> {
                     DrinkCategory.mocktail => Icons.local_drink,
                     DrinkCategory.shot => Icons.liquor,
                   },
-                  color: const Color(0xFF16D9CC),
+                  color: widget.store.appColors.accentColor,
                 ),
                 title: Text(widget.store.displayRecipeName(recipe)),
                 subtitle: Text('${recipe.baseVolumeMl.toStringAsFixed(0)} ml ${tr('Rezeptbasis')} · '
