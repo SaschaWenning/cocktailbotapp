@@ -770,9 +770,13 @@ ThemeData buildTheme(
 ) {
   final accent = colors.accentColor;
   final surface = colors.surfaceColor;
+  final effectiveBrightness =
+      colors.backgroundColor.computeLuminance() > 0.52
+          ? Brightness.light
+          : Brightness.dark;
   final scheme = ColorScheme.fromSeed(
     seedColor: accent,
-    brightness: Brightness.dark,
+    brightness: effectiveBrightness,
   ).copyWith(
     primary: accent,
     secondary: colors.secondaryAccentColor,
@@ -783,7 +787,7 @@ ThemeData buildTheme(
 
   final base = ThemeData(
     useMaterial3: true,
-    brightness: Brightness.dark,
+    brightness: effectiveBrightness,
     colorScheme: scheme,
   );
 
@@ -810,7 +814,8 @@ ThemeData buildTheme(
     filledButtonTheme: FilledButtonThemeData(
       style: FilledButton.styleFrom(
         backgroundColor: accent,
-        foregroundColor: Colors.black,
+        foregroundColor:
+            accent.computeLuminance() > .48 ? Colors.black : Colors.white,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(9),
         ),
@@ -970,19 +975,20 @@ class AppColorThemeConfig {
   final int error;
 
   factory AppColorThemeConfig.defaults() => const AppColorThemeConfig(
-        background: 0xFF07111A,
-        surface: 0xFF0D1823,
-        card: 0xFF122131,
-        navigation: 0xFF0A141D,
-        accent: 0xFF14B8A6,
-        secondaryAccent: 0xFF51E3D4,
-        border: 0xFF1F3244,
-        textPrimary: 0xFFF8FAFC,
-        textSecondary: 0xFF9FB0C3,
-        progressTrack: 0xFF203244,
-        success: 0xFF4FD38B,
-        warning: 0xFFFFB454,
-        error: 0xFFFF6B6B,
+        // V18 Standard: Edel / Exklusiv
+        background: 0xFF070707,
+        surface: 0xFF0D0D0D,
+        card: 0xFF14120E,
+        navigation: 0xFF090909,
+        accent: 0xFFD8A62A,
+        secondaryAccent: 0xFFFFD76A,
+        border: 0xFF5A4618,
+        textPrimary: 0xFFFFF8E7,
+        textSecondary: 0xFFC8B98F,
+        progressTrack: 0xFF2A2417,
+        success: 0xFF54D68B,
+        warning: 0xFFFFB84D,
+        error: 0xFFFF6565,
       );
 
   factory AppColorThemeConfig.fromJson(Map<String, dynamic> json) {
@@ -1081,6 +1087,18 @@ class AppColorThemeConfig {
       error: slot == AppColorSlot.error ? value : error,
     );
   }
+}
+
+bool _isLegacyDesignPreset(AppColorThemeConfig colors) {
+  const legacySignatures = <(int, int)>{
+    (0xFF07111A, 0xFF14B8A6),
+    (0xFF0D1117, 0xFFD84C7F),
+    (0xFFF6F1E9, 0xFFCB9B3E),
+    (0xFFF4F8FA, 0xFF16C2BE),
+    (0xFF061225, 0xFF4EA8DE),
+    (0xFFF5F2FA, 0xFF8B7FD6),
+  };
+  return legacySignatures.contains((colors.background, colors.accent));
 }
 
 String appText(AppLanguage language, String key) {
@@ -1954,6 +1972,12 @@ String appText(AppLanguage language, String key) {
     'Deaktivieren': 'Disable',
     'Der Raspberry installiert die Lizenz nach erfolgreicher Prüfung automatisch. Es sind keine Terminal- oder sudo-Befehle nötig.': 'The Raspberry installs the license automatically after successful verification. No terminal or sudo commands are required.',
     'Design wurde gespeichert': 'Design saved',
+    'Edel / Exklusiv': 'Elegant / Exclusive',
+    'Modern / Clean': 'Modern / Clean',
+    'Futuristisch / Neon': 'Futuristic / Neon',
+    'Tropisch / Sommer': 'Tropical / Summer',
+    'Industrial / Loft': 'Industrial / Loft',
+    'Vintage / Klassisch': 'Vintage / Classic',
     'Die Lizenzdatei ist leer.': 'The license file is empty.',
     'Die ausgewählte Datei ist keine gültige CocktailBot-Lizenzdatei.': 'The selected file is not a valid CocktailBot license file.',
     'Diese Daten können später auf Kassenmodus, Exporten und Berichten angezeigt werden.': 'These details can later be shown in checkout mode, exports and reports.',
@@ -2951,9 +2975,14 @@ class MachineStore extends ChangeNotifier {
         ).firstOrNull ?? AppLanguage.de;
         final savedColors = j['appColors'];
         if (savedColors is Map) {
-          appColors = AppColorThemeConfig.fromJson(
+          final loadedColors = AppColorThemeConfig.fromJson(
             Map<String, dynamic>.from(savedColors),
           );
+          // V18: alte Preset-Designs werden beim Update bewusst entfernt.
+          // Individuell angepasste Farbschemata bleiben erhalten.
+          appColors = _isLegacyDesignPreset(loadedColors)
+              ? AppColorThemeConfig.defaults()
+              : loadedColors;
         }
         final savedLedMode = j['ledIdleMode']?.toString();
         final migratedLedMode = savedLedMode == 'chase' ? 'blink' : savedLedMode;
@@ -5772,28 +5801,99 @@ class CocktailBotSideNavigation extends StatelessWidget {
 }
 
 class LogoMark extends StatelessWidget {
-  const LogoMark({super.key, this.extended = false}); final bool extended;
-  @override Widget build(BuildContext context) => Row(mainAxisSize: MainAxisSize.min, children: [
-    const Icon(Icons.local_bar, color: Color(0xFF16E0D0), size: 39),
-    if (extended) const Padding(padding: EdgeInsets.only(left: 10), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [T('CocktailBot', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 22, color: Colors.white)), T('Cocktail-Maschine', style: TextStyle(color: Color(0xFF18CFC4), fontSize: 11))])),
-  ]);
+  const LogoMark({super.key, this.extended = false});
+  final bool extended;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(Icons.local_bar, color: theme.colorScheme.primary, size: 39),
+        if (extended)
+          Padding(
+            padding: const EdgeInsets.only(left: 10),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  tr('CocktailBot'),
+                  style: TextStyle(
+                    fontWeight: FontWeight.w900,
+                    fontSize: 22,
+                    color: theme.colorScheme.onSurface,
+                  ),
+                ),
+                Text(
+                  tr('Cocktail-Maschine'),
+                  style: TextStyle(
+                    color: theme.colorScheme.primary,
+                    fontSize: 11,
+                  ),
+                ),
+              ],
+            ),
+          ),
+      ],
+    );
+  }
 }
 
 class MachineStatusCard extends StatelessWidget {
   const MachineStatusCard({super.key, required this.store}); final MachineStore store;
   @override Widget build(BuildContext context) => Padding(padding: const EdgeInsets.symmetric(horizontal: 14), child: Container(
     padding: const EdgeInsets.all(14), decoration: BoxDecoration(color: store.appColors.surfaceColor, borderRadius: BorderRadius.circular(12), border: Border.all(color: store.appColors.borderColor)),
-    child: Row(children: [const Icon(Icons.memory, color: Color(0xFFCFD7DE)), const SizedBox(width: 12), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(store.t('machine'), style: const TextStyle(fontWeight: FontWeight.w700)), const T('CocktailBot-RaspberryPi', style: TextStyle(fontSize: 11, color: Color(0xFF9AA6B2))), Text(store.connected ? store.t('online') : store.t('offline'), style: TextStyle(fontSize: 11, color: store.connected ? store.appColors.successColor : store.appColors.warningColor))]) )]),
+    child: Row(children: [Icon(Icons.memory, color: store.appColors.textSecondaryColor), const SizedBox(width: 12), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(store.t('machine'), style: const TextStyle(fontWeight: FontWeight.w700)), T('CocktailBot-RaspberryPi', style: TextStyle(fontSize: 11, color: store.appColors.textSecondaryColor)), Text(store.connected ? store.t('online') : store.t('offline'), style: TextStyle(fontSize: 11, color: store.connected ? store.appColors.successColor : store.appColors.warningColor))]) )]),
   ));
 }
 
 class AppHeader extends StatelessWidget {
-  const AppHeader({super.key, required this.store, required this.title, this.subtitle, this.showSearch = false});
-  final MachineStore store; final String title; final String? subtitle; final bool showSearch;
-  @override Widget build(BuildContext context) => Row(children: [
-    Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(title, style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800, color: Colors.white)), if (subtitle != null) ...[const SizedBox(height: 4), Text(subtitle!, style: const TextStyle(color: Color(0xFF97A3AE)))]])),
-    if (showSearch) IconButton(onPressed: () {}, icon: const Icon(Icons.search, color: Color(0xFF18DED0))),
-  ]);
+  const AppHeader({
+    super.key,
+    required this.store,
+    required this.title,
+    this.subtitle,
+    this.showSearch = false,
+  });
+  final MachineStore store;
+  final String title;
+  final String? subtitle;
+  final bool showSearch;
+
+  @override
+  Widget build(BuildContext context) => Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                        fontWeight: FontWeight.w800,
+                        color: store.appColors.textPrimaryColor,
+                      ),
+                ),
+                if (subtitle != null) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    subtitle!,
+                    style: TextStyle(
+                      color: store.appColors.textSecondaryColor,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          if (showSearch)
+            IconButton(
+              onPressed: () {},
+              icon: Icon(Icons.search, color: store.appColors.accentColor),
+            ),
+        ],
+      );
 }
 
 enum CocktailBotScreenClass {
@@ -7872,111 +7972,111 @@ class _ThemeSettingsPageState extends State<ThemeSettingsPage> {
 
   static const presets = <(String, AppColorThemeConfig)>[
     (
-      'Midnight Ocean',
+      'Edel / Exklusiv',
       AppColorThemeConfig(
-        background: 0xFF07111A,
-        surface: 0xFF0D1823,
-        card: 0xFF122131,
-        navigation: 0xFF0A141D,
-        accent: 0xFF14B8A6,
-        secondaryAccent: 0xFF51E3D4,
-        border: 0xFF1F3244,
-        textPrimary: 0xFFF8FAFC,
-        textSecondary: 0xFF9FB0C3,
-        progressTrack: 0xFF203244,
-        success: 0xFF4FD38B,
-        warning: 0xFFFFB454,
-        error: 0xFFFF6B6B,
+        background: 0xFF070707,
+        surface: 0xFF0D0D0D,
+        card: 0xFF14120E,
+        navigation: 0xFF090909,
+        accent: 0xFFD8A62A,
+        secondaryAccent: 0xFFFFD76A,
+        border: 0xFF5A4618,
+        textPrimary: 0xFFFFF8E7,
+        textSecondary: 0xFFC8B98F,
+        progressTrack: 0xFF2A2417,
+        success: 0xFF54D68B,
+        warning: 0xFFFFB84D,
+        error: 0xFFFF6565,
       ),
     ),
     (
-      'Graphite Berry',
+      'Modern / Clean',
       AppColorThemeConfig(
-        background: 0xFF0D1117,
-        surface: 0xFF161B22,
-        card: 0xFF1D2430,
-        navigation: 0xFF10151C,
-        accent: 0xFFD84C7F,
-        secondaryAccent: 0xFFF089A7,
-        border: 0xFF2A3340,
-        textPrimary: 0xFFF8FAFC,
-        textSecondary: 0xFFA8B3C3,
-        progressTrack: 0xFF283241,
-        success: 0xFF56D69A,
-        warning: 0xFFFFB865,
-        error: 0xFFFF7272,
-      ),
-    ),
-    (
-      'Ivory Gold',
-      AppColorThemeConfig(
-        background: 0xFFF6F1E9,
-        surface: 0xFFFFFBF5,
-        card: 0xFFEEE7DD,
-        navigation: 0xFFF1E9DE,
-        accent: 0xFFCB9B3E,
-        secondaryAccent: 0xFFE0B458,
-        border: 0xFFDCCFC1,
-        textPrimary: 0xFF201A14,
-        textSecondary: 0xFF726251,
-        progressTrack: 0xFFE8DED1,
-        success: 0xFF3AA56E,
-        warning: 0xFFE5A33C,
-        error: 0xFFD65C5C,
-      ),
-    ),
-    (
-      'Arctic Mint',
-      AppColorThemeConfig(
-        background: 0xFFF4F8FA,
+        background: 0xFFF3F6FA,
         surface: 0xFFFFFFFF,
-        card: 0xFFEAF1F4,
-        navigation: 0xFFF0F5F7,
-        accent: 0xFF16C2BE,
-        secondaryAccent: 0xFF7AD9D5,
-        border: 0xFFD8E5EA,
-        textPrimary: 0xFF17212B,
-        textSecondary: 0xFF6E7E8C,
-        progressTrack: 0xFFDDE9EE,
-        success: 0xFF39B979,
-        warning: 0xFFF2B34A,
-        error: 0xFFE36A6A,
+        card: 0xFFFFFFFF,
+        navigation: 0xFFF9FBFD,
+        accent: 0xFF1976F3,
+        secondaryAccent: 0xFF65A9FF,
+        border: 0xFFD7E0EA,
+        textPrimary: 0xFF15202B,
+        textSecondary: 0xFF667789,
+        progressTrack: 0xFFDDE7F1,
+        success: 0xFF20A66A,
+        warning: 0xFFE79A22,
+        error: 0xFFE14F4F,
       ),
     ),
     (
-      'Royal Night',
+      'Futuristisch / Neon',
       AppColorThemeConfig(
-        background: 0xFF061225,
-        surface: 0xFF0B1D36,
-        card: 0xFF0F2744,
-        navigation: 0xFF08172C,
-        accent: 0xFF4EA8DE,
-        secondaryAccent: 0xFF7BDFF2,
-        border: 0xFF1D3C61,
-        textPrimary: 0xFFF8FAFC,
-        textSecondary: 0xFFA8B9D0,
-        progressTrack: 0xFF1A3557,
-        success: 0xFF4FD38B,
-        warning: 0xFFF3BE62,
-        error: 0xFFFF7A7A,
+        background: 0xFF020817,
+        surface: 0xFF071127,
+        card: 0xFF0A1530,
+        navigation: 0xFF030C1E,
+        accent: 0xFF00E7FF,
+        secondaryAccent: 0xFFFF2BBF,
+        border: 0xFF164D79,
+        textPrimary: 0xFFF4FBFF,
+        textSecondary: 0xFF83BBD1,
+        progressTrack: 0xFF132844,
+        success: 0xFF32F6A2,
+        warning: 0xFFFFD64A,
+        error: 0xFFFF397A,
       ),
     ),
     (
-      'Lavender Haze',
+      'Tropisch / Sommer',
       AppColorThemeConfig(
-        background: 0xFFF5F2FA,
-        surface: 0xFFFFFEFF,
-        card: 0xFFEAE5F3,
-        navigation: 0xFFF1EDF8,
-        accent: 0xFF8B7FD6,
-        secondaryAccent: 0xFFC8BFF0,
-        border: 0xFFDAD2EB,
-        textPrimary: 0xFF241F32,
-        textSecondary: 0xFF726A87,
-        progressTrack: 0xFFE1DBEE,
-        success: 0xFF52B788,
-        warning: 0xFFE8B35B,
-        error: 0xFFD96C8E,
+        background: 0xFFE8F8F4,
+        surface: 0xFFD7F4EE,
+        card: 0xFFFFFEF8,
+        navigation: 0xFF08A7B7,
+        accent: 0xFFFF7A1A,
+        secondaryAccent: 0xFF15C6C0,
+        border: 0xFF74D1C8,
+        textPrimary: 0xFF123E43,
+        textSecondary: 0xFF4F7778,
+        progressTrack: 0xFFBFE8E0,
+        success: 0xFF2DBB72,
+        warning: 0xFFFFA928,
+        error: 0xFFF24D61,
+      ),
+    ),
+    (
+      'Industrial / Loft',
+      AppColorThemeConfig(
+        background: 0xFF171513,
+        surface: 0xFF24211E,
+        card: 0xFF302B26,
+        navigation: 0xFF1B1815,
+        accent: 0xFFE88719,
+        secondaryAccent: 0xFFB9A17F,
+        border: 0xFF5B5045,
+        textPrimary: 0xFFF2EEE8,
+        textSecondary: 0xFFB9AEA2,
+        progressTrack: 0xFF443C34,
+        success: 0xFF69BD79,
+        warning: 0xFFFFAE3A,
+        error: 0xFFE45F50,
+      ),
+    ),
+    (
+      'Vintage / Klassisch',
+      AppColorThemeConfig(
+        background: 0xFFF0DFC0,
+        surface: 0xFFF8E8C9,
+        card: 0xFFFFF1D2,
+        navigation: 0xFFE6C996,
+        accent: 0xFF7A3F12,
+        secondaryAccent: 0xFFC58A3B,
+        border: 0xFFB48A55,
+        textPrimary: 0xFF3A2616,
+        textSecondary: 0xFF76583C,
+        progressTrack: 0xFFD9BE91,
+        success: 0xFF578A4D,
+        warning: 0xFFC8791F,
+        error: 0xFFB94B3D,
       ),
     ),
   ];
@@ -8258,7 +8358,7 @@ class _ThemeSettingsPageState extends State<ThemeSettingsPage> {
               ),
               const SizedBox(height: 12),
               Text(
-                preset.$1,
+                tr(preset.$1),
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(

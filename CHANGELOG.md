@@ -1,5 +1,16 @@
 # CocktailBot – Changelog
 
+## V18 – Neue Designkollektion
+
+- Die bisherigen sechs Preset-Designs wurden vollständig aus der Auswahl entfernt.
+- War auf einem bestehenden Gerät exakt eines der alten Presets aktiv, wird es beim Update automatisch auf das neue Standarddesign **Edel / Exklusiv** migriert; eigene manuelle Farbanpassungen bleiben erhalten.
+- Neue Designkollektion: **Edel / Exklusiv**, **Modern / Clean**, **Futuristisch / Neon**, **Tropisch / Sommer**, **Industrial / Loft** und **Vintage / Klassisch**.
+- Die Presets orientieren sich an den zuvor erstellten CocktailBot-Designvorschauen und verwenden jeweils eigene Hintergrund-, Karten-, Navigations-, Akzent-, Status- und Textfarben.
+- Helle Presets verwenden nun automatisch ein helles Material-Farbschema; dunkle Presets ein dunkles. Dadurch bleiben Dialoge, Eingaben und Material-Komponenten besser lesbar.
+- **Edel / Exklusiv** ist das neue Standarddesign bei Neuinstallation bzw. nach „Standarddesign wiederherstellen“.
+- Designnamen werden über die Übersetzungslogik ausgegeben; bei Nicht-Deutsch steht mindestens eine englische Bezeichnung zur Verfügung.
+- Die freie RGB-Farbanpassung bleibt zusätzlich erhalten.
+
 ## V17 – Manuelle Zutaten in der Cocktailkarte
 
 - Zutaten, die im Rezept als **nicht automatisch / manuell** eingestellt sind, werden in der Cocktail-Detailkarte direkt gekennzeichnet.
