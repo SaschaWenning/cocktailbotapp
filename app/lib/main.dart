@@ -1590,6 +1590,8 @@ String appText(AppLanguage language, String key) {
     'Helligkeit': {AppLanguage.de: 'Helligkeit', AppLanguage.en: 'Brightness', AppLanguage.es: 'Brillo', AppLanguage.it: 'Luminosità', AppLanguage.nl: 'Helderheid', AppLanguage.fr: 'Brightness', AppLanguage.pt: 'Brightness', AppLanguage.pl: 'Brightness', AppLanguage.tr: 'Brightness', AppLanguage.ru: 'Brightness'},
     'Hinweis': {AppLanguage.de: 'Hinweis', AppLanguage.en: 'Note', AppLanguage.es: 'Nota', AppLanguage.it: 'Nota', AppLanguage.nl: 'Opmerking', AppLanguage.fr: 'Note', AppLanguage.pt: 'Note', AppLanguage.pl: 'Note', AppLanguage.tr: 'Note', AppLanguage.ru: 'Note'},
     'Hinweise': {AppLanguage.de: 'Hinweise', AppLanguage.en: 'Notes', AppLanguage.es: 'Notas', AppLanguage.it: 'Note', AppLanguage.nl: 'Opmerkingen', AppLanguage.fr: 'Notes', AppLanguage.pt: 'Notes', AppLanguage.pl: 'Notes', AppLanguage.tr: 'Notes', AppLanguage.ru: 'Notes'},
+    'Hinweise für die Zubereitung': {AppLanguage.de: 'Hinweise für die Zubereitung', AppLanguage.en: 'Preparation notes', AppLanguage.es: 'Notas de preparación', AppLanguage.it: 'Note di preparazione', AppLanguage.nl: 'Bereidingsnotities', AppLanguage.fr: 'Notes de préparation', AppLanguage.pt: 'Notas de preparação', AppLanguage.pl: 'Uwagi do przygotowania', AppLanguage.tr: 'Hazırlama notları', AppLanguage.ru: 'Примечания к приготовлению'},
+    'Ein Hinweis pro Zeile. Zum Beispiel: Frische Minze hinzufügen oder Limettenstücke ins Glas geben.': {AppLanguage.de: 'Ein Hinweis pro Zeile. Zum Beispiel: Frische Minze hinzufügen oder Limettenstücke ins Glas geben.', AppLanguage.en: 'One note per line. For example: Add fresh mint or add lime pieces to the glass.', AppLanguage.es: 'Una nota por línea. Por ejemplo: Añadir menta fresca o trozos de lima al vaso.', AppLanguage.it: 'Una nota per riga. Ad esempio: Aggiungere menta fresca o pezzi di lime nel bicchiere.', AppLanguage.nl: 'Eén opmerking per regel. Bijvoorbeeld: Verse munt toevoegen of stukjes limoen in het glas doen.', AppLanguage.fr: 'Une note par ligne. Par exemple : ajouter de la menthe fraîche ou des morceaux de citron vert dans le verre.', AppLanguage.pt: 'Uma nota por linha. Por exemplo: Adicionar hortelã fresca ou pedaços de lima ao copo.', AppLanguage.pl: 'Jedna uwaga w każdym wierszu. Na przykład: dodać świeżą miętę lub kawałki limonki do szklanki.', AppLanguage.tr: 'Her satıra bir not. Örneğin: Taze nane ekleyin veya bardağa lime parçaları koyun.', AppLanguage.ru: 'Одна подсказка на строку. Например: добавить свежую мяту или кусочки лайма в стакан.'},
     'Hinzufügen': {AppLanguage.de: 'Hinzufügen', AppLanguage.en: 'Add', AppLanguage.es: 'Añadir', AppLanguage.it: 'Aggiungi', AppLanguage.nl: 'Toevoegen', AppLanguage.fr: 'Add', AppLanguage.pt: 'Add', AppLanguage.pl: 'Add', AppLanguage.tr: 'Add', AppLanguage.ru: 'Add'},
     'Idle-Effekt': {AppLanguage.de: 'Idle-Effekt', AppLanguage.en: 'Idle effect', AppLanguage.es: 'Efecto en reposo', AppLanguage.it: 'Effetto idle', AppLanguage.nl: 'Idle-effect', AppLanguage.fr: 'Idle effect', AppLanguage.pt: 'Idle effect', AppLanguage.pl: 'Idle effect', AppLanguage.tr: 'Idle effect', AppLanguage.ru: 'Idle effect'},
     'Kalibrierwert speichern': {AppLanguage.de: 'Kalibrierwert speichern', AppLanguage.en: 'Save calibration value', AppLanguage.es: 'Guardar calibración', AppLanguage.it: 'Salva calibrazione', AppLanguage.nl: 'Kalibratiewaarde opslaan', AppLanguage.fr: 'Save calibration value', AppLanguage.pt: 'Save calibration value', AppLanguage.pl: 'Save calibration value', AppLanguage.tr: 'Save calibration value', AppLanguage.ru: 'Save calibration value'},
@@ -2142,6 +2144,72 @@ String appText(AppLanguage language, String key) {
       AppLanguage.pl: 'Zaplanuj zapotrzebowanie na składniki i brakujące ilości',
       AppLanguage.tr: 'Malzeme ihtiyacını ve eksik miktarları planla',
       AppLanguage.ru: 'Планировать потребность в ингредиентах и недостающие количества',
+    },
+    'Hinweis zur Lernphase': {
+      AppLanguage.de: 'Hinweis zur Lernphase',
+      AppLanguage.en: 'Learning phase notice',
+      AppLanguage.es: 'Aviso de fase de aprendizaje',
+      AppLanguage.it: 'Avviso sulla fase di apprendimento',
+      AppLanguage.nl: 'Melding leerfase',
+      AppLanguage.fr: 'Information sur la phase d’apprentissage',
+      AppLanguage.pt: 'Aviso sobre a fase de aprendizagem',
+      AppLanguage.pl: 'Informacja o fazie uczenia',
+      AppLanguage.tr: 'Öğrenme aşaması bilgisi',
+      AppLanguage.ru: 'Информация об этапе обучения',
+    },
+    'Partyplaner und Einkaufsliste lernen aus abgeschlossenen Partys. Aussagekräftige Ergebnisse entstehen erst nach mehreren Partys mit derselben Partykarte. Bis dahin sind die Werte nur Schätzungen.': {
+      AppLanguage.de: 'Partyplaner und Einkaufsliste lernen aus abgeschlossenen Partys. Aussagekräftige Ergebnisse entstehen erst nach mehreren Partys mit derselben Partykarte. Bis dahin sind die Werte nur Schätzungen.',
+      AppLanguage.en: 'The party planner and shopping list learn from completed parties. Meaningful results only emerge after several parties with the same party card. Until then, the values are estimates.',
+      AppLanguage.es: 'El planificador de fiestas y la lista de compras aprenden de fiestas finalizadas. Los resultados fiables aparecen tras varias fiestas con la misma tarjeta. Hasta entonces, los valores son estimaciones.',
+      AppLanguage.it: 'Il pianificatore feste e la lista della spesa apprendono dalle feste concluse. Risultati attendibili emergono solo dopo più feste con la stessa scheda. Fino ad allora i valori sono stime.',
+      AppLanguage.nl: 'De partyplanner en boodschappenlijst leren van afgeronde feesten. Betrouwbare resultaten ontstaan pas na meerdere feesten met dezelfde partykaart. Tot die tijd zijn de waarden schattingen.',
+      AppLanguage.fr: 'Le planificateur de fête et la liste de courses apprennent à partir des fêtes terminées. Des résultats fiables n’apparaissent qu’après plusieurs fêtes avec la même carte. D’ici là, les valeurs sont des estimations.',
+      AppLanguage.pt: 'O planejador de festas e a lista de compras aprendem com festas concluídas. Resultados confiáveis só aparecem após várias festas com o mesmo cartão. Até lá, os valores são estimativas.',
+      AppLanguage.pl: 'Planer imprezy i lista zakupów uczą się na podstawie zakończonych imprez. Wiarygodne wyniki pojawiają się dopiero po kilku imprezach z tą samą kartą. Do tego czasu wartości są szacunkowe.',
+      AppLanguage.tr: 'Parti planlayıcı ve alışveriş listesi tamamlanan partilerden öğrenir. Anlamlı sonuçlar aynı parti kartıyla birkaç partiden sonra oluşur. O zamana kadar değerler tahmindir.',
+      AppLanguage.ru: 'Планировщик вечеринки и список покупок обучаются на завершённых вечеринках. Достоверные результаты появляются только после нескольких вечеринок с одной и той же картой. До этого значения являются оценочными.',
+    },
+    'Bestand für Einkaufsliste': {
+      AppLanguage.de: 'Bestand für Einkaufsliste',
+      AppLanguage.en: 'Inventory for shopping list',
+      AppLanguage.es: 'Existencias para la lista de compras',
+      AppLanguage.it: 'Scorte per la lista della spesa',
+      AppLanguage.nl: 'Voorraad voor boodschappenlijst',
+      AppLanguage.fr: 'Stock pour la liste de courses',
+      AppLanguage.pt: 'Estoque para a lista de compras',
+      AppLanguage.pl: 'Stan magazynowy do listy zakupów',
+      AppLanguage.tr: 'Alışveriş listesi stoğu',
+      AppLanguage.ru: 'Запасы для списка покупок',
+    },
+    'Trage deinen aktuellen Bestand einmal ein. Nach jeder erfolgreichen Zubereitung werden die verwendeten Zutaten automatisch abgezogen. Leere Felder bleiben unbekannt; dann wird der komplette geplante Bedarf als Einkaufsmenge angezeigt.': {
+      AppLanguage.de: 'Trage deinen aktuellen Bestand einmal ein. Nach jeder erfolgreichen Zubereitung werden die verwendeten Zutaten automatisch abgezogen. Leere Felder bleiben unbekannt; dann wird der komplette geplante Bedarf als Einkaufsmenge angezeigt.',
+      AppLanguage.en: 'Enter your current inventory once. After every successful preparation, the used ingredients are deducted automatically. Empty fields remain unknown; in that case the full planned requirement is shown as the amount to buy.',
+      AppLanguage.es: 'Introduce una vez tus existencias actuales. Después de cada preparación correcta, los ingredientes usados se descuentan automáticamente. Los campos vacíos quedan como desconocidos; en ese caso se muestra toda la necesidad planificada como cantidad a comprar.',
+      AppLanguage.it: 'Inserisci una volta le scorte attuali. Dopo ogni preparazione riuscita, gli ingredienti utilizzati vengono sottratti automaticamente. I campi vuoti restano sconosciuti; in tal caso l’intero fabbisogno pianificato viene mostrato come quantità da acquistare.',
+      AppLanguage.nl: 'Voer je huidige voorraad één keer in. Na elke geslaagde bereiding worden de gebruikte ingrediënten automatisch afgetrokken. Lege velden blijven onbekend; dan wordt de volledige geplande behoefte als inkoophoeveelheid getoond.',
+      AppLanguage.fr: 'Saisis une fois ton stock actuel. Après chaque préparation réussie, les ingrédients utilisés sont déduits automatiquement. Les champs vides restent inconnus ; dans ce cas, le besoin planifié complet est affiché comme quantité à acheter.',
+      AppLanguage.pt: 'Insira uma vez o estoque atual. Após cada preparo concluído, os ingredientes usados são descontados automaticamente. Campos vazios permanecem desconhecidos; nesse caso, toda a necessidade planejada é mostrada como quantidade a comprar.',
+      AppLanguage.pl: 'Wprowadź raz aktualny stan magazynowy. Po każdym udanym przygotowaniu zużyte składniki są automatycznie odejmowane. Puste pola pozostają nieznane; wtedy całe planowane zapotrzebowanie jest pokazane jako ilość do zakupu.',
+      AppLanguage.tr: 'Mevcut stoğunu bir kez gir. Her başarılı hazırlamadan sonra kullanılan malzemeler otomatik olarak düşülür. Boş alanlar bilinmiyor olarak kalır; bu durumda planlanan ihtiyacın tamamı satın alınacak miktar olarak gösterilir.',
+      AppLanguage.ru: 'Введите текущий запас один раз. После каждого успешного приготовления использованные ингредиенты автоматически списываются. Пустые поля считаются неизвестными; в этом случае весь планируемый объём показывается как количество для покупки.',
+    },
+    'Bestand (ml)': {
+      AppLanguage.de: 'Bestand (ml)', AppLanguage.en: 'Inventory (ml)', AppLanguage.es: 'Existencias (ml)', AppLanguage.it: 'Scorte (ml)', AppLanguage.nl: 'Voorraad (ml)', AppLanguage.fr: 'Stock (ml)', AppLanguage.pt: 'Estoque (ml)', AppLanguage.pl: 'Stan (ml)', AppLanguage.tr: 'Stok (ml)', AppLanguage.ru: 'Запас (мл)',
+    },
+    'Bestand speichern': {
+      AppLanguage.de: 'Bestand speichern', AppLanguage.en: 'Save inventory', AppLanguage.es: 'Guardar existencias', AppLanguage.it: 'Salva scorte', AppLanguage.nl: 'Voorraad opslaan', AppLanguage.fr: 'Enregistrer le stock', AppLanguage.pt: 'Salvar estoque', AppLanguage.pl: 'Zapisz stan', AppLanguage.tr: 'Stoğu kaydet', AppLanguage.ru: 'Сохранить запас',
+    },
+    'Bestand gespeichert': {
+      AppLanguage.de: 'Bestand gespeichert', AppLanguage.en: 'Inventory saved', AppLanguage.es: 'Existencias guardadas', AppLanguage.it: 'Scorte salvate', AppLanguage.nl: 'Voorraad opgeslagen', AppLanguage.fr: 'Stock enregistré', AppLanguage.pt: 'Estoque salvo', AppLanguage.pl: 'Stan zapisany', AppLanguage.tr: 'Stok kaydedildi', AppLanguage.ru: 'Запас сохранён',
+    },
+    'nicht eingetragen': {
+      AppLanguage.de: 'nicht eingetragen', AppLanguage.en: 'not entered', AppLanguage.es: 'no indicado', AppLanguage.it: 'non inserito', AppLanguage.nl: 'niet ingevuld', AppLanguage.fr: 'non renseigné', AppLanguage.pt: 'não informado', AppLanguage.pl: 'nie wpisano', AppLanguage.tr: 'girilmedi', AppLanguage.ru: 'не указан',
+    },
+    'Bedarf': {
+      AppLanguage.de: 'Bedarf', AppLanguage.en: 'Required', AppLanguage.es: 'Necesario', AppLanguage.it: 'Fabbisogno', AppLanguage.nl: 'Benodigd', AppLanguage.fr: 'Besoin', AppLanguage.pt: 'Necessário', AppLanguage.pl: 'Zapotrzebowanie', AppLanguage.tr: 'İhtiyaç', AppLanguage.ru: 'Требуется',
+    },
+    'Einkaufen': {
+      AppLanguage.de: 'Einkaufen', AppLanguage.en: 'Buy', AppLanguage.es: 'Comprar', AppLanguage.it: 'Acquistare', AppLanguage.nl: 'Inkopen', AppLanguage.fr: 'Acheter', AppLanguage.pt: 'Comprar', AppLanguage.pl: 'Kupić', AppLanguage.tr: 'Satın al', AppLanguage.ru: 'Купить',
     },
     'PayPal Kassenmodus': {
       AppLanguage.de: 'PayPal Kassenmodus',
@@ -3122,6 +3190,10 @@ class MachineStore extends ChangeNotifier {
   Map<String, int> recipeDrinkCounts = {};
   Map<String, int> servingSizeCounts = {};
   Map<String, double> ingredientUsageMl = {};
+  // Optionaler Lagerbestand fuer die Party-Einkaufsliste. Fehlt ein Eintrag,
+  // gilt der Bestand als nicht erfasst; dann wird der komplette geplante
+  // Bedarf als Einkaufsmenge ausgewiesen.
+  Map<String, double> shoppingInventoryMl = {};
   bool darkMode = true;
   AppLanguage appLanguage = AppLanguage.de;
   AppColorThemeConfig appColors = AppColorThemeConfig.defaults();
@@ -3159,8 +3231,6 @@ class MachineStore extends ChangeNotifier {
   String commercialLicenseType = 'PRIVATE';
   bool commercialPublicKeyInstalled = false;
   DateTime? commercialLicenseActivatedAt;
-  String commercialBusinessName = 'CocktailBot';
-  String commercialBusinessSubtitle = 'Gewerbliche Nutzung erlaubt';
   final partyCards = <PartyCardProfile>[];
   final partySessions = <PartySession>[];
   String? activePartyCardId;
@@ -3283,6 +3353,14 @@ class MachineStore extends ChangeNotifier {
             (key, value) => MapEntry(key.toString(), (value as num).toDouble()),
           ),
         );
+        shoppingInventoryMl = Map<String, double>.from(
+          ((j['shoppingInventoryMl'] as Map?) ?? const {}).map(
+            (key, value) => MapEntry(
+              key.toString(),
+              math.max(0.0, (value as num).toDouble()),
+            ),
+          ),
+        );
         darkMode = j['darkMode'] ?? true;
         wifiHost = j['wifiHost'] ?? wifiHost;
         servingSizes = ((j['servingSizes'] as List?) ?? [200, 300, 400])
@@ -3394,11 +3472,6 @@ class MachineStore extends ChangeNotifier {
         commercialLicenseType = 'PRIVATE';
         commercialPublicKeyInstalled = false;
         commercialLicenseActivatedAt = null;
-        commercialBusinessName =
-            j['commercialBusinessName']?.toString() ?? 'CocktailBot';
-        commercialBusinessSubtitle =
-            j['commercialBusinessSubtitle']?.toString() ??
-                'Gewerbliche Nutzung erlaubt';
         final savedLanguage = j['appLanguage']?.toString();
         appLanguage = AppLanguage.values.where(
           (language) => language.name == savedLanguage,
@@ -3597,7 +3670,7 @@ class MachineStore extends ChangeNotifier {
         RecipePart(ingredientId: 'lime-juice', amountMl: 60, automatic: true),
         RecipePart(ingredientId: 'soda-water', amountMl: 100, automatic: false, instruction: '100ml Sprudelwasser hinzufügen'),
         ],
-        manualNotes: ['Frische Minzblätter hinzufügen'],
+        manualNotes: ['Frische Minzblätter ins Glas geben', 'Limettenstücke hinzufügen'],
       ),
       Recipe(
         id: 'passion-colada',
@@ -4219,6 +4292,7 @@ class MachineStore extends ChangeNotifier {
       'recipeDrinkCounts': recipeDrinkCounts,
       'servingSizeCounts': servingSizeCounts,
       'ingredientUsageMl': ingredientUsageMl,
+      'shoppingInventoryMl': shoppingInventoryMl,
       'darkMode': darkMode,
       'appLanguage': appLanguage.name,
       'appColors': appColors.toJson(),
@@ -4249,8 +4323,6 @@ class MachineStore extends ChangeNotifier {
       'commercialLicensedMachineId': commercialLicensedMachineId,
       'commercialLicenseActivatedAt':
           commercialLicenseActivatedAt?.toIso8601String(),
-      'commercialBusinessName': commercialBusinessName,
-      'commercialBusinessSubtitle': commercialBusinessSubtitle,
       'ledIdleMode': ledIdleMode.name,
       'ledColorValue': ledColorValue,
       'ledBrightness': ledBrightness,
@@ -4395,6 +4467,7 @@ class MachineStore extends ChangeNotifier {
 
     ingredients.removeWhere((ingredient) => ingredient.id == ingredientId);
     ingredientUsageMl.remove(ingredientId);
+    shoppingInventoryMl.remove(ingredientId);
 
     await save();
     notifyListeners();
@@ -4558,19 +4631,6 @@ class MachineStore extends ChangeNotifier {
     }
     commercialLicenseCode = '';
     paypalPaymentEnabled = false;
-    await save();
-    notifyListeners();
-  }
-
-  Future<void> saveCommercialBranding({
-    required String businessName,
-    required String subtitle,
-  }) async {
-    commercialBusinessName =
-        businessName.trim().isEmpty ? 'CocktailBot' : businessName.trim();
-    commercialBusinessSubtitle = subtitle.trim().isEmpty
-        ? 'Gewerbliche Nutzung erlaubt'
-        : subtitle.trim();
     await save();
     notifyListeners();
   }
@@ -5364,7 +5424,37 @@ class MachineStore extends ChangeNotifier {
         (value) => value + amountMl,
         ifAbsent: () => amountMl,
       );
+      // Ein in der Einkaufsliste gepflegter Lagerbestand wird nach jeder
+      // tatsaechlich zubereiteten Portion reduziert. Das gilt auch fuer
+      // manuelle Rezeptbestandteile, weil sie ebenfalls verbraucht werden.
+      _consumeShoppingInventory(part.ingredientId, amountMl);
     }
+  }
+
+  double? shoppingInventoryFor(String ingredientId) =>
+      shoppingInventoryMl[ingredientId];
+
+  Future<void> saveShoppingInventory(
+    Map<String, double?> values,
+  ) async {
+    for (final entry in values.entries) {
+      final value = entry.value;
+      if (value == null) {
+        shoppingInventoryMl.remove(entry.key);
+      } else {
+        shoppingInventoryMl[entry.key] = math.max(0.0, value);
+      }
+    }
+    await save();
+    notifyListeners();
+  }
+
+  void _consumeShoppingInventory(String ingredientId, double amountMl) {
+    if (amountMl <= 0 || !shoppingInventoryMl.containsKey(ingredientId)) {
+      return;
+    }
+    final current = shoppingInventoryMl[ingredientId] ?? 0;
+    shoppingInventoryMl[ingredientId] = math.max(0.0, current - amountMl);
   }
 
   Future<void> resetConsumptionStatistics() async {
@@ -6244,20 +6334,21 @@ class LogoMark extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         Icon(Icons.local_bar, color: theme.colorScheme.primary, size: 39),
-        if (extended)
-          Padding(
-            padding: const EdgeInsets.only(left: 10),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  tr('CocktailBot'),
-                  style: TextStyle(
-                    fontWeight: FontWeight.w900,
-                    fontSize: 22,
-                    color: theme.colorScheme.onSurface,
-                  ),
+        Padding(
+          padding: const EdgeInsets.only(left: 8),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                tr('CocktailBot'),
+                style: TextStyle(
+                  fontWeight: FontWeight.w900,
+                  fontSize: extended ? 22 : 16,
+                  color: theme.colorScheme.onSurface,
                 ),
+              ),
+              if (extended)
                 Text(
                   tr('Cocktail-Maschine'),
                   style: TextStyle(
@@ -6265,9 +6356,9 @@ class LogoMark extends StatelessWidget {
                     fontSize: 11,
                   ),
                 ),
-              ],
-            ),
+            ],
           ),
+        ),
       ],
     );
   }
@@ -7708,7 +7799,6 @@ class SettingsPage extends StatelessWidget {
     final warning = store.appColors.warningColor;
     final error = store.appColors.errorColor;
     final mixed = Color.lerp(accent, secondary, .5)!;
-    final softAccent = Color.lerp(accent, store.appColors.textPrimaryColor, .28)!;
 
     final items = [
       (store.t('settingsConnection'), store.connected ? tr('Raspberry Pi verbunden') : tr('Lokale GPIO-Steuerung'), Icons.wifi, accent, ConnectionPage(store: store)),
@@ -7730,10 +7820,9 @@ class SettingsPage extends StatelessWidget {
       (store.t('Verbrauchsstatistik'), commercialSubtitle(store.t('Cocktail-Ranking, Kosten und Zutatenverbrauch')), Icons.bar_chart_outlined, success, commercialPage(store.t('Verbrauchsstatistik'), ConsumptionStatisticsPage(store: store))),
       (store.t('Partykarten'), commercialSubtitle(store.t('Auswahl und Beliebtheit für Veranstaltungen')), Icons.fact_check_outlined, mixed, commercialPage(store.t('Partykarten'), PartyCardsPage(store: store))),
       (store.t('Partyplaner'), commercialSubtitle(store.t('Prognose aus vergangenen Partys')), Icons.event_available_outlined, secondary, commercialPage(store.t('Partyplaner'), PartyPlannerPage(store: store))),
-      (store.t('Einkaufsliste'), commercialSubtitle(store.t('Zutatenbedarf und fehlende Mengen planen')), Icons.shopping_cart_outlined, warning, commercialPage(store.t('Einkaufsliste'), PartyPlannerPage(store: store))),
+      (store.t('Einkaufsliste'), commercialSubtitle(store.t('Zutatenbedarf und fehlende Mengen planen')), Icons.shopping_cart_outlined, warning, commercialPage(store.t('Einkaufsliste'), ShoppingListPage(store: store))),
       (store.t('PayPal Kassenmodus'), commercialSubtitle(store.t('Lokale PayPal-Zahlung über den Raspberry Pi')), Icons.payments_outlined, accent, commercialPage(store.t('PayPal Kassenmodus'), PaymentSettingsPage(store: store))),
       (store.t('Cocktailpreise'), commercialSubtitle(store.t('Einzelpreise pro Cocktail festlegen')), Icons.euro_outlined, success, commercialPage(store.t('Cocktailpreise'), CocktailPricesPage(store: store))),
-      (store.t('Branding'), commercialSubtitle(store.t('Barname und Gewerbehinweis')), Icons.storefront_outlined, softAccent, commercialPage(store.t('Branding'), CommercialBrandingPage(store: store))),
     ];
 
     return SafeArea(
@@ -12198,7 +12287,6 @@ class _CommercialLicensePageState extends State<CommercialLicensePage> {
                     'PayPal Kassenmodus',
                     'Kosten- und Margenberechnung',
                     'CSV/PDF-Export vorbereitet',
-                    'Bar-/Firmenbranding',
                   ].map(
                     (feature) => Padding(
                       padding: const EdgeInsets.only(bottom: 8),
@@ -12226,141 +12314,6 @@ class _CommercialLicensePageState extends State<CommercialLicensePage> {
     );
   }
 }
-
-class CommercialBrandingPage extends StatefulWidget {
-  const CommercialBrandingPage({super.key, required this.store});
-  final MachineStore store;
-
-  @override
-  State<CommercialBrandingPage> createState() => _CommercialBrandingPageState();
-}
-
-class _CommercialBrandingPageState extends State<CommercialBrandingPage> {
-  late final nameController =
-      TextEditingController(text: widget.store.commercialBusinessName);
-  late final subtitleController =
-      TextEditingController(text: widget.store.commercialBusinessSubtitle);
-
-  @override
-  void dispose() {
-    nameController.dispose();
-    subtitleController.dispose();
-    super.dispose();
-  }
-
-  Future<void> _save() async {
-    await widget.store.saveCommercialBranding(
-      businessName: nameController.text,
-      subtitle: subtitleController.text,
-    );
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(tr('Branding wurde gespeichert'))),
-    );
-    setState(() {});
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return PageFrame(
-      title: tr('Branding'),
-      child: ListView(
-        padding: const EdgeInsets.all(20),
-        children: [
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(18),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    tr('Bar-/Firmenbranding'),
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w900,
-                      fontSize: 18,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    tr('Diese Daten können später auf Kassenmodus, Exporten und Berichten angezeigt werden.'),
-                    style: TextStyle(
-                      color: widget.store.appColors.textSecondaryColor,
-                      height: 1.35,
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-                  TextField(
-                    controller: nameController,
-                    decoration: InputDecoration(
-                      labelText: tr('Bar- oder Firmenname'),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: subtitleController,
-                    decoration: InputDecoration(
-                      labelText: tr('Untertitel / Hinweis'),
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-                  SizedBox(
-                    width: double.infinity,
-                    child: FilledButton.icon(
-                      onPressed: _save,
-                      icon: const Icon(Icons.save_outlined),
-                      label: Text(tr('Branding speichern')),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 14),
-          Container(
-            padding: const EdgeInsets.all(18),
-            decoration: BoxDecoration(
-              color: widget.store.appColors.backgroundColor,
-              borderRadius: BorderRadius.circular(18),
-              border: Border.all(color: widget.store.appColors.borderColor),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Icon(
-                  Icons.local_bar,
-                  color: widget.store.appColors.accentColor,
-                  size: 38,
-                ),
-                const SizedBox(height: 10),
-                Text(
-                  nameController.text.trim().isEmpty
-                      ? 'CocktailBot'
-                      : nameController.text.trim(),
-                  style: TextStyle(
-                    color: widget.store.appColors.textPrimaryColor,
-                    fontWeight: FontWeight.w900,
-                    fontSize: 24,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  subtitleController.text.trim().isEmpty
-                      ? tr('Gewerbliche Nutzung erlaubt')
-                      : subtitleController.text.trim(),
-                  style: TextStyle(
-                    color: widget.store.appColors.textSecondaryColor,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-
 
 class CocktailPricesPage extends StatefulWidget {
   const CocktailPricesPage({super.key, required this.store});
@@ -13374,6 +13327,61 @@ class _PartyCardsPageState extends State<PartyCardsPage> {
   }
 }
 
+class _PartyLearningNotice extends StatelessWidget {
+  const _PartyLearningNotice({
+    required this.store,
+    required this.completedCount,
+  });
+
+  final MachineStore store;
+  final int completedCount;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      color: store.appColors.warningColor.withOpacity(0.10),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(
+              Icons.info_outline,
+              color: store.appColors.warningColor,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    tr('Hinweis zur Lernphase'),
+                    style: const TextStyle(fontWeight: FontWeight.w900),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    tr('Partyplaner und Einkaufsliste lernen aus abgeschlossenen Partys. Aussagekräftige Ergebnisse entstehen erst nach mehreren Partys mit derselben Partykarte. Bis dahin sind die Werte nur Schätzungen.'),
+                  ),
+                  if (completedCount > 0) ...[
+                    const SizedBox(height: 6),
+                    Text(
+                      '$completedCount ${tr('abgeschlossene Partys mit dieser Partykarte')}',
+                      style: TextStyle(
+                        color: store.appColors.textSecondaryColor,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class PartyPlannerPage extends StatefulWidget {
   const PartyPlannerPage({super.key, required this.store});
   final MachineStore store;
@@ -13470,22 +13478,17 @@ class _PartyPlannerPageState extends State<PartyPlannerPage> {
             .reduce(math.max)
             .round();
     final usage = widget.store.plannedIngredientUsageMl(stats);
-    final missingLiters = usage.entries.fold<double>(0, (sum, entry) {
-      final ingredientPumps = widget.store.pumps.where(
-        (pump) => pump.ingredientId == entry.key,
-      );
-      final available = ingredientPumps.fold<double>(
-        0,
-        (innerSum, pump) => innerSum + pump.remainingMl,
-      );
-      return sum + math.max(0, entry.value - available);
-    }) / 1000;
 
     return PageFrame(
       title: tr('Partyplaner'),
       child: ListView(
         padding: const EdgeInsets.all(20),
         children: [
+          _PartyLearningNotice(
+            store: widget.store,
+            completedCount: completed.length,
+          ),
+          const SizedBox(height: 18),
           if (cards.isEmpty)
             Card(
               child: Padding(
@@ -13646,10 +13649,6 @@ class _PartyPlannerPageState extends State<PartyPlannerPage> {
                           label: tr('Geplant'),
                           value: '$plannedTotal',
                         ),
-                        _PlannerMetric(
-                          label: tr('Fehlt ca.'),
-                          value: '${missingLiters.toStringAsFixed(2)} L',
-                        ),
                       ],
                     ),
                     const SizedBox(height: 16),
@@ -13702,14 +13701,6 @@ class _PartyPlannerPageState extends State<PartyPlannerPage> {
                       ...usage.entries.map((entry) {
                         final ingredientName =
                             widget.store.displayIngredientNameById(entry.key);
-                        final ingredientPumps = widget.store.pumps.where(
-                          (pump) => pump.ingredientId == entry.key,
-                        );
-                        final available = ingredientPumps.fold<double>(
-                          0,
-                          (sum, pump) => sum + pump.remainingMl,
-                        );
-                        final missing = math.max(0, entry.value - available);
                         return Padding(
                           padding: const EdgeInsets.only(bottom: 8),
                           child: Row(
@@ -13724,18 +13715,6 @@ class _PartyPlannerPageState extends State<PartyPlannerPage> {
                               ),
                               Text(
                                 '${(entry.value / 1000).toStringAsFixed(2)} L',
-                              ),
-                              const SizedBox(width: 12),
-                              Text(
-                                missing <= 0
-                                    ? tr('vorhanden')
-                                    : '${tr('fehlt')} ${(missing / 1000).toStringAsFixed(2)} L',
-                                style: TextStyle(
-                                  color: missing <= 0
-                                      ? widget.store.appColors.successColor
-                                      : widget.store.appColors.errorColor,
-                                  fontWeight: FontWeight.w800,
-                                ),
                               ),
                             ],
                           ),
@@ -13795,6 +13774,391 @@ class _PartyPlannerPageState extends State<PartyPlannerPage> {
                   ),
                 ),
               ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class ShoppingListPage extends StatefulWidget {
+  const ShoppingListPage({super.key, required this.store});
+  final MachineStore store;
+
+  @override
+  State<ShoppingListPage> createState() => _ShoppingListPageState();
+}
+
+class _ShoppingListPageState extends State<ShoppingListPage> {
+  late final guestController = TextEditingController(
+    text: widget.store.partyPlannerGuestCount.toString(),
+  );
+  late final reserveController = TextEditingController(
+    text: widget.store.partyPlannerReservePercent.toString(),
+  );
+  final Map<String, TextEditingController> inventoryControllers = {};
+
+  @override
+  void dispose() {
+    guestController.dispose();
+    reserveController.dispose();
+    for (final controller in inventoryControllers.values) {
+      controller.dispose();
+    }
+    super.dispose();
+  }
+
+  int _readInt(TextEditingController controller, int fallback) {
+    return int.tryParse(controller.text.trim()) ?? fallback;
+  }
+
+  TextEditingController _inventoryController(String ingredientId) {
+    return inventoryControllers.putIfAbsent(ingredientId, () {
+      final stored = widget.store.shoppingInventoryFor(ingredientId);
+      final text = stored == null
+          ? ''
+          : stored % 1 == 0
+              ? stored.toStringAsFixed(0)
+              : stored.toStringAsFixed(1);
+      return TextEditingController(text: text);
+    });
+  }
+
+  double? _inventoryValue(String ingredientId) {
+    final text = _inventoryController(ingredientId)
+        .text
+        .trim()
+        .replaceAll(',', '.');
+    if (text.isEmpty) return null;
+    final parsed = double.tryParse(text);
+    if (parsed == null) return null;
+    return math.max(0.0, parsed);
+  }
+
+  Future<void> _savePlanningSettings(String cardId) async {
+    await widget.store.setPartyPlannerSettings(
+      guestCount: _readInt(guestController, 30),
+      reservePercent: _readInt(reserveController, 10),
+      partyCardId: cardId,
+    );
+  }
+
+  Future<void> _saveInventory(Iterable<String> ingredientIds) async {
+    final values = <String, double?>{};
+    for (final ingredientId in ingredientIds) {
+      final raw = _inventoryController(ingredientId).text.trim();
+      values[ingredientId] = raw.isEmpty ? null : _inventoryValue(ingredientId);
+    }
+    await widget.store.saveShoppingInventory(values);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(tr('Bestand gespeichert'))),
+    );
+    setState(() {});
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cards = widget.store.partyCards;
+    final selectedCard = widget.store.partyCardById(
+          widget.store.activePartyCardId,
+        ) ??
+        cards.firstOrNull;
+    final completed = selectedCard == null
+        ? <PartySession>[]
+        : widget.store.completedPartySessionsForCard(selectedCard.id);
+    final guestCount = _readInt(
+      guestController,
+      widget.store.partyPlannerGuestCount,
+    ).clamp(1, 10000).toInt();
+    final reservePercent = _readInt(
+      reserveController,
+      widget.store.partyPlannerReservePercent,
+    ).clamp(0, 100).toInt();
+
+    final stats = selectedCard == null
+        ? <CocktailPlanningStats>[]
+        : widget.store.planningStatsForPartyCard(
+            selectedCard,
+            guestCount: guestCount,
+            reservePercent: reservePercent,
+          );
+    final usage = widget.store.plannedIngredientUsageMl(stats);
+
+    final rows = usage.entries.map((entry) {
+      final stockMl = _inventoryValue(entry.key);
+      final purchaseMl = math.max(0.0, entry.value - (stockMl ?? 0));
+      return (
+        id: entry.key,
+        requiredMl: entry.value,
+        stockMl: stockMl,
+        purchaseMl: purchaseMl,
+      );
+    }).toList()
+      ..sort((a, b) {
+        final byPurchase = b.purchaseMl.compareTo(a.purchaseMl);
+        if (byPurchase != 0) return byPurchase;
+        return widget.store
+            .displayIngredientNameById(a.id)
+            .compareTo(widget.store.displayIngredientNameById(b.id));
+      });
+
+    final totalPurchaseMl = rows.fold<double>(
+      0,
+      (sum, row) => sum + row.purchaseMl,
+    );
+
+    return PageFrame(
+      title: tr('Einkaufsliste'),
+      child: ListView(
+        padding: const EdgeInsets.all(20),
+        children: [
+          _PartyLearningNotice(
+            store: widget.store,
+            completedCount: completed.length,
+          ),
+          const SizedBox(height: 18),
+          if (cards.isEmpty)
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(18),
+                child: Text(
+                  tr('Bitte zuerst unter Einstellungen → Partykarten eine Partykarte erstellen.'),
+                ),
+              ),
+            )
+          else ...[
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(18),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      tr('Einkaufsliste'),
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w900,
+                        fontSize: 18,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      tr('Zutatenbedarf und fehlende Mengen planen'),
+                      style: TextStyle(
+                        color: widget.store.appColors.textSecondaryColor,
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: guestController,
+                            keyboardType: TextInputType.number,
+                            decoration: InputDecoration(
+                              labelText: tr('Gästezahl'),
+                            ),
+                            onChanged: (_) => setState(() {}),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: TextField(
+                            controller: reserveController,
+                            keyboardType: TextInputType.number,
+                            decoration: InputDecoration(
+                              labelText: tr('Reserve in Prozent'),
+                            ),
+                            onChanged: (_) => setState(() {}),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    DropdownButtonFormField<String>(
+                      value: selectedCard?.id,
+                      decoration: InputDecoration(labelText: tr('Partykarte')),
+                      items: cards
+                          .map(
+                            (card) => DropdownMenuItem(
+                              value: card.id,
+                              child: Text(card.name),
+                            ),
+                          )
+                          .toList(),
+                      onChanged: (value) async {
+                        if (value == null) return;
+                        await _savePlanningSettings(value);
+                        if (mounted) setState(() {});
+                      },
+                    ),
+                    const SizedBox(height: 14),
+                    Wrap(
+                      spacing: 10,
+                      runSpacing: 10,
+                      children: [
+                        _PlannerMetric(
+                          label: tr('Geplant'),
+                          value:
+                              '${stats.fold<int>(0, (sum, e) => sum + e.plannedCount)}',
+                        ),
+                        _PlannerMetric(
+                          label: tr('Einkaufen'),
+                          value:
+                              '${(totalPurchaseMl / 1000).toStringAsFixed(2)} L',
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 18),
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(18),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      tr('Bestand für Einkaufsliste'),
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w900,
+                        fontSize: 18,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      tr('Trage deinen aktuellen Bestand einmal ein. Nach jeder erfolgreichen Zubereitung werden die verwendeten Zutaten automatisch abgezogen. Leere Felder bleiben unbekannt; dann wird der komplette geplante Bedarf als Einkaufsmenge angezeigt.'),
+                      style: TextStyle(
+                        color: widget.store.appColors.textSecondaryColor,
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    if (rows.isEmpty)
+                      Text(tr('Keine Zutaten berechnet'))
+                    else ...[
+                      ...rows.map((row) {
+                        final ingredientName =
+                            widget.store.displayIngredientNameById(row.id);
+                        final stockKnown = row.stockMl != null;
+                        final enough = stockKnown && row.purchaseMl <= 0.01;
+                        return Card(
+                          margin: const EdgeInsets.only(bottom: 10),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 14,
+                              vertical: 12,
+                            ),
+                            child: LayoutBuilder(
+                              builder: (context, constraints) {
+                                final info = Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      ingredientName,
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.w900,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      '${tr('Bedarf')}: ${(row.requiredMl / 1000).toStringAsFixed(2)} L · '
+                                      '${tr('Einkaufen')}: ${(row.purchaseMl / 1000).toStringAsFixed(2)} L',
+                                      style: TextStyle(
+                                        color: widget.store
+                                            .appColors.textSecondaryColor,
+                                      ),
+                                    ),
+                                    if (!stockKnown) ...[
+                                      const SizedBox(height: 3),
+                                      Text(
+                                        tr('nicht eingetragen'),
+                                        style: TextStyle(
+                                          color: widget.store
+                                              .appColors.warningColor,
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                      ),
+                                    ],
+                                  ],
+                                );
+
+                                final input = SizedBox(
+                                  width: 165,
+                                  child: TextField(
+                                    controller: _inventoryController(row.id),
+                                    keyboardType:
+                                        const TextInputType.numberWithOptions(
+                                      decimal: true,
+                                    ),
+                                    decoration: InputDecoration(
+                                      labelText: tr('Bestand (ml)'),
+                                      prefixIcon: Icon(
+                                        enough
+                                            ? Icons.check_circle_outline
+                                            : Icons.inventory_2_outlined,
+                                        color: enough
+                                            ? widget.store.appColors.successColor
+                                            : widget.store.appColors.accentColor,
+                                      ),
+                                    ),
+                                    onChanged: (_) => setState(() {}),
+                                  ),
+                                );
+
+                                if (constraints.maxWidth < 620) {
+                                  return Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.stretch,
+                                    children: [
+                                      info,
+                                      const SizedBox(height: 10),
+                                      Align(
+                                        alignment: Alignment.centerLeft,
+                                        child: input,
+                                      ),
+                                    ],
+                                  );
+                                }
+
+                                return Row(
+                                  children: [
+                                    Icon(
+                                      enough
+                                          ? Icons.check_circle_outline
+                                          : Icons.shopping_cart_checkout_outlined,
+                                      color: enough
+                                          ? widget.store.appColors.successColor
+                                          : widget.store.appColors.warningColor,
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Expanded(child: info),
+                                    const SizedBox(width: 12),
+                                    input,
+                                  ],
+                                );
+                              },
+                            ),
+                          ),
+                        );
+                      }),
+                      const SizedBox(height: 6),
+                      SizedBox(
+                        width: double.infinity,
+                        child: FilledButton.icon(
+                          onPressed: () => _saveInventory(
+                            rows.map((row) => row.id),
+                          ),
+                          icon: const Icon(Icons.save_outlined),
+                          label: Text(tr('Bestand speichern')),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
           ],
         ],
       ),
@@ -14459,7 +14823,7 @@ class _RecipeEditorPageState extends State<RecipeEditorPage> {
   late final TextEditingController baseVolume;
   late DrinkCategory category;
   late final List<RecipePart> parts;
-  late final List<String> manualNotes;
+  late final TextEditingController preparationNotes;
   String? imagePath;
 
   bool get isEditing => widget.recipe != null;
@@ -14479,7 +14843,9 @@ class _RecipeEditorPageState extends State<RecipeEditorPage> {
           .toStringAsFixed(0),
     );
     imagePath = recipe?.imagePath;
-    manualNotes = List<String>.from(recipe?.manualNotes ?? const []);
+    preparationNotes = TextEditingController(
+      text: (recipe?.manualNotes ?? const <String>[]).join('\n'),
+    );
     parts = recipe?.parts
             .map(
               (part) => RecipePart(
@@ -14499,6 +14865,7 @@ class _RecipeEditorPageState extends State<RecipeEditorPage> {
     name.dispose();
     description.dispose();
     baseVolume.dispose();
+    preparationNotes.dispose();
     super.dispose();
   }
 
@@ -14577,6 +14944,19 @@ class _RecipeEditorPageState extends State<RecipeEditorPage> {
             decoration: InputDecoration(labelText: tr('Beschreibung')),
           ),
           const SizedBox(height: 12),
+          TextField(
+            controller: preparationNotes,
+            minLines: 3,
+            maxLines: 6,
+            decoration: InputDecoration(
+              labelText: tr('Hinweise für die Zubereitung'),
+              helperText: tr(
+                'Ein Hinweis pro Zeile. Zum Beispiel: Frische Minze hinzufügen oder Limettenstücke ins Glas geben.',
+              ),
+              alignLabelWithHint: true,
+            ),
+          ),
+          const SizedBox(height: 12),
           DropdownButtonFormField(
             initialValue: category,
             decoration: InputDecoration(labelText: tr('Kategorie')),
@@ -14641,48 +15021,9 @@ class _RecipeEditorPageState extends State<RecipeEditorPage> {
                 icon: const Icon(Icons.add),
                 label: const T('Zutat'),
               ),
-              const SizedBox(width: 8),
-              OutlinedButton.icon(
-                onPressed: _addManualNote,
-                icon: const Icon(Icons.notes),
-                label: const T('Hinweis'),
-              ),
             ],
           ),
           const SizedBox(height: 8),
-          if (manualNotes.isNotEmpty) ...[
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(14),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const T('Zusätzliche manuelle Hinweise',
-                      style: TextStyle(fontWeight: FontWeight.w800),
-                    ),
-                    const SizedBox(height: 8),
-                    ...manualNotes.asMap().entries.map(
-                      (entry) => ListTile(
-                        contentPadding: EdgeInsets.zero,
-                        leading: const Icon(
-                          Icons.pan_tool_alt_outlined,
-                          color: Color(0xFFFFA726),
-                        ),
-                        title: Text(entry.value),
-                        trailing: IconButton(
-                          onPressed: () => setState(
-                            () => manualNotes.removeAt(entry.key),
-                          ),
-                          icon: const Icon(Icons.delete_outline),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 8),
-          ],
           ...parts.asMap().entries.map((entry) {
             final i = entry.key;
             final p = entry.value;
@@ -14758,52 +15099,6 @@ class _RecipeEditorPageState extends State<RecipeEditorPage> {
     );
   }
 
-  Future<void> _addManualNote() async {
-    String enteredText = '';
-
-    final note = await showDialog<String>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const T('Manuellen Hinweis hinzufügen'),
-        content: TextField(
-          autofocus: true,
-          maxLines: 3,
-          decoration: InputDecoration(
-            labelText: tr('Hinweis'),
-            hintText: tr('Zum Beispiel: Mit Ananas dekorieren'),
-          ),
-          onChanged: (value) => enteredText = value,
-          onSubmitted: (value) {
-            final trimmed = value.trim();
-            Navigator.pop(
-              dialogContext,
-              trimmed.isEmpty ? null : trimmed,
-            );
-          },
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: const T('Abbrechen'),
-          ),
-          FilledButton(
-            onPressed: () {
-              final trimmed = enteredText.trim();
-              Navigator.pop(
-                dialogContext,
-                trimmed.isEmpty ? null : trimmed,
-              );
-            },
-            child: const T('Hinzufügen'),
-          ),
-        ],
-      ),
-    );
-
-    if (!mounted || note == null) return;
-    setState(() => manualNotes.add(note));
-  }
-
   void _addPart() {
     if (widget.store.ingredients.isEmpty) return;
     setState(
@@ -14820,6 +15115,11 @@ class _RecipeEditorPageState extends State<RecipeEditorPage> {
   void _save() {
     final recipeSize =
         double.tryParse(baseVolume.text.replaceAll(',', '.'));
+    final parsedNotes = preparationNotes.text
+        .split('\n')
+        .map((note) => note.trim())
+        .where((note) => note.isNotEmpty)
+        .toList();
 
     if (name.text.trim().isEmpty ||
         parts.isEmpty ||
@@ -14842,7 +15142,7 @@ class _RecipeEditorPageState extends State<RecipeEditorPage> {
       recipe.parts = List.of(parts);
       recipe.imagePath = imagePath;
       recipe.baseVolumeMl = recipeSize;
-      recipe.manualNotes = List<String>.from(manualNotes);
+      recipe.manualNotes = List<String>.from(parsedNotes);
     } else {
       widget.store.recipes.add(
         Recipe(
@@ -14853,7 +15153,7 @@ class _RecipeEditorPageState extends State<RecipeEditorPage> {
           parts: List.of(parts),
           imagePath: imagePath,
           baseVolumeMl: recipeSize,
-          manualNotes: List<String>.from(manualNotes),
+          manualNotes: List<String>.from(parsedNotes),
         ),
       );
     }

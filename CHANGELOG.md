@@ -1,5 +1,34 @@
 # CocktailBot Changelog
 
+## V24 – Branding entfernt & Rezept-Hinweise
+
+- Der Branding-Bereich wurde vollständig aus den Einstellungen und aus der Liste der Gewerbefunktionen entfernt.
+- Der sichtbare Produktname ist fest **CocktailBot** und kann nicht mehr durch einen Bar- oder Firmennamen ersetzt werden.
+- In der 1024×600-Topnavigation wird **CocktailBot** jetzt dauerhaft neben dem Cocktail-Symbol angezeigt.
+- Im Rezepteditor gibt es ein direkt sichtbares mehrzeiliges Feld **„Hinweise für die Zubereitung“**. Jede Zeile wird als eigener Hinweis gespeichert.
+- Beispiele: „Frische Minze hinzufügen“, „Limettenstücke ins Glas geben“, „Mit Crushed Ice auffüllen“.
+- Vorhandene Rezept-Hinweise bleiben kompatibel und werden beim Bearbeiten automatisch in das neue Textfeld übernommen.
+- Die Hinweise werden auf der Cocktail-Detailseite unter **Hinweise** angezeigt.
+- Der mitgelieferte Mojito enthält als Beispiel Hinweise für frische Minze und Limettenstücke.
+
+## V23 – Partybestand und lernende Einkaufsliste
+
+- Der Lagerbestand für die Partyplanung wird jetzt direkt in der **Einkaufsliste** gepflegt und nicht mehr aus den Pumpen-Füllständen abgeleitet.
+- Pro benötigter Zutat kann ein Bestand in ml eingetragen und gespeichert werden. Das Feld darf leer bleiben; dann gilt der Bestand als unbekannt und der komplette geplante Bedarf wird als Einkaufsmenge ausgewiesen.
+- Ein gespeicherter Bestand wird nach jeder erfolgreich zubereiteten Portion automatisch um die tatsächlich verwendete Rezeptmenge reduziert – auch bei manuellen Zutaten.
+- Die Einkaufsliste zeigt pro Zutat **Bedarf**, **Bestand** und **Einkaufen** sowie die gesamte Einkaufsmenge.
+- Partyplaner und Einkaufsliste zeigen jetzt deutlich den Hinweis, dass aussagekräftige Prognosen erst nach mehreren abgeschlossenen Partys mit derselben Partykarte entstehen.
+- Der Partyplaner zeigt nur noch den geplanten Zutatenbedarf; Bestands- und Einkaufsberechnung findet ausschließlich in der Einkaufsliste statt.
+- Neue sichtbare Texte wurden für alle vorhandenen App-Sprachen ergänzt.
+
+## V22 – Einkaufsliste Navigation
+
+- Der Menüpunkt **Einkaufsliste** öffnet nicht mehr versehentlich den Partyplaner.
+- Neue eigenständige Einkaufsliste mit Partykarte, Gästezahl und Reserve.
+- Zeigt geplanten Zutatenbedarf, vorhandene Mengen und fehlende Einkaufsmengen.
+- Fehlende Zutaten werden in der Liste zuerst angezeigt.
+
+
 ## V21 – Raspberry-Dateibrowser für Rezeptbilder
 - Rezeptbilder werden wieder über den nativen Chromium/Raspberry-Dateidialog ausgewählt.
 - Ordner, USB-Sticks und andere eingebundene Laufwerke können im Dateidialog durchsucht werden.
