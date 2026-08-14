@@ -298,40 +298,71 @@ configure_display_and_boot() {
     config_file=/boot/config.txt
   fi
 
-  if [[ -n "$config_file" ]]; then
-    log "Aktiviere KMS und entferne alte 1920x1080-/Framebuffer-Zwangseinstellungen"
-    cp -a "$config_file" "${config_file}.cocktailbot.bak" || true
-    sed -i -E \
-      -e '/^[[:space:]]*#?[[:space:]]*dtoverlay=vc4-fkms-v3d/d' \
-      -e '/^[[:space:]]*#?[[:space:]]*dtoverlay=vc4-kms-v3d/d' \
-      -e '/^[[:space:]]*hdmi_force_hotplug=/d' \
-      -e '/^[[:space:]]*hdmi_group=/d' \
-      -e '/^[[:space:]]*hdmi_mode=/d' \
-      -e '/^[[:space:]]*hdmi_cvt([=[:space:]])/d' \
-      -e '/^[[:space:]]*framebuffer_width=/d' \
-      -e '/^[[:space:]]*framebuffer_height=/d' \
-      -e '/^[[:space:]]*disable_fw_kms_setup=/d' \
-      "$config_file"
-    printf '\n# CocktailBot Display\ndtoverlay=vc4-kms-v3d\n' >> "$config_file"
-  else
-    warn "Keine config.txt unter /boot/firmware oder /boot gefunden."
-  fi
+  log "Setze Display robust auf KMS 1024x600@60"
+  [[ -n "$config_file" ]] && cp -a "$config_file" "${config_file}.cocktailbot.bak" || true
+  [[ -n "$cmdline_file" ]] && cp -a "$cmdline_file" "${cmdline_file}.cocktailbot.bak" || true
 
-  if [[ -n "$cmdline_file" ]]; then
-    log "Setze KMS-Ausgabe auf 1024x600@60"
-    cp -a "$cmdline_file" "${cmdline_file}.cocktailbot.bak" || true
-    sed -i -E \
-      -e 's/(^|[[:space:]])quiet([[:space:]]|$)/ /g' \
-      -e 's/(^|[[:space:]])splash([[:space:]]|$)/ /g' \
-      -e 's/(^|[[:space:]])video=[^[:space:]]+([[:space:]]|$)/ /g' \
-      -e 's/[[:space:]]+/ /g' \
-      -e 's/^ //' \
-      -e 's/ $//' \
-      "$cmdline_file"
-    sed -i 's/$/ video=HDMI-A-1:1024x600M@60/' "$cmdline_file"
-  else
-    warn "Keine cmdline.txt unter /boot/firmware oder /boot gefunden."
-  fi
+  # Python statt komplexer sed-Ausdrücke: GoodTFT-Versionen ändern ihre
+  # config.txt regelmäßig. Token-/Zeilenbasiertes Bereinigen ist robuster und
+  # hält cmdline.txt garantiert einzeilig.
+  python3 - "$config_file" "$cmdline_file" <<'PY_DISPLAY'
+from pathlib import Path
+import sys
+
+config_name, cmdline_name = sys.argv[1], sys.argv[2]
+
+if config_name:
+    p = Path(config_name)
+    lines = p.read_text(errors="replace").splitlines()
+    out = []
+    in_old_block = False
+    remove_prefixes = (
+        "dtoverlay=vc4-fkms-v3d",
+        "dtoverlay=vc4-kms-v3d",
+        "hdmi_force_hotplug=",
+        "hdmi_group=",
+        "hdmi_mode=",
+        "hdmi_cvt=",
+        "framebuffer_width=",
+        "framebuffer_height=",
+        "disable_fw_kms_setup=",
+    )
+    for raw in lines:
+        stripped = raw.strip()
+        if stripped == "# BEGIN COCKTAILBOT DISPLAY":
+            in_old_block = True
+            continue
+        if stripped == "# END COCKTAILBOT DISPLAY":
+            in_old_block = False
+            continue
+        if in_old_block:
+            continue
+        active = stripped.lstrip("#").strip()
+        if any(active.startswith(prefix) for prefix in remove_prefixes):
+            continue
+        out.append(raw)
+    while out and not out[-1].strip():
+        out.pop()
+    out += [
+        "",
+        "# BEGIN COCKTAILBOT DISPLAY",
+        "[all]",
+        "dtoverlay=vc4-kms-v3d",
+        "# END COCKTAILBOT DISPLAY",
+    ]
+    p.write_text("\n".join(out) + "\n")
+
+if cmdline_name:
+    p = Path(cmdline_name)
+    tokens = p.read_text(errors="replace").split()
+    tokens = [
+        t for t in tokens
+        if t not in {"quiet", "splash"}
+        and not t.startswith("video=")
+    ]
+    tokens.append("video=HDMI-A-1:1024x600M@60")
+    p.write_text(" ".join(tokens) + "\n")
+PY_DISPLAY
 
   systemctl unmask dev-dri-card0.device >/dev/null 2>&1 || true
   systemctl unmask dev-dri-renderD128.device >/dev/null 2>&1 || true
@@ -342,6 +373,9 @@ configure_display_and_boot() {
   if command -v raspi-config >/dev/null 2>&1; then
     raspi-config nonint do_boot_behaviour B4 || warn "Desktop-Autologin konnte nicht gesetzt werden."
     raspi-config nonint do_blanking 1 || warn "Bildschirmabschaltung konnte nicht deaktiviert werden."
+  fi
+  if systemctl list-unit-files lightdm.service >/dev/null 2>&1; then
+    systemctl enable lightdm.service >/dev/null 2>&1 || true
   fi
 }
 

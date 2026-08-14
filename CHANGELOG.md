@@ -1,5 +1,10 @@
 # CocktailBot – Changelog
 
+## V13 – Display/Desktop/Kiosk-Reparatur
+- KMS/1024×600-Konfiguration ohne komplexe sed-Regex.
+- Neues `tools/repair-display-kiosk.sh` repariert Bootauflösung, Desktop-Autologin, Kiosk-Autostart, Webrechte und Dienst nach einem abgebrochenen Installer.
+- LOW-aktive Pumpen-Bootsicherheit bleibt erhalten.
+
 ## V12 – Desktop-/KMS-Installer-Fix (2026-08-14)
 
 - Fehlerhaften mehrzeiligen `sed`-Ausdruck in der Display-/KMS-Konfiguration behoben.
