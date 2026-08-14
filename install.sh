@@ -11,7 +11,7 @@ VENV_DIR="$INSTALL_ROOT/venv"
 FLUTTER_DIR="${COCKTAILBOT_FLUTTER_DIR:-/opt/flutter}"
 ACTIVE_HIGH="${COCKTAILBOT_ACTIVE_HIGH:-0}"
 KIOSK_DELAY="${COCKTAILBOT_KIOSK_DELAY_SECONDS:-30}"
-BUILD_MODE="${COCKTAILBOT_BUILD_MODE:-auto}"
+BUILD_MODE="${COCKTAILBOT_BUILD_MODE:-source}"
 SKIP_APT="${COCKTAILBOT_SKIP_APT:-0}"
 REBOOT_AFTER=0
 USE_LOCAL_SOURCE=0
@@ -34,6 +34,7 @@ Optionen:
   --active-high 0|1         Relaislogik; Standard: 0 (LOW = EIN, HIGH = AUS)
   --kiosk-delay SEKUNDEN    Wartezeit bis Chromium startet; Standard: 30
   --build-mode auto|release|source
+                            Standard: source (aktuellen Quellcode lokal bauen)
                             auto: web-release bevorzugen, sonst lokal bauen
                             release: nur GitHub-Branch web-release verwenden
                             source: Flutter-App auf dem Raspberry bauen
@@ -298,78 +299,89 @@ configure_display_and_boot() {
     config_file=/boot/config.txt
   fi
 
-  log "Setze Display robust auf KMS 1024x600@60"
-  [[ -n "$config_file" ]] && cp -a "$config_file" "${config_file}.cocktailbot.bak" || true
-  [[ -n "$cmdline_file" ]] && cp -a "$cmdline_file" "${cmdline_file}.cocktailbot.bak" || true
+  [[ -n "$config_file" && -n "$cmdline_file" ]] || die "Bootdateien config.txt/cmdline.txt wurden nicht gefunden."
 
-  # Python statt komplexer sed-Ausdrücke: GoodTFT-Versionen ändern ihre
-  # config.txt regelmäßig. Token-/Zeilenbasiertes Bereinigen ist robuster und
-  # hält cmdline.txt garantiert einzeilig.
+  log "Setze Display auf den auf LCD7C getesteten KMS-Modus 1024x600@60"
+  cp -a "$config_file" "${config_file}.cocktailbot.bak" || true
+  cp -a "$cmdline_file" "${cmdline_file}.cocktailbot.bak" || true
+
+  # GoodTFT/LCD-show legt je nach Version unterschiedliche Legacy-HDMI- und
+  # Framebuffer-Zeilen an (teils mit '=', teils mit Leerzeichen). Python
+  # bereinigt beides ohne fragile sed-RegEx und setzt danach exakt die auf dem
+  # realen CocktailBot getestete KMS-Konfiguration.
   python3 - "$config_file" "$cmdline_file" <<'PY_DISPLAY'
 from pathlib import Path
 import sys
 
-config_name, cmdline_name = sys.argv[1], sys.argv[2]
+config, cmdline = map(Path, sys.argv[1:3])
+lines = config.read_text(errors="replace").splitlines()
+out = []
+in_block = False
 
-if config_name:
-    p = Path(config_name)
-    lines = p.read_text(errors="replace").splitlines()
-    out = []
-    in_old_block = False
-    remove_prefixes = (
-        "dtoverlay=vc4-fkms-v3d",
-        "dtoverlay=vc4-kms-v3d",
-        "hdmi_force_hotplug=",
-        "hdmi_group=",
-        "hdmi_mode=",
-        "hdmi_cvt=",
-        "framebuffer_width=",
-        "framebuffer_height=",
-        "disable_fw_kms_setup=",
-    )
-    for raw in lines:
-        stripped = raw.strip()
-        if stripped == "# BEGIN COCKTAILBOT DISPLAY":
-            in_old_block = True
-            continue
-        if stripped == "# END COCKTAILBOT DISPLAY":
-            in_old_block = False
-            continue
-        if in_old_block:
-            continue
-        active = stripped.lstrip("#").strip()
-        if any(active.startswith(prefix) for prefix in remove_prefixes):
-            continue
-        out.append(raw)
-    while out and not out[-1].strip():
-        out.pop()
-    out += [
-        "",
-        "# BEGIN COCKTAILBOT DISPLAY",
-        "[all]",
-        "dtoverlay=vc4-kms-v3d",
-        "# END COCKTAILBOT DISPLAY",
-    ]
-    p.write_text("\n".join(out) + "\n")
+# Prefix comparison is done after stripping a possible leading '#'. This also
+# removes commented legacy settings that could later accidentally be enabled.
+legacy_prefixes = (
+    "dtoverlay=vc4-fkms-v3d",
+    "dtoverlay=vc4-kms-v3d",
+    "disable_fw_kms_setup",
+    "hdmi_force_hotplug",
+    "hdmi_group",
+    "hdmi_mode",
+    "hdmi_cvt",
+    "hdmi_drive",
+    "config_hdmi_boost",
+    "framebuffer_width",
+    "framebuffer_height",
+    "max_framebuffer_width",
+    "max_framebuffer_height",
+)
 
-if cmdline_name:
-    p = Path(cmdline_name)
-    tokens = p.read_text(errors="replace").split()
-    tokens = [
-        t for t in tokens
-        if t not in {"quiet", "splash"}
-        and not t.startswith("video=")
-    ]
-    tokens.append("video=HDMI-A-1:1024x600M@60")
-    p.write_text(" ".join(tokens) + "\n")
+for raw in lines:
+    stripped = raw.strip()
+    if stripped == "# BEGIN COCKTAILBOT DISPLAY":
+        in_block = True
+        continue
+    if stripped == "# END COCKTAILBOT DISPLAY":
+        in_block = False
+        continue
+    if in_block:
+        continue
+
+    active = stripped.lstrip("#").strip()
+    if any(active.startswith(prefix) for prefix in legacy_prefixes):
+        continue
+    out.append(raw)
+
+while out and not out[-1].strip():
+    out.pop()
+out += [
+    "",
+    "# BEGIN COCKTAILBOT DISPLAY",
+    "[all]",
+    "dtoverlay=vc4-kms-v3d",
+    "# LCD7C native resolution is selected by the kernel command line below.",
+    "# END COCKTAILBOT DISPLAY",
+]
+config.write_text("\n".join(out) + "\n")
+
+tokens = cmdline.read_text(errors="replace").split()
+tokens = [
+    t for t in tokens
+    if t not in {"quiet", "splash"}
+    and not t.startswith("video=")
+]
+tokens.append("video=HDMI-A-1:1024x600M@60")
+cmdline.write_text(" ".join(tokens) + "\n")
 PY_DISPLAY
 
+  # GoodTFT installations from older runs may have masked DRM devices.
   systemctl unmask dev-dri-card0.device >/dev/null 2>&1 || true
+  systemctl unmask dev-dri-card1.device >/dev/null 2>&1 || true
   systemctl unmask dev-dri-renderD128.device >/dev/null 2>&1 || true
   systemctl disable NetworkManager-wait-online.service >/dev/null 2>&1 || true
 
-  log "Erzwinge grafischen Desktopstart und Autologin"
-  systemctl set-default graphical.target >/dev/null 2>&1 || true
+  log "Aktiviere grafischen Desktopstart und automatisches Login"
+  systemctl set-default graphical.target
   if command -v raspi-config >/dev/null 2>&1; then
     raspi-config nonint do_boot_behaviour B4 || warn "Desktop-Autologin konnte nicht gesetzt werden."
     raspi-config nonint do_blanking 1 || warn "Bildschirmabschaltung konnte nicht deaktiviert werden."
@@ -377,22 +389,17 @@ PY_DISPLAY
   if systemctl list-unit-files lightdm.service >/dev/null 2>&1; then
     systemctl enable lightdm.service >/dev/null 2>&1 || true
   fi
-}
 
+  log "Boot-Displaykonfiguration gesetzt: KMS + HDMI-A-1 1024x600@60"
+}
 configure_pump_boot_safety() {
-  # CocktailBot uses these BCM GPIOs exclusively for pumps.  The installed
-  # relay boards are LOW-active by default, so HIGH is the safe/off level.
-  # Keep this separate from display boot optimisation: pump safety must also
-  # be applied during updates that use --skip-boot-opt.
+  # These BCM GPIOs are exclusively used by the 18 pump relays.
   local config_file=""
   local cmdline_file=""
   local safe_drive="dh"
   local pins="17,18,27,22,23,24,25,4,5,6,13,19,26,16,20,21,12,15"
 
-  if [[ "$ACTIVE_HIGH" == "1" ]]; then
-    # HIGH-active relays are off at LOW.
-    safe_drive="dl"
-  fi
+  [[ "$ACTIVE_HIGH" == "1" ]] && safe_drive="dl"
 
   if [[ -f /boot/firmware/config.txt ]]; then
     config_file=/boot/firmware/config.txt
@@ -408,49 +415,69 @@ configure_pump_boot_safety() {
   if [[ -n "$config_file" ]]; then
     log "Setze alle Pumpen-GPIOs bereits im Bootloader auf AUS"
     cp -a "$config_file" "${config_file}.cocktailbot-pumps.bak" || true
+    python3 - "$config_file" "$pins" "$safe_drive" <<'PY_PUMPS_CONFIG'
+from pathlib import Path
+import sys
 
-    # Remove an older CocktailBot safety block and legacy exact pump line so
-    # reinstallations stay idempotent. The block is appended at the end,
-    # because gpio= directives are applied in order and the last one wins.
-    sed -i \
-      '/^# BEGIN COCKTAILBOT PUMP SAFETY$/,/^# END COCKTAILBOT PUMP SAFETY$/d' \
-      "$config_file"
-    sed -i -E \
-      "/^[[:space:]]*gpio=${pins//,/\\,}=op,d[hl][[:space:]]*$/d; \
-       /^[[:space:]]*enable_uart=/d" \
-      "$config_file"
-
-    cat >> "$config_file" <<EOF
-
-# BEGIN COCKTAILBOT PUMP SAFETY
-# These BCM pins drive the 18 pump relays. Keep them at the relay OFF level
-# from the earliest firmware/boot stage. GPIO15 is reserved for pump 18, so
-# the on-board UART is disabled; the Pico LED controller uses USB serial.
-[all]
-enable_uart=0
-gpio=$pins=op,$safe_drive
-# END COCKTAILBOT PUMP SAFETY
-EOF
+config = Path(sys.argv[1])
+pins = sys.argv[2]
+safe_drive = sys.argv[3]
+lines = config.read_text(errors="replace").splitlines()
+out = []
+in_block = False
+for raw in lines:
+    stripped = raw.strip()
+    if stripped == "# BEGIN COCKTAILBOT PUMP SAFETY":
+        in_block = True
+        continue
+    if stripped == "# END COCKTAILBOT PUMP SAFETY":
+        in_block = False
+        continue
+    if in_block:
+        continue
+    if stripped.startswith("enable_uart="):
+        continue
+    if stripped.startswith(f"gpio={pins}=op,"):
+        continue
+    out.append(raw)
+while out and not out[-1].strip():
+    out.pop()
+out += [
+    "",
+    "# BEGIN COCKTAILBOT PUMP SAFETY",
+    "[all]",
+    "enable_uart=0",
+    f"gpio={pins}=op,{safe_drive}",
+    "# END COCKTAILBOT PUMP SAFETY",
+]
+config.write_text("\n".join(out) + "\n")
+PY_PUMPS_CONFIG
   else
-    warn "Keine config.txt gefunden; Pumpen-GPIOs konnten nicht frueh auf AUS gesetzt werden."
+    warn "Keine config.txt gefunden; Pumpen-GPIOs konnten nicht früh auf AUS gesetzt werden."
   fi
 
   if [[ -n "$cmdline_file" ]]; then
-    # GPIO15 is pump 18. A serial console would claim GPIO14/15 again when
-    # Linux starts, so remove only UART console entries (keep console=tty1).
     cp -a "$cmdline_file" "${cmdline_file}.cocktailbot-pumps.bak" || true
-    sed -i -E \
-      's/(^|[[:space:]])console=(serial0|ttyAMA[0-9]*|ttyS[0-9]*),[^[:space:]]+([[:space:]]|$)/ /g; \
-       s/[[:space:]]+/ /g; s/^ //; s/ $//' \
-      "$cmdline_file"
+    python3 - "$cmdline_file" <<'PY_PUMPS_CMDLINE'
+from pathlib import Path
+import sys
+
+p = Path(sys.argv[1])
+tokens = p.read_text(errors="replace").split()
+tokens = [t for t in tokens if not (
+    t.startswith("console=serial0,") or
+    t.startswith("console=ttyAMA") or
+    t.startswith("console=ttyS")
+)]
+p.write_text(" ".join(tokens) + "\n")
+PY_PUMPS_CMDLINE
   fi
 
-  # Do not allow a previously enabled serial getty to reclaim pump GPIO15.
+  # GPIO15 belongs to pump 18. Do not let a serial getty claim it again.
   systemctl disable --now serial-getty@serial0.service >/dev/null 2>&1 || true
   systemctl disable --now serial-getty@ttyAMA0.service >/dev/null 2>&1 || true
   systemctl disable --now serial-getty@ttyS0.service >/dev/null 2>&1 || true
 }
-
 configure_kiosk() {
   log "Konfiguriere Desktop-Autostart und Kioskstart nach ${KIOSK_DELAY} Sekunden"
   install -d -o "$TARGET_USER" -g "$TARGET_GROUP" -m 0755 \

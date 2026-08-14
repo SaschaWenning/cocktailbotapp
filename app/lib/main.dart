@@ -1345,6 +1345,7 @@ String appText(AppLanguage language, String key) {
     'Kategorie': {AppLanguage.de: 'Kategorie', AppLanguage.en: 'Category', AppLanguage.es: 'Categoría', AppLanguage.it: 'Categoria', AppLanguage.nl: 'Categorie', AppLanguage.fr: 'Catégorie', AppLanguage.pt: 'Categoria', AppLanguage.pl: 'Kategoria', AppLanguage.tr: 'Kategori', AppLanguage.ru: 'Категория'},
     'Größen für Cocktails': {AppLanguage.de: 'Größen für Cocktails', AppLanguage.en: 'Cocktail sizes', AppLanguage.es: 'Tamaños de cóctel', AppLanguage.it: 'Dimensioni cocktail', AppLanguage.nl: 'Cocktailformaten', AppLanguage.fr: 'Tailles des cocktails', AppLanguage.pt: 'Tamanhos de coquetel', AppLanguage.pl: 'Rozmiary koktajli', AppLanguage.tr: 'Kokteyl boyutları', AppLanguage.ru: 'Размеры коктейлей'},
     'Größen für Shots': {AppLanguage.de: 'Größen für Shots', AppLanguage.en: 'Shot sizes', AppLanguage.es: 'Tamaños de chupitos', AppLanguage.it: 'Dimensioni shot', AppLanguage.nl: 'Shotformaten', AppLanguage.fr: 'Tailles des shots', AppLanguage.pt: 'Tamanhos de shots', AppLanguage.pl: 'Rozmiary shotów', AppLanguage.tr: 'Shot boyutları', AppLanguage.ru: 'Размеры шотов'},
+    'Mehrere Größen können gleichzeitig aktiviert werden. Die Standardgröße ist beim Öffnen eines Cocktails vorausgewählt.': {AppLanguage.de: 'Mehrere Größen können gleichzeitig aktiviert werden. Die Standardgröße ist beim Öffnen eines Cocktails vorausgewählt.', AppLanguage.en: 'Multiple sizes can be enabled at the same time. The default size is preselected when a drink is opened.', AppLanguage.es: 'Se pueden activar varios tamaños al mismo tiempo. El tamaño predeterminado aparece preseleccionado al abrir una bebida.', AppLanguage.it: 'È possibile attivare più dimensioni contemporaneamente. La dimensione predefinita viene preselezionata quando si apre una bevanda.', AppLanguage.nl: 'Meerdere formaten kunnen tegelijk worden ingeschakeld. Het standaardformaat is vooraf geselecteerd wanneer een drankje wordt geopend.', AppLanguage.fr: 'Plusieurs tailles peuvent être activées en même temps. La taille par défaut est présélectionnée à l’ouverture d’une boisson.', AppLanguage.pt: 'Vários tamanhos podem ser ativados ao mesmo tempo. O tamanho padrão fica pré-selecionado ao abrir uma bebida.', AppLanguage.pl: 'Można włączyć kilka rozmiarów jednocześnie. Domyślny rozmiar jest wstępnie wybrany po otwarciu napoju.', AppLanguage.tr: 'Birden fazla boyut aynı anda etkinleştirilebilir. Bir içecek açıldığında varsayılan boyut önceden seçilir.', AppLanguage.ru: 'Можно одновременно включить несколько размеров. При открытии напитка стандартный размер выбирается заранее.'},
     'Standardmäßig 200 ml. Diese Größen gelten für Cocktails und alkoholfreie Cocktails.': {AppLanguage.de: 'Standardmäßig 200 ml. Diese Größen gelten für Cocktails und alkoholfreie Cocktails.', AppLanguage.en: 'Default is 200 ml. These sizes apply to cocktails and alcohol-free cocktails.', AppLanguage.es: 'El valor predeterminado es 200 ml. Estos tamaños se aplican a cócteles y cócteles sin alcohol.', AppLanguage.it: 'Il valore predefinito è 200 ml. Queste dimensioni valgono per cocktail e analcolici.', AppLanguage.nl: 'Standaard is 200 ml. Deze formaten gelden voor cocktails en alcoholvrije cocktails.', AppLanguage.fr: 'La valeur par défaut est 200 ml. Ces tailles s’appliquent aux cocktails et cocktails sans alcool.', AppLanguage.pt: 'O padrão é 200 ml. Esses tamanhos valem para coquetéis e coquetéis sem álcool.', AppLanguage.pl: 'Domyślnie 200 ml. Te rozmiary dotyczą koktajli i koktajli bezalkoholowych.', AppLanguage.tr: 'Varsayılan 200 ml. Bu boyutlar kokteyller ve alkolsüz kokteyller için geçerlidir.', AppLanguage.ru: 'По умолчанию 200 мл. Эти размеры применяются к коктейлям и безалкогольным коктейлям.'},
     'Voreingestellt sind 2 cl und 4 cl. In der App werden die Werte als 20 ml und 40 ml gespeichert.': {AppLanguage.de: 'Voreingestellt sind 2 cl und 4 cl. In der App werden die Werte als 20 ml und 40 ml gespeichert.', AppLanguage.en: 'Preset values are 2 cl and 4 cl. In the app they are stored as 20 ml and 40 ml.', AppLanguage.es: 'Los valores preestablecidos son 2 cl y 4 cl. En la app se guardan como 20 ml y 40 ml.', AppLanguage.it: 'I valori predefiniti sono 2 cl e 4 cl. Nell’app vengono salvati come 20 ml e 40 ml.', AppLanguage.nl: 'Vooringesteld zijn 2 cl en 4 cl. In de app worden ze opgeslagen als 20 ml en 40 ml.', AppLanguage.fr: 'Les valeurs prédéfinies sont 2 cl et 4 cl. Dans l’app, elles sont enregistrées comme 20 ml et 40 ml.', AppLanguage.pt: 'Os valores predefinidos são 2 cl e 4 cl. No app são salvos como 20 ml e 40 ml.', AppLanguage.pl: 'Domyślnie ustawiono 2 cl i 4 cl. W aplikacji zapisane są jako 20 ml i 40 ml.', AppLanguage.tr: 'Varsayılan değerler 2 cl ve 4 cl’dir. Uygulamada 20 ml ve 40 ml olarak kaydedilir.', AppLanguage.ru: 'Предустановлены 2 cl и 4 cl. В приложении они сохраняются как 20 мл и 40 мл.'},
     'Neue Größe in ml': {AppLanguage.de: 'Neue Größe in ml', AppLanguage.en: 'New size in ml', AppLanguage.es: 'Nuevo tamaño en ml', AppLanguage.it: 'Nuova dimensione in ml', AppLanguage.nl: 'Nieuw formaat in ml', AppLanguage.fr: 'Nouvelle taille en ml', AppLanguage.pt: 'Novo tamanho em ml', AppLanguage.pl: 'Nowy rozmiar w ml', AppLanguage.tr: 'ml cinsinden yeni boyut', AppLanguage.ru: 'Новый размер в мл'},
@@ -2677,8 +2678,10 @@ class MachineStore extends ChangeNotifier {
   String status = 'Nicht verbunden';
   bool loaded = false;
   List<double> servingSizes = [200, 300, 400];
+  List<double> enabledServingSizes = [200, 300, 400];
   double defaultServingSizeMl = 200;
   List<double> shotSizes = [20, 40];
+  List<double> enabledShotSizes = [20, 40];
   double defaultShotSizeMl = 20;
   List<double> primeTimesSeconds = List<double>.filled(18, 5);
   double cleaningSeconds = 15;
@@ -2841,6 +2844,17 @@ class MachineStore extends ChangeNotifier {
           servingSizes.add(defaultServingSizeMl);
           servingSizes.sort();
         }
+        enabledServingSizes =
+            ((j['enabledServingSizes'] as List?) ?? servingSizes)
+                .map((e) => (e as num).toDouble())
+                .where((e) => e > 0 && servingSizes.contains(e))
+                .toSet()
+                .toList()
+              ..sort();
+        if (!enabledServingSizes.contains(defaultServingSizeMl)) {
+          enabledServingSizes.add(defaultServingSizeMl);
+          enabledServingSizes.sort();
+        }
         shotSizes = ((j['shotSizes'] as List?) ?? [20, 40])
             .map((e) => (e as num).toDouble())
             .where((e) => e > 0)
@@ -2852,6 +2866,16 @@ class MachineStore extends ChangeNotifier {
         if (!shotSizes.contains(defaultShotSizeMl)) {
           shotSizes.add(defaultShotSizeMl);
           shotSizes.sort();
+        }
+        enabledShotSizes = ((j['enabledShotSizes'] as List?) ?? shotSizes)
+            .map((e) => (e as num).toDouble())
+            .where((e) => e > 0 && shotSizes.contains(e))
+            .toSet()
+            .toList()
+          ..sort();
+        if (!enabledShotSizes.contains(defaultShotSizeMl)) {
+          enabledShotSizes.add(defaultShotSizeMl);
+          enabledShotSizes.sort();
         }
         final savedPrimeTimes = (j['primeTimesSeconds'] as List?)
             ?.map((e) => (e as num).toDouble())
@@ -3742,8 +3766,10 @@ class MachineStore extends ChangeNotifier {
       'appColors': appColors.toJson(),
       'wifiHost': wifiHost,
       'servingSizes': servingSizes,
+      'enabledServingSizes': enabledServingSizes,
       'defaultServingSizeMl': defaultServingSizeMl,
       'shotSizes': shotSizes,
+      'enabledShotSizes': enabledShotSizes,
       'defaultShotSizeMl': defaultShotSizeMl,
       'primeTimesSeconds': primeTimesSeconds,
       'cleaningSeconds': cleaningSeconds,
@@ -3861,7 +3887,9 @@ class MachineStore extends ChangeNotifier {
   }
 
   List<double> sizesFor(DrinkCategory category) =>
-      category == DrinkCategory.shot ? shotSizes : servingSizes;
+      category == DrinkCategory.shot
+          ? List<double>.unmodifiable(enabledShotSizes)
+          : List<double>.unmodifiable(enabledServingSizes);
 
   Future<void> setCocktailsPerPage(int value) async {
     cocktailsPerPage = value.clamp(1, 1000).toInt();
@@ -6178,22 +6206,6 @@ class RecipeCard extends StatelessWidget {
                 ),
               ),
             ),
-            Positioned(
-              top: 8,
-              right: 8,
-              child: Container(
-                padding: const EdgeInsets.all(5),
-                decoration: BoxDecoration(
-                  color: Colors.black.withValues(alpha: .28),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.favorite_border,
-                  color: Colors.white,
-                  size: 19,
-                ),
-              ),
-            ),
             if (unavailable || uncalibrated || low)
               Positioned(
                 left: 8,
@@ -6459,36 +6471,31 @@ class _RecipeDetailPageState extends State<RecipeDetailPage> {
             ),
           ),
           const SizedBox(height: 7),
-          DropdownButtonFormField<double>(
-            initialValue: widget.store.sizesFor(r.category).contains(selectedSizeMl)
-                ? selectedSizeMl
-                : null,
-            decoration: InputDecoration(
-              labelText: tr('Zielgröße'),
-              suffixText: tr('ml'),
-              isDense: true,
-            ),
-            items: widget.store
-                .sizesFor(r.category)
-                .map(
-                  (size) => DropdownMenuItem(
-                    value: size,
-                    child: Text(
-                      '${size.toStringAsFixed(size % 1 == 0 ? 0 : 1)} ml',
-                    ),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: widget.store.sizesFor(r.category).map((size) {
+              final selected = size == selectedSizeMl;
+              return ChoiceChip(
+                label: Text(
+                  '${size.toStringAsFixed(size % 1 == 0 ? 0 : 1)} ml',
+                  style: TextStyle(
+                    fontWeight: selected ? FontWeight.w900 : FontWeight.w700,
                   ),
-                )
-                .toList(),
-            onChanged: working
-                ? null
-                : (value) {
-                    if (value == null) return;
-                    setState(() {
-                      selectedSizeMl = value;
-                      selectedAlcoholPercent =
-                          selectedAlcoholPercent.clamp(0, 25).toDouble();
-                    });
-                  },
+                ),
+                selected: selected,
+                onSelected: working
+                    ? null
+                    : (value) {
+                        if (!value) return;
+                        setState(() {
+                          selectedSizeMl = size;
+                          selectedAlcoholPercent =
+                              selectedAlcoholPercent.clamp(0, 25).toDouble();
+                        });
+                      },
+              );
+            }).toList(),
           ),
           const SizedBox(height: 6),
           Text(
@@ -6701,11 +6708,6 @@ class _RecipeDetailPageState extends State<RecipeDetailPage> {
                         fontSize: kioskLandscape ? 20 : 23,
                       ),
                     ),
-                  ),
-                  IconButton(
-                    tooltip: tr('Favorit'),
-                    onPressed: () {},
-                    icon: const Icon(Icons.favorite_border),
                   ),
                 ],
               ),
@@ -10168,60 +10170,96 @@ class _ServingSizesPageState extends State<ServingSizesPage> {
 
   @override
   Widget build(BuildContext context) {
-    return PageFrame(title: tr('Getränkegrößen'),
+    return PageFrame(
+      title: tr('Getränkegrößen'),
       child: ListView(
         padding: const EdgeInsets.all(20),
         children: [
           _sizeSection(
             title: tr('Größen für Cocktails'),
             description: tr(
-                'Standardmäßig 200 ml. Diese Größen gelten für Cocktails '
-                'und alkoholfreie Cocktails.',
-              ),
+              'Mehrere Größen können gleichzeitig aktiviert werden. Die Standardgröße ist beim Öffnen eines Cocktails vorausgewählt.',
+            ),
             sizes: widget.store.servingSizes,
+            enabledSizes: widget.store.enabledServingSizes,
             defaultSize: widget.store.defaultServingSizeMl,
             controller: cocktailController,
             onDefaultChanged: (value) async {
+              if (!widget.store.enabledServingSizes.contains(value)) {
+                widget.store.enabledServingSizes.add(value);
+                widget.store.enabledServingSizes.sort();
+              }
               widget.store.defaultServingSizeMl = value;
               await widget.store.save();
-              setState(() {});
+              if (mounted) setState(() {});
+            },
+            onEnabledChanged: (value, enabled) async {
+              if (enabled) {
+                if (!widget.store.enabledServingSizes.contains(value)) {
+                  widget.store.enabledServingSizes.add(value);
+                  widget.store.enabledServingSizes.sort();
+                }
+              } else {
+                widget.store.enabledServingSizes.remove(value);
+              }
+              await widget.store.save();
+              if (mounted) setState(() {});
             },
             onAdd: () => _addSize(
               controller: cocktailController,
               sizes: widget.store.servingSizes,
-              setDefault: (value) =>
-                  widget.store.defaultServingSizeMl = value,
+              enabledSizes: widget.store.enabledServingSizes,
+              setDefault: (value) => widget.store.defaultServingSizeMl = value,
             ),
             onDelete: (value) async {
               widget.store.servingSizes.remove(value);
+              widget.store.enabledServingSizes.remove(value);
               await widget.store.save();
-              setState(() {});
+              if (mounted) setState(() {});
             },
           ),
           const SizedBox(height: 24),
           _sizeSection(
             title: tr('Größen für Shots'),
             description: tr(
-                'Voreingestellt sind 2 cl und 4 cl. In der App werden '
-                'die Werte als 20 ml und 40 ml gespeichert.',
-              ),
+              'Mehrere Größen können gleichzeitig aktiviert werden. Die Standardgröße ist beim Öffnen eines Cocktails vorausgewählt.',
+            ),
             sizes: widget.store.shotSizes,
+            enabledSizes: widget.store.enabledShotSizes,
             defaultSize: widget.store.defaultShotSizeMl,
             controller: shotController,
             onDefaultChanged: (value) async {
+              if (!widget.store.enabledShotSizes.contains(value)) {
+                widget.store.enabledShotSizes.add(value);
+                widget.store.enabledShotSizes.sort();
+              }
               widget.store.defaultShotSizeMl = value;
               await widget.store.save();
-              setState(() {});
+              if (mounted) setState(() {});
+            },
+            onEnabledChanged: (value, enabled) async {
+              if (enabled) {
+                if (!widget.store.enabledShotSizes.contains(value)) {
+                  widget.store.enabledShotSizes.add(value);
+                  widget.store.enabledShotSizes.sort();
+                }
+              } else {
+                widget.store.enabledShotSizes.remove(value);
+              }
+              await widget.store.save();
+              if (mounted) setState(() {});
             },
             onAdd: () => _addSize(
               controller: shotController,
               sizes: widget.store.shotSizes,
+              enabledSizes: widget.store.enabledShotSizes,
               setDefault: (value) => widget.store.defaultShotSizeMl = value,
             ),
             onDelete: (value) async {
               widget.store.shotSizes.remove(value);
+              widget.store.enabledShotSizes.remove(value);
               await widget.store.save();
-              setState(() {});
+              if (mounted) setState(() {});
             },
             displayInCl: true,
           ),
@@ -10234,9 +10272,11 @@ class _ServingSizesPageState extends State<ServingSizesPage> {
     required String title,
     required String description,
     required List<double> sizes,
+    required List<double> enabledSizes,
     required double defaultSize,
     required TextEditingController controller,
     required ValueChanged<double> onDefaultChanged,
+    required void Function(double value, bool enabled) onEnabledChanged,
     required VoidCallback onAdd,
     required ValueChanged<double> onDelete,
     bool displayInCl = false,
@@ -10249,6 +10289,11 @@ class _ServingSizesPageState extends State<ServingSizesPage> {
       }
       return '${size.toStringAsFixed(size % 1 == 0 ? 0 : 1)} ml';
     }
+
+    final selectableDefaults = sizes
+        .where(enabledSizes.contains)
+        .toList()
+      ..sort();
 
     return Card(
       child: Padding(
@@ -10270,12 +10315,14 @@ class _ServingSizesPageState extends State<ServingSizesPage> {
             ),
             const SizedBox(height: 16),
             DropdownButtonFormField<double>(
-              key: ValueKey('$title-$defaultSize'),
-              initialValue: defaultSize,
+              key: ValueKey('$title-$defaultSize-${selectableDefaults.join(',')}'),
+              initialValue: selectableDefaults.contains(defaultSize)
+                  ? defaultSize
+                  : null,
               decoration: InputDecoration(
                 labelText: tr('Standardgröße'),
               ),
-              items: sizes
+              items: selectableDefaults
                   .map(
                     (size) => DropdownMenuItem(
                       value: size,
@@ -10312,33 +10359,37 @@ class _ServingSizesPageState extends State<ServingSizesPage> {
               ],
             ),
             const SizedBox(height: 14),
-            ...sizes.map(
-              (size) => ListTile(
+            ...sizes.map((size) {
+              final enabled = enabledSizes.contains(size);
+              final isDefault = size == defaultSize;
+              return ListTile(
                 contentPadding: EdgeInsets.zero,
-                leading: Icon(
-                  size == defaultSize
-                      ? Icons.check_circle
-                      : Icons.circle_outlined,
-                  color: size == defaultSize
-                      ? const Color(0xFF16D9CC)
-                      : const Color(0xFF8A949E),
+                leading: Checkbox(
+                  value: enabled,
+                  onChanged: isDefault
+                      ? null
+                      : (value) => onEnabledChanged(size, value ?? false),
                 ),
                 title: Text(label(size)),
                 subtitle: Text(
-                  size == defaultSize
+                  isDefault
                       ? tr('Aktuelle Standardgröße')
-                      : tr('Verfügbare Größe'),
+                      : enabled
+                          ? tr('Verfügbare Größe')
+                          : tr('Nicht verfügbar'),
                 ),
-                trailing: size == defaultSize
-                    ? null
+                trailing: isDefault
+                    ? const Icon(Icons.star, color: Color(0xFFFFC857))
                     : IconButton(
                         tooltip: tr('Größe löschen'),
                         onPressed: () => onDelete(size),
                         icon: const Icon(Icons.delete_outline),
                       ),
-                onTap: () => onDefaultChanged(size),
-              ),
-            ),
+                onTap: isDefault
+                    ? null
+                    : () => onEnabledChanged(size, !enabled),
+              );
+            }),
           ],
         ),
       ),
@@ -10348,6 +10399,7 @@ class _ServingSizesPageState extends State<ServingSizesPage> {
   Future<void> _addSize({
     required TextEditingController controller,
     required List<double> sizes,
+    required List<double> enabledSizes,
     required ValueChanged<double> setDefault,
   }) async {
     final value = double.tryParse(controller.text.replaceAll(',', '.'));
@@ -10357,10 +10409,14 @@ class _ServingSizesPageState extends State<ServingSizesPage> {
       sizes.add(value);
       sizes.sort();
     }
+    if (!enabledSizes.contains(value)) {
+      enabledSizes.add(value);
+      enabledSizes.sort();
+    }
     setDefault(value);
     controller.clear();
     await widget.store.save();
-    setState(() {});
+    if (mounted) setState(() {});
   }
 }
 

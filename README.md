@@ -27,6 +27,9 @@ cd cocktailbotapp
 
 ```bash
 sudo ./install.sh --reboot
+
+The installer now builds the current Flutter Web app from source by default, avoiding stale `web-release` builds on fresh installations.
+
 ```
 
 Die Installation richtet ein:

@@ -28,8 +28,9 @@ out=[]
 in_block=False
 prefixes=(
  'dtoverlay=vc4-fkms-v3d','dtoverlay=vc4-kms-v3d',
- 'hdmi_force_hotplug=','hdmi_group=','hdmi_mode=','hdmi_cvt=',
- 'framebuffer_width=','framebuffer_height=','disable_fw_kms_setup=',
+ 'hdmi_force_hotplug','hdmi_group','hdmi_mode','hdmi_cvt',
+ 'hdmi_drive','config_hdmi_boost','framebuffer_width','framebuffer_height',
+ 'max_framebuffer_width','max_framebuffer_height','disable_fw_kms_setup',
 )
 for raw in lines:
     s=raw.strip()
@@ -74,7 +75,7 @@ cmdline.write_text(' '.join(tokens)+'\n')
 PY
 
 systemctl disable --now serial-getty@serial0.service serial-getty@ttyAMA0.service serial-getty@ttyS0.service >/dev/null 2>&1 || true
-systemctl unmask dev-dri-card0.device dev-dri-renderD128.device >/dev/null 2>&1 || true
+systemctl unmask dev-dri-card0.device dev-dri-card1.device dev-dri-renderD128.device >/dev/null 2>&1 || true
 systemctl set-default graphical.target
 if command -v raspi-config >/dev/null 2>&1; then
   raspi-config nonint do_boot_behaviour B4 || true

@@ -1,5 +1,26 @@
 # CocktailBot – Changelog
 
+## V15 – Mehrfachauswahl bei Getränkegrößen (14.08.2026)
+
+- Cocktailgrößen und Shotgrößen können in den Einstellungen jetzt unabhängig voneinander per Checkbox aktiviert oder deaktiviert werden.
+- Mehrere Größen können gleichzeitig aktiv sein; nur die aktive Standardgröße muss immer freigegeben bleiben.
+- Die Standardgröße wird weiterhin separat festgelegt und beim Öffnen eines Getränks vorausgewählt.
+- Auf der Cocktail-Detailseite werden alle freigegebenen Größen direkt als Auswahlchips angezeigt, sodass der Nutzer ohne Dropdown zwischen den Größen wählen kann.
+- Aktivierte Größen werden dauerhaft gespeichert; bestehende Installationen übernehmen beim ersten Start automatisch alle bisher vorhandenen Größen als aktiviert.
+- Neue Größen werden beim Hinzufügen automatisch aktiviert und als neue Standardgröße gesetzt.
+- Neue UI-Texte wurden für alle vorhandenen App-Sprachen ergänzt.
+
+## V14 – Neuinstallation, Display/Kiosk und Cocktailkarten (14.08.2026)
+
+- Der Installer übernimmt den auf dem realen LCD7C erfolgreich getesteten Zustand direkt bei der Neuinstallation: KMS (`vc4-kms-v3d`) und `video=HDMI-A-1:1024x600M@60`.
+- Legacy-GoodTFT-HDMI-/Framebuffer-Zeilen werden robust per Python entfernt, einschließlich Varianten mit Leerzeichen statt `=`.
+- DRM-Geräte `card0`, `card1` und `renderD128` werden entmaskiert.
+- Grafischer Desktop, Desktop-Autologin, CocktailBot-Service und Kiosk-Autostart werden während derselben Installation eingerichtet.
+- Pumpen-Bootschutz und Entfernen der seriellen GPIO-Konsole verwenden ebenfalls robuste Python-Verarbeitung statt komplexer `sed`-Ausdrücke.
+- LOW-aktive Relais bleiben Standard und alle 18 Pumpen werden beim Boot auf den sicheren AUS-Pegel gesetzt.
+- Herz-/Favoriten-Symbole wurden von Cocktail-Kacheln und Cocktail-Detailseite entfernt.
+
+
 ## V13 – Display/Desktop/Kiosk-Reparatur
 - KMS/1024×600-Konfiguration ohne komplexe sed-Regex.
 - Neues `tools/repair-display-kiosk.sh` repariert Bootauflösung, Desktop-Autologin, Kiosk-Autostart, Webrechte und Dienst nach einem abgebrochenen Installer.
