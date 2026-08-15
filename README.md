@@ -40,7 +40,7 @@ Die Installation richtet ein:
 - 1024×600 Displaykonfiguration
 - Bootoptimierungen
 - Python-/Flask-Dienst
-- GPIO-Pumpensteuerung
+- GPIO-Pumpensteuerung mit automatischer RP1-`gpiochip`-Erkennung auf Raspberry Pi 5
 - Pico-2-USB-Serial-Bridge
 - lokales PayPal-Backend
 - SQLite unter `/var/lib/cocktailbot/payments.db`
@@ -55,6 +55,8 @@ sudo ./install.sh --reboot
 ```
 
 Nach der Installation läuft CocktailBot vollständig; die Bezahlfunktion bleibt einfach inaktiv, solange keine PayPal-Zugangsdaten hinterlegt wurden.
+
+Auf dem Raspberry Pi 5 erkennt CocktailBot den RP1-GPIO-Chip automatisch über `pinctrl-rp1`. Dadurch ist die Pumpensteuerung nicht von einer festen Nummer wie `gpiochip0`, `gpiochip4` oder `gpiochip15` abhängig. Für Diagnosezwecke kann mit `--gpio-chip NUMMER` manuell überschrieben werden; im Normalbetrieb sollte `auto` verwendet werden.
 
 ## PayPal lokal konfigurieren
 
@@ -137,7 +139,7 @@ POST /api/payment/mark-used
 | 8 | 4 | 17 | 12 |
 | 9 | 5 | 18 | 15 |
 
-Standard: `HIGH = Pumpe EIN`.
+Standard: `LOW = Pumpe EIN`, `HIGH = Pumpe AUS` (`--active-high 0`).
 
 Für LOW-aktive Relais:
 

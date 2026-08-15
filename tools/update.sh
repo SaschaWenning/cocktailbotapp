@@ -4,11 +4,13 @@ set -Eeuo pipefail
 
 ACTIVE_HIGH=0
 PICO_PORT=auto
+GPIO_CHIP=auto
 DELAY=30
 
 if [[ -f /etc/cocktailbot/cocktailbot.env ]]; then
   ACTIVE_HIGH="$(grep -E '^COCKTAILBOT_ACTIVE_HIGH=' /etc/cocktailbot/cocktailbot.env | tail -1 | cut -d= -f2- || echo 0)"
   PICO_PORT="$(grep -E '^COCKTAILBOT_PICO_PORT=' /etc/cocktailbot/cocktailbot.env | tail -1 | cut -d= -f2- || echo auto)"
+  GPIO_CHIP="$(grep -E '^COCKTAILBOT_GPIO_CHIP=' /etc/cocktailbot/cocktailbot.env | tail -1 | cut -d= -f2- || echo auto)"
 fi
 
 if [[ -f /etc/cocktailbot/kiosk.env ]]; then
@@ -20,6 +22,7 @@ fi
 exec bash /opt/cocktailbot/source/install.sh \
   --active-high "${ACTIVE_HIGH:-0}" \
   --pico-port "${PICO_PORT:-auto}" \
+  --gpio-chip "${GPIO_CHIP:-auto}" \
   --kiosk-delay "${DELAY:-30}" \
   --skip-lcd --skip-boot-opt \
   --build-mode source \

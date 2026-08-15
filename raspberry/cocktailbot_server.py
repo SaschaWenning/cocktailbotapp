@@ -23,6 +23,7 @@ import hashlib
 import json
 import os
 import io
+import re
 import signal
 import sqlite3
 import subprocess
@@ -61,6 +62,86 @@ except ImportError as exc:  # pragma: no cover - production dependency check
     raise SystemExit(
         "gpiozero fehlt. Installiere es mit: sudo apt install python3-gpiozero"
     ) from exc
+
+
+def _detect_rp1_gpio_chip() -> tuple[int | None, str]:
+    """Resolve the RP1 gpiochip used by the Pi 5 40-pin header.
+
+    Raspberry Pi kernel updates may renumber the RP1 gpiochip.  Old gpiozero
+    releases assume gpiochip0/gpiochip4 and can therefore fail with
+    ``lgpio.error: can not open gpiochip``.  We intentionally resolve the
+    kernel label ``pinctrl-rp1`` instead of relying on a fixed number.
+    """
+    configured = os.getenv("COCKTAILBOT_GPIO_CHIP", "auto").strip().lower()
+    if configured and configured != "auto":
+        if not configured.isdigit():
+            raise RuntimeError(
+                "COCKTAILBOT_GPIO_CHIP muss 'auto' oder eine ganze Zahl sein"
+            )
+        chip = int(configured)
+        if not Path(f"/dev/gpiochip{chip}").exists():
+            raise RuntimeError(f"/dev/gpiochip{chip} existiert nicht")
+        return chip, "konfiguriert"
+
+    try:
+        result = subprocess.run(
+            ["gpiodetect"],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=3,
+        )
+    except (FileNotFoundError, OSError, subprocess.TimeoutExpired):
+        return None, "gpiozero-standard"
+
+    if result.returncode != 0:
+        return None, "gpiozero-standard"
+
+    for line in result.stdout.splitlines():
+        if "[pinctrl-rp1]" not in line:
+            continue
+        match = re.match(r"^gpiochip(\d+)\s", line.strip())
+        if match:
+            chip = int(match.group(1))
+            if Path(f"/dev/gpiochip{chip}").exists():
+                return chip, "pinctrl-rp1"
+    return None, "gpiozero-standard"
+
+
+def _configure_gpiozero_lgpio_factory() -> tuple[int | None, str]:
+    """Patch gpiozero's LGPIOFactory only when an RP1 chip is resolved.
+
+    This keeps non-Pi-5 systems on gpiozero's native behaviour while making
+    Pi 5 installations independent of the current gpiochip number.
+    """
+    if os.getenv("COCKTAILBOT_GPIO_MOCK", "0") in {"1", "true", "True"}:
+        return None, "mock"
+
+    chip, source = _detect_rp1_gpio_chip()
+    if chip is None:
+        return None, source
+
+    try:
+        import lgpio
+        import gpiozero.pins.lgpio as gpiozero_lgpio
+    except ImportError as exc:
+        raise RuntimeError(
+            "lgpio fehlt; installiere python3-lgpio für die Pumpensteuerung"
+        ) from exc
+
+    base_init = gpiozero_lgpio.LGPIOFactory.__bases__[0].__init__
+
+    def cocktailbot_init(self, _chip=None):  # type: ignore[no-untyped-def]
+        base_init(self)
+        self._handle = lgpio.gpiochip_open(chip)
+        self._chip = chip
+        self.pin_class = gpiozero_lgpio.LGPIOPin
+
+    gpiozero_lgpio.LGPIOFactory.__init__ = cocktailbot_init
+    return chip, source
+
+
+GPIOZERO_LGPIO_CHIP, GPIOZERO_LGPIO_CHIP_SOURCE = _configure_gpiozero_lgpio_factory()
 
 
 PUMP_PINS: tuple[int, ...] = (
@@ -1866,6 +1947,13 @@ def main() -> None:
 
     print("CocktailBot Raspberry Pi")
     print(f"GPIO-Modus: BCM | active_high={ACTIVE_HIGH} | mock={MOCK_GPIO}")
+    if GPIOZERO_LGPIO_CHIP is not None:
+        print(
+            f"GPIO-Chip: gpiochip{GPIOZERO_LGPIO_CHIP} "
+            f"| Quelle={GPIOZERO_LGPIO_CHIP_SOURCE}"
+        )
+    else:
+        print(f"GPIO-Chip: gpiozero-standard | Quelle={GPIOZERO_LGPIO_CHIP_SOURCE}")
     print("Pumpen:", ", ".join(f"{i}=GPIO{pin}" for i, pin in enumerate(PUMP_PINS, 1)))
     print(f"Web/API: http://{args.host}:{args.port}")
     print(f"PayPal: mode={PAYPAL_MODE} | configured={bool(PAYPAL_CLIENT_ID and PAYPAL_CLIENT_SECRET)}")

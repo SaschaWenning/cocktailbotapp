@@ -1,4 +1,21 @@
+# V26 – Image-Build-Unterstützung
+
+- `install.sh` unterstützt jetzt `--image-build` / `COCKTAILBOT_IMAGE_BUILD=1`.
+- Im Image-Build werden CocktailBot-Dienst und Kiosk vorbereitet und aktiviert, aber nicht im Chroot gestartet.
+- GPIO-Hardwaretests werden beim Offline-Image-Build übersprungen; auf dem echten Raspberry erkennt der Server `pinctrl-rp1` weiterhin dynamisch.
+- Grundlage für reproduzierbare CocktailBot-Images für Raspberry Pi Imager.
+
 # CocktailBot Changelog
+
+## V25 – Raspberry Pi 5 GPIO-Autoerkennung nach Kernel-Updates
+
+- Der Installer installiert jetzt `gpiod`, damit der reale GPIO-Chip über seinen Kernel-Namen erkannt werden kann.
+- Auf Raspberry Pi 5 wird nicht mehr auf feste Nummern wie `gpiochip0`, `gpiochip4` oder `gpiochip15` vertraut. CocktailBot sucht bei jedem Serverstart nach **`pinctrl-rp1`** und verwendet dessen aktuelle `gpiochip`-Nummer.
+- Damit wird der Fehler `lgpio.error: can not open gpiochip` nach Kernel-/Raspberry-Pi-OS-Updates abgefangen, wenn sich die Chipnummer des RP1 ändert.
+- Die Korrektur erfolgt in CocktailBot selbst; die systemweite Datei von `python3-gpiozero` muss bei einer Neuinstallation nicht mehr manuell editiert werden.
+- Neuer optionaler Installer-Schalter `--gpio-chip auto|NUMMER`; Standard ist `auto`.
+- `tools/update.sh` übernimmt eine manuell gesetzte Chipnummer, falls ein Betreiber den Auto-Modus ausdrücklich überschrieben hat.
+- Der Server protokolliert beim Start die tatsächlich verwendete GPIO-Chipnummer und die Erkennungsquelle.
 
 ## V24 – Branding entfernt & Rezept-Hinweise
 

@@ -19,6 +19,8 @@ INSTALL_LCD="${COCKTAILBOT_INSTALL_LCD:-1}"
 BOOT_OPTIMIZE="${COCKTAILBOT_BOOT_OPTIMIZE:-1}"
 PICO_PORT="${COCKTAILBOT_PICO_PORT:-auto}"
 PICO_BAUD="${COCKTAILBOT_PICO_BAUD:-115200}"
+GPIO_CHIP="${COCKTAILBOT_GPIO_CHIP:-auto}"
+IMAGE_BUILD="${COCKTAILBOT_IMAGE_BUILD:-0}"
 LCD_REPO_URL="${COCKTAILBOT_LCD_REPO_URL:-https://github.com/goodtft/LCD-show.git}"
 
 usage() {
@@ -44,6 +46,8 @@ Optionen:
   --skip-lcd                GoodTFT LCD7C-Treiber nicht installieren
   --skip-boot-opt           Plymouth/cmdline/Display-Bootoptimierung überspringen
   --pico-port PORT          Pico-USB-Port; Standard: auto
+  --gpio-chip auto|NUMMER   RP1-GPIO-Chip; Standard: auto (empfohlen)
+  --image-build              Offline-Image-Build: Dienste nur aktivieren, nicht starten
   -h, --help                Hilfe anzeigen
 USAGE
 }
@@ -62,6 +66,8 @@ while [[ $# -gt 0 ]]; do
     --skip-lcd) INSTALL_LCD=0; shift ;;
     --skip-boot-opt) BOOT_OPTIMIZE=0; shift ;;
     --pico-port) PICO_PORT="${2:?Port fehlt}"; shift 2 ;;
+    --gpio-chip) GPIO_CHIP="${2:?GPIO-Chip fehlt}"; shift 2 ;;
+    --image-build) IMAGE_BUILD=1; shift ;;
     -h|--help) usage; exit 0 ;;
     *) echo "Unbekannte Option: $1" >&2; usage >&2; exit 2 ;;
   esac
@@ -79,6 +85,8 @@ die() { printf '\n\033[1;31m[CocktailBot FEHLER]\033[0m %s\n' "$*" >&2; exit 1; 
 [[ "$INSTALL_LCD" =~ ^[01]$ ]] || die "COCKTAILBOT_INSTALL_LCD muss 0 oder 1 sein."
 [[ "$BOOT_OPTIMIZE" =~ ^[01]$ ]] || die "COCKTAILBOT_BOOT_OPTIMIZE muss 0 oder 1 sein."
 [[ "$PICO_BAUD" =~ ^[0-9]+$ ]] || die "COCKTAILBOT_PICO_BAUD muss eine ganze Zahl sein."
+[[ "$GPIO_CHIP" == "auto" || "$GPIO_CHIP" =~ ^[0-9]+$ ]] || die "--gpio-chip muss auto oder eine ganze Chipnummer sein."
+[[ "$IMAGE_BUILD" =~ ^[01]$ ]] || die "COCKTAILBOT_IMAGE_BUILD muss 0 oder 1 sein."
 
 if [[ -z "$TARGET_USER" || "$TARGET_USER" == "root" ]]; then
   TARGET_USER="$(getent passwd | awk -F: '$3 >= 1000 && $3 < 60000 && $6 ~ /^\/home\// {print $1; exit}')"
@@ -107,7 +115,7 @@ install_packages() {
   export DEBIAN_FRONTEND=noninteractive
   apt-get update
   apt-get install -y \
-    ca-certificates curl git rsync unzip xz-utils zip libglu1-mesa \
+    ca-certificates curl git rsync unzip xz-utils zip libglu1-mesa gpiod \
     python3 python3-venv python3-pip python3-gpiozero python3-serial python3-cryptography \
     x11-xserver-utils unclutter util-linux onboard dbus-x11 dconf-cli
 
@@ -233,6 +241,7 @@ COCKTAILBOT_ACTIVE_HIGH=$ACTIVE_HIGH
 COCKTAILBOT_STATE_FILE=/var/lib/cocktailbot/machine_state.json
 COCKTAILBOT_PICO_PORT=$PICO_PORT
 COCKTAILBOT_PICO_BAUD=$PICO_BAUD
+COCKTAILBOT_GPIO_CHIP=$GPIO_CHIP
 COCKTAILBOT_LICENSE_FILE=/var/lib/cocktailbot/license.json
 COCKTAILBOT_LICENSE_PUBLIC_KEY=/etc/cocktailbot/license_public_key.pem
 ENV
@@ -478,6 +487,39 @@ PY_PUMPS_CMDLINE
   systemctl disable --now serial-getty@ttyAMA0.service >/dev/null 2>&1 || true
   systemctl disable --now serial-getty@ttyS0.service >/dev/null 2>&1 || true
 }
+
+report_gpio_configuration() {
+  log "Prüfe Raspberry-Pi-GPIO-Backend"
+
+  if [[ "$IMAGE_BUILD" == "1" ]]; then
+    log "Image-Build: GPIO-Hardwareprüfung wird übersprungen; pinctrl-rp1 wird beim echten Serverstart automatisch erkannt."
+    return 0
+  fi
+
+  if [[ "$GPIO_CHIP" != "auto" ]]; then
+    if [[ -e "/dev/gpiochip${GPIO_CHIP}" ]]; then
+      log "GPIO-Chip manuell festgelegt: gpiochip${GPIO_CHIP}"
+    else
+      die "Konfigurierter GPIO-Chip gpiochip${GPIO_CHIP} existiert nicht. Nutze --gpio-chip auto oder prüfe gpiodetect."
+    fi
+    return 0
+  fi
+
+  if ! command -v gpiodetect >/dev/null 2>&1; then
+    warn "gpiodetect fehlt. Automatische RP1-Erkennung kann nicht vorab geprüft werden."
+    return 0
+  fi
+
+  local rp1_line
+  rp1_line="$(gpiodetect 2>/dev/null | awk '/\[pinctrl-rp1\]/ {print; exit}')"
+  if [[ -n "$rp1_line" ]]; then
+    log "RP1-GPIO automatisch erkannt: $rp1_line"
+    log "CocktailBot ermittelt die gpiochip-Nummer bei jedem Serverstart neu."
+  else
+    log "Kein pinctrl-rp1 gefunden; gpiozero verwendet sein Standard-Backend (z. B. Raspberry Pi 4)."
+  fi
+}
+
 configure_kiosk() {
   log "Konfiguriere Desktop-Autostart und Kioskstart nach ${KIOSK_DELAY} Sekunden"
   install -d -o "$TARGET_USER" -g "$TARGET_GROUP" -m 0755 \
@@ -533,8 +575,14 @@ LABWC
 
 start_services() {
   log "Aktiviere CocktailBot-Dienst"
-  systemctl daemon-reload
+  systemctl daemon-reload >/dev/null 2>&1 || true
   systemctl enable cocktailbot.service
+
+  if [[ "$IMAGE_BUILD" == "1" ]]; then
+    log "Image-Build: Dienst ist für den ersten echten Boot aktiviert; Start/Hardwaretest im Chroot wird übersprungen."
+    return 0
+  fi
+
   systemctl restart cocktailbot.service
 
   for _ in $(seq 1 30); do
@@ -575,6 +623,7 @@ install_runtime
 install_lcd_driver
 configure_display_and_boot
 configure_pump_boot_safety
+report_gpio_configuration
 configure_kiosk
 start_services
 
@@ -594,6 +643,8 @@ LCD7C/GoodTFT:    $INSTALL_LCD
 Bootoptimierung:  $BOOT_OPTIMIZE
 Pico LED-Port:     $PICO_PORT
 Pico Baudrate:     $PICO_BAUD
+GPIO-Chip:         $GPIO_CHIP (auto erkennt pinctrl-rp1 dynamisch)
+Image-Build:        $IMAGE_BUILD
 Displayziel:      1024x600
 
 Status prüfen:

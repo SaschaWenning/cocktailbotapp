@@ -40,7 +40,7 @@ Die Installation richtet ein:
 - 1024×600 Displaykonfiguration
 - Bootoptimierungen
 - Python-/Flask-Dienst
-- GPIO-Pumpensteuerung
+- GPIO-Pumpensteuerung mit automatischer RP1-`gpiochip`-Erkennung auf Raspberry Pi 5
 - Pico-2-USB-Serial-Bridge
 - lokales PayPal-Backend
 - SQLite unter `/var/lib/cocktailbot/payments.db`
@@ -55,6 +55,8 @@ sudo ./install.sh --reboot
 ```
 
 Nach der Installation läuft CocktailBot vollständig; die Bezahlfunktion bleibt einfach inaktiv, solange keine PayPal-Zugangsdaten hinterlegt wurden.
+
+Auf dem Raspberry Pi 5 erkennt CocktailBot den RP1-GPIO-Chip automatisch über `pinctrl-rp1`. Dadurch ist die Pumpensteuerung nicht von einer festen Nummer wie `gpiochip0`, `gpiochip4` oder `gpiochip15` abhängig. Für Diagnosezwecke kann mit `--gpio-chip NUMMER` manuell überschrieben werden; im Normalbetrieb sollte `auto` verwendet werden.
 
 ## PayPal lokal konfigurieren
 
@@ -137,7 +139,7 @@ POST /api/payment/mark-used
 | 8 | 4 | 17 | 12 |
 | 9 | 5 | 18 | 15 |
 
-Standard: `HIGH = Pumpe EIN`.
+Standard: `LOW = Pumpe EIN`, `HIGH = Pumpe AUS` (`--active-high 0`).
 
 Für LOW-aktive Relais:
 
@@ -244,3 +246,7 @@ install.sh                                Komplettinstallation
 CocktailBot unterstützt eine gerätegebundene Offline-Gewerbelizenz ohne Lizenzserver. Unter **Einstellungen → Gewerbelizenz** zeigt der Raspberry eine hardwarebasierte Geräte-ID an. Diese ID wird an den Lizenzgeber gesendet. Der separate CocktailBot-Lizenzgenerator signiert genau diese Geräte-ID und erzeugt einen `CBL1-...` Lizenzcode. Der Raspberry prüft die Signatur lokal mit dem öffentlichen Ed25519-Schlüssel.
 
 Der private Signierschlüssel gehört ausschließlich in den Lizenzgenerator und darf niemals in dieses Repository übernommen werden.
+
+## Offline-Image-Build (V26)
+
+Für den CocktailBot-Master-Image-Builder unterstützt `install.sh` den Schalter `--image-build`. Dabei werden Dateien, Dienste, Kiosk und Displaykonfiguration vollständig vorbereitet, aber der CocktailBot-Dienst und GPIO-Hardwaretest nicht im Chroot gestartet. Auf dem echten Raspberry Pi wird `pinctrl-rp1` anschließend beim Serverstart automatisch erkannt.
