@@ -1,3 +1,11 @@
+## V27 – Kompakte Füllstände & neue Warnschwellen (15.08.2026)
+
+- **Füllstände** sind auf 1024×600 jetzt als responsives Raster aufgebaut; bei normaler Displaybreite stehen **3 Pumpen nebeneinander**.
+- Füllstandskarten wurden kompakter gestaltet: Pumpennummer, Zutat, Prozent-Badge, Fortschrittsbalken, Behältergröße, aktueller Füllstand sowie Speichern/Auffüllen auf einer Karte.
+- **Warnschwellen** komplett neu gestaltet: zwei klar getrennte Touch-Panels mit Symbol, aktuellem Grenzwert und Slider.
+- Cocktailkarten-Warnung bleibt von 1–10 Restcocktails einstellbar; Füllstandswarnung bleibt in 5-%-Schritten von 5–90 % einstellbar.
+- Auf schmaleren Displays fällt das Raster automatisch auf zwei bzw. eine Spalte zurück.
+
 # V26 – Image-Build-Unterstützung
 
 - `install.sh` unterstützt jetzt `--image-build` / `COCKTAILBOT_IMAGE_BUILD=1`.

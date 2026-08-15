@@ -9988,34 +9988,87 @@ class _FillLevelsPageState extends State<FillLevelsPage> {
     await widget.store.save();
   }
 
-  Widget _stepper({
-    required int value,
-    required VoidCallback? onMinus,
-    required VoidCallback? onPlus,
-    required String suffix,
+  Widget _thresholdPanel({
+    required IconData icon,
+    required Color color,
+    required String title,
+    required String valueText,
+    required double value,
+    required double min,
+    required double max,
+    required int divisions,
+    required ValueChanged<double> onChanged,
+    required ValueChanged<double> onChangeEnd,
   }) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        IconButton.filledTonal(
-          tooltip: tr('Weniger'),
-          onPressed: onMinus,
-          icon: const Icon(Icons.remove),
-        ),
-        SizedBox(
-          width: 92,
-          child: Text(
-            '$value $suffix',
-            textAlign: TextAlign.center,
-            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+    final theme = Theme.of(context);
+    return Container(
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 10),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: .08),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: color.withValues(alpha: .38)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 38,
+                height: 38,
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: .16),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(icon, color: color, size: 22),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  title,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontWeight: FontWeight.w800),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: .18),
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: Text(
+                  valueText,
+                  style: TextStyle(
+                    color: color,
+                    fontWeight: FontWeight.w900,
+                    fontSize: 15,
+                  ),
+                ),
+              ),
+            ],
           ),
-        ),
-        IconButton.filledTonal(
-          tooltip: tr('Mehr'),
-          onPressed: onPlus,
-          icon: const Icon(Icons.add),
-        ),
-      ],
+          const SizedBox(height: 8),
+          SliderTheme(
+            data: theme.sliderTheme.copyWith(
+              activeTrackColor: color,
+              inactiveTrackColor: color.withValues(alpha: .18),
+              thumbColor: color,
+              overlayColor: color.withValues(alpha: .12),
+              trackHeight: 5,
+            ),
+            child: Slider(
+              value: value.clamp(min, max),
+              min: min,
+              max: max,
+              divisions: divisions,
+              onChanged: onChanged,
+              onChangeEnd: onChangeEnd,
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -10027,18 +10080,20 @@ class _FillLevelsPageState extends State<FillLevelsPage> {
     return PageFrame(
       title: tr('Füllstände'),
       child: ListView(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(16),
         children: [
           Card(
             child: Padding(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
                     children: [
-                      Icon(Icons.warning_amber_rounded,
-                          color: store.appColors.warningColor),
+                      Icon(
+                        Icons.tune_rounded,
+                        color: store.appColors.warningColor,
+                      ),
                       const SizedBox(width: 10),
                       Expanded(
                         child: Text(
@@ -10051,76 +10106,67 @@ class _FillLevelsPageState extends State<FillLevelsPage> {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 14),
+                  const SizedBox(height: 12),
                   LayoutBuilder(
                     builder: (context, constraints) {
-                      final compact = constraints.maxWidth < 650;
-                      final portionsControl = Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            tr('Cocktailkarte orange ab'),
-                            style: const TextStyle(fontWeight: FontWeight.w700),
-                          ),
-                          const SizedBox(height: 6),
-                          _stepper(
-                            value: store.lowStockWarningPortions,
-                            suffix: tr('Restcocktails'),
-                            onMinus: store.lowStockWarningPortions <= 1
-                                ? null
-                                : () => _setLowStockWarning(
-                                    store.lowStockWarningPortions - 1),
-                            onPlus: store.lowStockWarningPortions >= 10
-                                ? null
-                                : () => _setLowStockWarning(
-                                    store.lowStockWarningPortions + 1),
-                          ),
-                        ],
+                      final compact = constraints.maxWidth < 620;
+                      final portions = _thresholdPanel(
+                        icon: Icons.local_bar_rounded,
+                        color: store.appColors.accentColor,
+                        title: tr('Cocktailkarte orange ab'),
+                        valueText:
+                            '≤ ${store.lowStockWarningPortions} ${tr('Restcocktails')}',
+                        value: store.lowStockWarningPortions.toDouble(),
+                        min: 1,
+                        max: 10,
+                        divisions: 9,
+                        onChanged: (raw) {
+                          setState(() {
+                            store.lowStockWarningPortions = raw.round();
+                          });
+                        },
+                        onChangeEnd: (raw) =>
+                            _setLowStockWarning(raw.round()),
                       );
-                      final percentControl = Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            tr('Füllstandsseite orange unter'),
-                            style: const TextStyle(fontWeight: FontWeight.w700),
-                          ),
-                          const SizedBox(height: 6),
-                          _stepper(
-                            value: store.lowFillWarningPercent,
-                            suffix: '%',
-                            onMinus: store.lowFillWarningPercent <= 5
-                                ? null
-                                : () => _setLowFillWarning(
-                                    store.lowFillWarningPercent - 5),
-                            onPlus: store.lowFillWarningPercent >= 90
-                                ? null
-                                : () => _setLowFillWarning(
-                                    store.lowFillWarningPercent + 5),
-                          ),
-                        ],
+                      final fill = _thresholdPanel(
+                        icon: Icons.water_drop_rounded,
+                        color: store.appColors.warningColor,
+                        title: tr('Füllstandsseite orange unter'),
+                        valueText: '≤ ${store.lowFillWarningPercent} %',
+                        value: store.lowFillWarningPercent.toDouble(),
+                        min: 5,
+                        max: 90,
+                        divisions: 17,
+                        onChanged: (raw) {
+                          setState(() {
+                            store.lowFillWarningPercent =
+                                (raw / 5).round() * 5;
+                          });
+                        },
+                        onChangeEnd: (raw) =>
+                            _setLowFillWarning((raw / 5).round() * 5),
                       );
 
                       if (compact) {
                         return Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
-                            portionsControl,
-                            const SizedBox(height: 14),
-                            percentControl,
+                            portions,
+                            const SizedBox(height: 10),
+                            fill,
                           ],
                         );
                       }
                       return Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Expanded(child: portionsControl),
-                          const SizedBox(width: 18),
-                          Expanded(child: percentControl),
+                          Expanded(child: portions),
+                          const SizedBox(width: 12),
+                          Expanded(child: fill),
                         ],
                       );
                     },
                   ),
-                  const SizedBox(height: 10),
+                  const SizedBox(height: 8),
                   Text(
                     tr('Diese Werte bestimmen nur die Warnanzeige. Die tatsächliche Verfügbarkeit wird weiterhin aus der benötigten Rezeptmenge berechnet.'),
                     style: Theme.of(context).textTheme.bodySmall,
@@ -10129,18 +10175,36 @@ class _FillLevelsPageState extends State<FillLevelsPage> {
               ),
             ),
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 12),
           if (activePumps.isEmpty)
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 40),
               child: Center(child: Text(tr('Keine Pumpen aktiviert'))),
             )
           else
-            ...activePumps.expand(
-              (pump) => [
-                FillCard(store: store, pump: pump),
-                const SizedBox(height: 14),
-              ],
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final columns = constraints.maxWidth >= 820
+                    ? 3
+                    : constraints.maxWidth >= 540
+                        ? 2
+                        : 1;
+                return GridView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: activePumps.length,
+                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: columns,
+                    crossAxisSpacing: 12,
+                    mainAxisSpacing: 12,
+                    mainAxisExtent: 304,
+                  ),
+                  itemBuilder: (context, index) => FillCard(
+                    store: store,
+                    pump: activePumps[index],
+                  ),
+                );
+              },
             ),
         ],
       ),
@@ -10182,44 +10246,83 @@ class _FillCardState extends State<FillCard> {
     final ing = widget.store.ingredientById(widget.pump.ingredientId);
     final percent = (widget.pump.level * 100).round();
     final lowFill = percent <= widget.store.lowFillWarningPercent;
+    final warning = widget.store.appColors.warningColor;
 
     return Card(
+      margin: EdgeInsets.zero,
+      clipBehavior: Clip.antiAlias,
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(12),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
-                CircleAvatar(child: T('${widget.pump.number}')),
-                const SizedBox(width: 10),
+                Container(
+                  width: 34,
+                  height: 34,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: widget.store.appColors.accentColor.withValues(alpha: .14),
+                    borderRadius: BorderRadius.circular(11),
+                    border: Border.all(
+                      color: widget.store.appColors.accentColor.withValues(alpha: .38),
+                    ),
+                  ),
+                  child: Text(
+                    '${widget.pump.number}',
+                    style: TextStyle(
+                      color: widget.store.appColors.accentColor,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 9),
                 Expanded(
                   child: Text(
                     widget.store.displayIngredientName(ing),
-                    style: const TextStyle(fontWeight: FontWeight.w800),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w800,
+                      fontSize: 14,
+                    ),
                   ),
                 ),
-                Text(
-                  '$percent%',
-                  style: TextStyle(
-                    color: lowFill ? widget.store.appColors.warningColor : null,
-                    fontWeight: FontWeight.w800,
+                const SizedBox(width: 6),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: (lowFill ? warning : widget.store.appColors.successColor)
+                        .withValues(alpha: .12),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Text(
+                    '$percent%',
+                    style: TextStyle(
+                      color: lowFill ? warning : widget.store.appColors.successColor,
+                      fontWeight: FontWeight.w900,
+                    ),
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 14),
+            const SizedBox(height: 10),
             LinearProgressIndicator(
               value: widget.pump.level,
-              color: lowFill ? widget.store.appColors.warningColor : null,
-              minHeight: 12,
+              color: lowFill ? warning : widget.store.appColors.accentColor,
+              minHeight: 9,
               borderRadius: BorderRadius.circular(20),
             ),
-            const SizedBox(height: 8),
-            T('${widget.pump.remainingMl.toStringAsFixed(0)} / '
+            const SizedBox(height: 5),
+            Text(
+              '${widget.pump.remainingMl.toStringAsFixed(0)} / '
               '${widget.pump.capacityMl.toStringAsFixed(0)} ml',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
             ),
-            const SizedBox(height: 14),
+            const SizedBox(height: 10),
             TextField(
               controller: capacity,
               keyboardType:
@@ -10227,10 +10330,13 @@ class _FillCardState extends State<FillCard> {
               decoration: InputDecoration(
                 labelText: tr('Behältergröße'),
                 suffixText: tr('ml'),
+                isDense: true,
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 11, vertical: 11),
               ),
               onSubmitted: (_) => _saveValues(),
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: 8),
             TextField(
               controller: remaining,
               keyboardType:
@@ -10238,57 +10344,40 @@ class _FillCardState extends State<FillCard> {
               decoration: InputDecoration(
                 labelText: tr('Aktueller Füllstand'),
                 suffixText: tr('ml'),
-                helperText: tr('Für bereits geöffnete Behälter eintragen'),
+                isDense: true,
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 11, vertical: 11),
               ),
               onSubmitted: (_) => _saveValues(),
             ),
-            const SizedBox(height: 10),
-            LayoutBuilder(
-              builder: (context, constraints) {
-                final narrow = constraints.maxWidth < 360;
-                final refillButton = FilledButton.tonal(
-                  onPressed: () async {
-                    _saveCapacityOnly();
-                    widget.pump.remainingMl = widget.pump.capacityMl;
-                    remaining.text =
-                        widget.pump.remainingMl.toStringAsFixed(0);
-                    await widget.store.save();
-                    await widget.store.syncMachineStateToController();
-                    if (!mounted) return;
-                    setState(() {});
-                  },
-                  child: const T('Auffüllen'),
-                );
-
-                if (narrow) {
-                  return Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      OutlinedButton.icon(
-                        onPressed: _saveValues,
-                        icon: const Icon(Icons.save_outlined),
-                        label: const T('Füllstand speichern'),
-                      ),
-                      const SizedBox(height: 10),
-                      refillButton,
-                    ],
-                  );
-                }
-
-                return Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: _saveValues,
-                        icon: const Icon(Icons.save_outlined),
-                        label: const T('Füllstand speichern'),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(child: refillButton),
-                  ],
-                );
-              },
+            const Spacer(),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: _saveValues,
+                    icon: const Icon(Icons.save_outlined, size: 18),
+                    label: Text(tr('Speichern')),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: FilledButton.tonalIcon(
+                    onPressed: () async {
+                      _saveCapacityOnly();
+                      widget.pump.remainingMl = widget.pump.capacityMl;
+                      remaining.text =
+                          widget.pump.remainingMl.toStringAsFixed(0);
+                      await widget.store.save();
+                      await widget.store.syncMachineStateToController();
+                      if (!mounted) return;
+                      setState(() {});
+                    },
+                    icon: const Icon(Icons.water_drop_outlined, size: 18),
+                    label: Text(tr('Auffüllen')),
+                  ),
+                ),
+              ],
             ),
           ],
         ),
