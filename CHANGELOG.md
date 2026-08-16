@@ -1,3 +1,9 @@
+## V28.1 – Flutter-Compile-Fix für Verbrauchsstatistik
+
+- Behebt den Dart-Compilefehler in der neuen V28-Verbrauchsstatistik: `averageCost` wird jetzt explizit als `double` geführt.
+- Die Durchschnittskosten-Getter verwenden ebenfalls explizit `0.0`, damit die Typinferenz unter aktuellen Dart-/Flutter-Versionen eindeutig `double` bleibt.
+- Keine funktionalen Änderungen an Statistik, PayPal oder Preisen pro Cocktailgröße gegenüber V28.
+
 ## V28 – Verbrauchsstatistik & PayPal-Preise pro Größe (16.08.2026)
 
 - **Verbrauchsstatistik komplett neu aufgebaut**: Zeitraumfilter für Heute, 7 Tage, 30 Tage, Party und Gesamt sowie Umschaltung zwischen Cocktails und Zutaten.

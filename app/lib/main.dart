@@ -11531,7 +11531,7 @@ class _SizeConsumptionAggregate {
   double revenue = 0;
   int missingPriceCount = 0;
 
-  double get averageCost => count == 0 ? 0 : totalCost / count;
+  double get averageCost => count == 0 ? 0.0 : totalCost / count;
 }
 
 class _RecipeConsumptionAggregate {
@@ -11552,7 +11552,7 @@ class _RecipeConsumptionAggregate {
   DateTime? lastPreparedAt;
   final Map<int, _SizeConsumptionAggregate> sizes = {};
 
-  double get averageCost => count == 0 ? 0 : totalCost / count;
+  double get averageCost => count == 0 ? 0.0 : totalCost / count;
 }
 
 class _IngredientConsumptionAggregate {
@@ -11788,7 +11788,7 @@ class _ConsumptionStatisticsPageState extends State<ConsumptionStatisticsPage> {
           final missingPriceEvents = records
               .where((item) => item.missingPriceIngredientIds.isNotEmpty)
               .length;
-          final averageCost = records.isEmpty ? 0 : totalCost / records.length;
+          final double averageCost = records.isEmpty ? 0.0 : totalCost / records.length;
           final topRecipe = recipes.isEmpty
               ? null
               : recipes.reduce((a, b) => a.count >= b.count ? a : b);
