@@ -1,3 +1,19 @@
+## V28 – Verbrauchsstatistik & PayPal-Preise pro Größe (16.08.2026)
+
+- **Verbrauchsstatistik komplett neu aufgebaut**: Zeitraumfilter für Heute, 7 Tage, 30 Tage, Party und Gesamt sowie Umschaltung zwischen Cocktails und Zutaten.
+- Neue kompakte Kennzahlen für **Zubereitungen, Gesamtkosten, Durchschnittskosten und ausgegebene Getränkemenge**.
+- Pro Cocktail werden **Anzahl, Gesamtkosten, Durchschnittskosten, Gesamtmenge und die tatsächliche Aufteilung nach Cocktailgröße** angezeigt.
+- Kosten werden ab V28 bei jeder Zubereitung mit dem **damals gültigen Zutatenpreis** gespeichert; spätere Preisänderungen verändern historische Kosten nicht mehr.
+- Zutatenstatistik zeigt Verbrauch und historische Kosten; fehlende Literpreise werden sichtbar markiert.
+- Neue Hinweise für **beliebtesten Cocktail** und **beliebteste Größe**.
+- Bei PayPal-Zubereitungen werden zusätzlich **Einnahmen** und **Einnahmen minus Zutatenkosten** angezeigt.
+- Bestehende alte Statistikzähler bleiben erhalten; Detailauswertungen beginnen mit der V28-Historie.
+- **PayPal-Standardpreise können jetzt pro aktivierter Größe** gepflegt werden – getrennt für Cocktails, alkoholfreie Cocktails und Shots.
+- **Einzelpreise pro Cocktail sind ebenfalls größenabhängig**. Nur aktivierte Größen werden angezeigt.
+- Auf der Cocktail-Detailseite ändert sich der angezeigte PayPal-Preis sofort mit der ausgewählten Größe.
+- Das lokale Raspberry-PayPal-Backend ermittelt den Preis serverseitig aus **Rezept + Größe** und bleibt kompatibel zu alten Preisangaben.
+- Bestehende V27-Einzelpreise werden beim Update automatisch auf die aktuell aktivierten Größen übernommen.
+
 ## V27 – Kompakte Füllstände & neue Warnschwellen (15.08.2026)
 
 - **Füllstände** sind auf 1024×600 jetzt als responsives Raster aufgebaut; bei normaler Displaybreite stehen **3 Pumpen nebeneinander**.

@@ -2615,6 +2615,42 @@ String appText(AppLanguage language, String key) {
     'ml': 'ml',
     'vorhanden': 'available',
     'Ø gesamt': 'Average total',
+    'Verkaufspreise nach Cocktailgröße': 'Selling prices by cocktail size',
+    'Für jede aktivierte Größe kann ein eigener Preis hinterlegt werden. Ohne Einzelpreis gilt der Standardpreis dieser Größe aus dem PayPal-Kassenmodus.': 'A separate price can be set for every enabled size. Without an individual price, the default price for that size from PayPal checkout mode applies.',
+    'Nur die in den Größeneinstellungen aktivierten Größen werden angezeigt.': 'Only sizes enabled in the size settings are shown.',
+    'Eigener Preis für diese Größe': 'Custom price for this size',
+    'Standardpreise nach Größe': 'Default prices by size',
+    'Diese Preise gelten, wenn für einen einzelnen Cocktail und diese Größe kein eigener Preis gesetzt wurde.': 'These prices apply when no individual price is set for a cocktail and this size.',
+    'Einzelpreise pro Cocktail und Größe stellst du im Menü „Cocktailpreise“ ein.': 'Set individual prices per cocktail and size in the Cocktail prices menu.',
+    'Zubereitet': 'Prepared',
+    'Gesamtkosten': 'Total cost',
+    'Ø Kosten / Cocktail': 'Avg. cost / cocktail',
+    'Ausgegeben': 'Dispensed',
+    'Cocktails im Detail': 'Cocktails in detail',
+    'Häufigkeit': 'Frequency',
+    'Kosten': 'Cost',
+    'Zuletzt': 'Most recent',
+    'Heute': 'Today',
+    '7 Tage': '7 days',
+    '30 Tage': '30 days',
+    'Gesamt': 'All time',
+    'Beliebtester Cocktail': 'Most popular cocktail',
+    'Beliebteste Größe': 'Most popular size',
+    'Einnahmen': 'Revenue',
+    'Einnahmen − Zutatenkosten': 'Revenue − ingredient cost',
+    'Gesamtmenge': 'Total volume',
+    'Ø Kosten': 'Avg. cost',
+    'Nach Größe': 'By size',
+    'Verkauf': 'Sales',
+    'Kosten unvollständig – mindestens eine Zutat ohne Literpreis': 'Incomplete cost – at least one ingredient has no liter price',
+    'Kein Literpreis hinterlegt': 'No liter price set',
+    'Für diesen Zeitraum sind noch keine Zubereitungen vorhanden.': 'No preparations are available for this period yet.',
+    'Zubereitungen fehlen Zutatenpreise. Die angezeigten Kosten sind deshalb unvollständig.': 'preparations have missing ingredient prices. The displayed costs are therefore incomplete.',
+    'ältere Zubereitungen sind nicht in der Detailhistorie enthalten. Anzahl und bisheriger Gesamtverbrauch bleiben gespeichert; Größen- und historische Kostenanalyse gilt für die vorhandene V28-Detailhistorie.': 'older preparations are not included in the detailed history. Counts and previous total usage remain stored; size and historical cost analysis applies to the available V28 detailed history.',
+    'Cocktail-Ranking, Größenstatistik, Kostenhistorie und Zutatenverbrauch werden gelöscht. Füllstände und Kalibrierungen bleiben erhalten.': 'Cocktail ranking, size statistics, cost history and ingredient usage will be deleted. Fill levels and calibrations remain unchanged.',
+    'PayPal': 'PayPal',
+    'Bei': 'For',
+    'Ø': 'Avg.',
   };
 
   final directTranslation =
@@ -3113,6 +3149,88 @@ class PartySession {
   }
 }
 
+class ConsumptionRecord {
+  ConsumptionRecord({
+    required this.timestamp,
+    required this.recipeId,
+    required this.recipeName,
+    required this.category,
+    required this.sizeMl,
+    required this.ingredientAmountsMl,
+    required this.ingredientCostsEur,
+    required this.totalCostEur,
+    required this.missingPriceIngredientIds,
+    this.salePriceEur,
+    this.partySessionId,
+  });
+
+  final DateTime timestamp;
+  final String recipeId;
+  final String recipeName;
+  final DrinkCategory category;
+  final double sizeMl;
+  final Map<String, double> ingredientAmountsMl;
+  final Map<String, double> ingredientCostsEur;
+  final double totalCostEur;
+  final List<String> missingPriceIngredientIds;
+  final double? salePriceEur;
+  final String? partySessionId;
+
+  bool get paid => salePriceEur != null;
+
+  Map<String, dynamic> toJson() => {
+        'timestamp': timestamp.toIso8601String(),
+        'recipeId': recipeId,
+        'recipeName': recipeName,
+        'category': category.name,
+        'sizeMl': sizeMl,
+        'ingredientAmountsMl': ingredientAmountsMl,
+        'ingredientCostsEur': ingredientCostsEur,
+        'totalCostEur': totalCostEur,
+        'missingPriceIngredientIds': missingPriceIngredientIds,
+        'salePriceEur': salePriceEur,
+        'partySessionId': partySessionId,
+      };
+
+  factory ConsumptionRecord.fromJson(Map<String, dynamic> json) {
+    Map<String, double> parseDoubleMap(Object? value) {
+      if (value is! Map) return {};
+      return Map<String, double>.from(
+        value.map(
+          (key, item) => MapEntry(
+            key.toString(),
+            ((item as num?) ?? 0).toDouble(),
+          ),
+        ),
+      );
+    }
+
+    final categoryName = json['category']?.toString();
+    final category = DrinkCategory.values
+            .where((item) => item.name == categoryName)
+            .firstOrNull ??
+        DrinkCategory.cocktail;
+
+    return ConsumptionRecord(
+      timestamp: DateTime.tryParse(json['timestamp']?.toString() ?? '') ??
+          DateTime.now(),
+      recipeId: json['recipeId']?.toString() ?? '',
+      recipeName: json['recipeName']?.toString() ?? 'Cocktail',
+      category: category,
+      sizeMl: ((json['sizeMl'] as num?) ?? 0).toDouble(),
+      ingredientAmountsMl: parseDoubleMap(json['ingredientAmountsMl']),
+      ingredientCostsEur: parseDoubleMap(json['ingredientCostsEur']),
+      totalCostEur: ((json['totalCostEur'] as num?) ?? 0).toDouble(),
+      missingPriceIngredientIds:
+          ((json['missingPriceIngredientIds'] as List?) ?? const [])
+              .map((item) => item.toString())
+              .toList(),
+      salePriceEur: (json['salePriceEur'] as num?)?.toDouble(),
+      partySessionId: json['partySessionId']?.toString(),
+    );
+  }
+}
+
 class CocktailPlanningStats {
   const CocktailPlanningStats({
     required this.recipe,
@@ -3190,6 +3308,7 @@ class MachineStore extends ChangeNotifier {
   Map<String, int> recipeDrinkCounts = {};
   Map<String, int> servingSizeCounts = {};
   Map<String, double> ingredientUsageMl = {};
+  final List<ConsumptionRecord> consumptionHistory = [];
   // Optionaler Lagerbestand fuer die Party-Einkaufsliste. Fehlt ein Eintrag,
   // gilt der Bestand als nicht erfasst; dann wird der komplette geplante
   // Bedarf als Einkaufsmenge ausgewiesen.
@@ -3219,7 +3338,13 @@ class MachineStore extends ChangeNotifier {
   double cocktailPriceEur = 6.50;
   double mocktailPriceEur = 4.50;
   double shotPriceEur = 3.00;
+  // Legacy-Preise bleiben als Fallback erhalten, damit bestehende
+  // Installationen nach dem Update ihre bisherigen Preise nicht verlieren.
   Map<String, double> recipePricesEur = {};
+  // V28: Verkaufspreise koennen pro aktivierter Groesse gepflegt werden.
+  // Key: "category|size" bzw. "recipeId|size".
+  Map<String, double> categorySizePricesEur = {};
+  Map<String, double> recipeSizePricesEur = {};
   bool alcoholStrengthSliderEnabled = false;
   bool settingsLockEnabled = false;
   String settingsPassword = '';
@@ -3353,6 +3478,17 @@ class MachineStore extends ChangeNotifier {
             (key, value) => MapEntry(key.toString(), (value as num).toDouble()),
           ),
         );
+        consumptionHistory
+          ..clear()
+          ..addAll(
+            ((j['consumptionHistory'] as List?) ?? const [])
+                .whereType<Map>()
+                .map(
+                  (entry) => ConsumptionRecord.fromJson(
+                    Map<String, dynamic>.from(entry),
+                  ),
+                ),
+          );
         shoppingInventoryMl = Map<String, double>.from(
           ((j['shoppingInventoryMl'] as Map?) ?? const {}).map(
             (key, value) => MapEntry(
@@ -3458,6 +3594,36 @@ class MachineStore extends ChangeNotifier {
             ),
           ),
         );
+        categorySizePricesEur = Map<String, double>.from(
+          ((j['categorySizePricesEur'] as Map?) ?? const {}).map(
+            (key, value) => MapEntry(
+              key.toString(),
+              (value as num).toDouble().clamp(0, 9999).toDouble(),
+            ),
+          ),
+        );
+        recipeSizePricesEur = Map<String, double>.from(
+          ((j['recipeSizePricesEur'] as Map?) ?? const {}).map(
+            (key, value) => MapEntry(
+              key.toString(),
+              (value as num).toDouble().clamp(0, 9999).toDouble(),
+            ),
+          ),
+        );
+        // Einmalige V27 -> V28 Migration: Ein alter Einzelpreis wird fuer
+        // alle aktuell aktivierten Groessen uebernommen. Danach kann jede
+        // Groesse unabhaengig bearbeitet oder auf den Standard zurueckgesetzt
+        // werden.
+        if (recipeSizePricesEur.isEmpty && recipePricesEur.isNotEmpty) {
+          for (final recipe in recipes) {
+            final legacyPrice = recipePricesEur[recipe.id];
+            if (legacyPrice == null) continue;
+            for (final size in sizesFor(recipe.category)) {
+              recipeSizePricesEur[_sizePriceKey(recipe.id, size)] = legacyPrice;
+            }
+          }
+          recipePricesEur = {};
+        }
         alcoholStrengthSliderEnabled =
             j['alcoholStrengthSliderEnabled'] == true;
         settingsLockEnabled = j['settingsLockEnabled'] == true;
@@ -4292,6 +4458,7 @@ class MachineStore extends ChangeNotifier {
       'recipeDrinkCounts': recipeDrinkCounts,
       'servingSizeCounts': servingSizeCounts,
       'ingredientUsageMl': ingredientUsageMl,
+      'consumptionHistory': consumptionHistory.map((e) => e.toJson()).toList(),
       'shoppingInventoryMl': shoppingInventoryMl,
       'darkMode': darkMode,
       'appLanguage': appLanguage.name,
@@ -4315,6 +4482,8 @@ class MachineStore extends ChangeNotifier {
       'mocktailPriceEur': mocktailPriceEur,
       'shotPriceEur': shotPriceEur,
       'recipePricesEur': recipePricesEur,
+      'categorySizePricesEur': categorySizePricesEur,
+      'recipeSizePricesEur': recipeSizePricesEur,
       'alcoholStrengthSliderEnabled': alcoholStrengthSliderEnabled,
       'settingsLockEnabled': settingsLockEnabled,
       'settingsPassword': settingsPassword,
@@ -4641,12 +4810,75 @@ class MachineStore extends ChangeNotifier {
         DrinkCategory.shot => shotPriceEur,
       };
 
-  double priceForRecipe(Recipe recipe) {
-    final custom = recipePricesEur[recipe.id];
-    if (custom != null) return custom;
-    return categoryPriceFor(recipe.category);
+  String _sizePriceKey(String prefix, double sizeMl) =>
+      '$prefix|${sizeMl.round()}';
+
+  double categoryPriceForSize(DrinkCategory category, double sizeMl) {
+    final custom = categorySizePricesEur[_sizePriceKey(category.name, sizeMl)];
+    return custom ?? categoryPriceFor(category);
   }
 
+  bool hasCategorySizePrice(DrinkCategory category, double sizeMl) =>
+      categorySizePricesEur.containsKey(_sizePriceKey(category.name, sizeMl));
+
+  double priceForRecipe(Recipe recipe, {double? targetVolumeMl}) {
+    final size = targetVolumeMl ?? defaultSizeFor(recipe.category);
+    final sizeCustom = recipeSizePricesEur[_sizePriceKey(recipe.id, size)];
+    if (sizeCustom != null) return sizeCustom;
+
+    // Bestehende Einzelpreise aus V27 gelten weiterhin fuer jede Groesse,
+    // bis fuer diese Groesse ein neuer V28-Preis hinterlegt wird.
+    final legacyCustom = recipePricesEur[recipe.id];
+    if (legacyCustom != null) return legacyCustom;
+
+    return categoryPriceForSize(recipe.category, size);
+  }
+
+  bool hasRecipeSizePrice(Recipe recipe, double sizeMl) =>
+      recipeSizePricesEur.containsKey(_sizePriceKey(recipe.id, sizeMl));
+
+  Future<void> setCategorySizePrice(
+    DrinkCategory category,
+    double sizeMl,
+    double? price,
+  ) async {
+    final key = _sizePriceKey(category.name, sizeMl);
+    if (price == null) {
+      categorySizePricesEur.remove(key);
+    } else {
+      categorySizePricesEur[key] = price.clamp(0, 9999).toDouble();
+    }
+    await save();
+    if (connected && connectionMode == ConnectionMode.wifi) {
+      try {
+        await syncPaymentSettingsToController();
+      } catch (_) {}
+    }
+    notifyListeners();
+  }
+
+  Future<void> setRecipeSizePrice(
+    Recipe recipe,
+    double sizeMl,
+    double? price,
+  ) async {
+    final key = _sizePriceKey(recipe.id, sizeMl);
+    if (price == null) {
+      recipeSizePricesEur.remove(key);
+    } else {
+      recipeSizePricesEur[key] = price.clamp(0, 9999).toDouble();
+    }
+    await save();
+    if (connected && connectionMode == ConnectionMode.wifi) {
+      try {
+        await syncPaymentSettingsToController();
+      } catch (_) {}
+    }
+    notifyListeners();
+  }
+
+  // Legacy-API fuer alte Aufrufe. Setzt weiterhin einen allgemeinen
+  // Einzelpreis, der als Fallback fuer alle Groessen gilt.
   Future<void> setRecipePrice(Recipe recipe, double? price) async {
     if (price == null) {
       recipePricesEur.remove(recipe.id);
@@ -4657,10 +4889,7 @@ class MachineStore extends ChangeNotifier {
     if (connected && connectionMode == ConnectionMode.wifi) {
       try {
         await syncPaymentSettingsToController();
-      } catch (_) {
-        // Preise bleiben lokal gespeichert; der Server wird spätestens vor
-        // der nächsten Bestellung erneut synchronisiert.
-      }
+      } catch (_) {}
     }
     notifyListeners();
   }
@@ -4675,6 +4904,12 @@ class MachineStore extends ChangeNotifier {
         'shot': shotPriceEur.toStringAsFixed(2),
       },
       'recipePrices': recipePricesEur.map(
+        (key, value) => MapEntry(key, value.toStringAsFixed(2)),
+      ),
+      'defaultSizePrices': categorySizePricesEur.map(
+        (key, value) => MapEntry(key, value.toStringAsFixed(2)),
+      ),
+      'recipeSizePrices': recipeSizePricesEur.map(
         (key, value) => MapEntry(key, value.toStringAsFixed(2)),
       ),
     };
@@ -4718,6 +4953,7 @@ class MachineStore extends ChangeNotifier {
     required double cocktailPrice,
     required double mocktailPrice,
     required double shotPrice,
+    Map<String, double>? sizePrices,
   }) async {
     paypalPaymentEnabled = enabled && commercialLicenseActive;
     paymentMachineId = commercialDeviceId.isNotEmpty
@@ -4726,6 +4962,16 @@ class MachineStore extends ChangeNotifier {
     cocktailPriceEur = cocktailPrice.clamp(0, 9999).toDouble();
     mocktailPriceEur = mocktailPrice.clamp(0, 9999).toDouble();
     shotPriceEur = shotPrice.clamp(0, 9999).toDouble();
+    if (sizePrices != null) {
+      categorySizePricesEur = Map<String, double>.from(
+        sizePrices.map(
+          (key, value) => MapEntry(
+            key,
+            value.clamp(0, 9999).toDouble(),
+          ),
+        ),
+      );
+    }
     await save();
     if (connected && connectionMode == ConnectionMode.wifi) {
       await syncPaymentSettingsToController();
@@ -4741,7 +4987,7 @@ class MachineStore extends ChangeNotifier {
       throw Exception('PayPal Kassenmodus benötigt eine aktive Gewerbelizenz');
     }
 
-    final amount = priceForRecipe(recipe);
+    final amount = priceForRecipe(recipe, targetVolumeMl: targetVolumeMl);
     if (amount <= 0) {
       throw Exception('Für diesen Cocktail ist kein Verkaufspreis gesetzt');
     }
@@ -5385,6 +5631,7 @@ class MachineStore extends ChangeNotifier {
     Recipe recipe, {
     required double targetVolumeMl,
     Map<RecipePart, double>? actualPartAmountsMl,
+    double? salePriceEur,
   }) {
     if (targetVolumeMl <= 0 || recipe.baseVolumeMl <= 0) return;
 
@@ -5417,6 +5664,11 @@ class MachineStore extends ChangeNotifier {
       );
     }
 
+    final eventAmounts = <String, double>{};
+    final eventCosts = <String, double>{};
+    final missingPriceIds = <String>[];
+    var eventCost = 0.0;
+
     for (final part in recipe.parts) {
       final amountMl = actualPartAmountsMl?[part] ?? part.amountMl * scale;
       ingredientUsageMl.update(
@@ -5424,10 +5676,51 @@ class MachineStore extends ChangeNotifier {
         (value) => value + amountMl,
         ifAbsent: () => amountMl,
       );
+      eventAmounts.update(
+        part.ingredientId,
+        (value) => value + amountMl,
+        ifAbsent: () => amountMl,
+      );
+      final ingredient = ingredientById(part.ingredientId);
+      if (ingredient == null || ingredient.pricePerLiter <= 0) {
+        if (!missingPriceIds.contains(part.ingredientId)) {
+          missingPriceIds.add(part.ingredientId);
+        }
+      } else {
+        final partCost = amountMl / 1000 * ingredient.pricePerLiter;
+        eventCost += partCost;
+        eventCosts.update(
+          part.ingredientId,
+          (value) => value + partCost,
+          ifAbsent: () => partCost,
+        );
+      }
       // Ein in der Einkaufsliste gepflegter Lagerbestand wird nach jeder
       // tatsaechlich zubereiteten Portion reduziert. Das gilt auch fuer
       // manuelle Rezeptbestandteile, weil sie ebenfalls verbraucht werden.
       _consumeShoppingInventory(part.ingredientId, amountMl);
+    }
+
+    consumptionHistory.add(
+      ConsumptionRecord(
+        timestamp: DateTime.now(),
+        recipeId: recipe.id,
+        recipeName: recipe.name,
+        category: recipe.category,
+        sizeMl: targetVolumeMl,
+        ingredientAmountsMl: eventAmounts,
+        ingredientCostsEur: eventCosts,
+        totalCostEur: eventCost,
+        missingPriceIngredientIds: missingPriceIds,
+        salePriceEur: salePriceEur,
+        partySessionId: runningParty?.id,
+      ),
+    );
+    // Begrenze die lokale Historie auf einen sehr grosszuegigen Rahmen.
+    // 5.000 Detaildatensaetze halten den Browser-Speicher klein; die bisherigen
+    // Gesamtzaehler bleiben davon unberuehrt.
+    if (consumptionHistory.length > 5000) {
+      consumptionHistory.removeRange(0, consumptionHistory.length - 5000);
     }
   }
 
@@ -5461,6 +5754,7 @@ class MachineStore extends ChangeNotifier {
     recipeDrinkCounts = {};
     servingSizeCounts = {};
     ingredientUsageMl = {};
+    consumptionHistory.clear();
     await save();
     notifyListeners();
   }
@@ -5861,6 +6155,7 @@ class MachineStore extends ChangeNotifier {
     double? targetVolumeMl,
     double? targetAlcoholPercent,
     void Function(Map<String, dynamic> status)? onStatus,
+    double? salePriceEur,
   }) async {
     final target = targetVolumeMl ?? defaultSizeFor(recipe.category);
     if (target <= 0 || recipe.baseVolumeMl <= 0) {
@@ -5932,6 +6227,7 @@ class MachineStore extends ChangeNotifier {
       recipe,
       targetVolumeMl: target,
       actualPartAmountsMl: amounts,
+      salePriceEur: salePriceEur,
     );
 
     await save();
@@ -7066,7 +7362,7 @@ class _RecipeDetailPageState extends State<RecipeDetailPage> {
                 ? tr('Wird gestartet …')
                 : (widget.store.paypalPaymentEnabled &&
                         widget.store.commercialLicenseActive)
-                    ? '${widget.store.priceForRecipe(r).toStringAsFixed(2).replaceAll('.', ',')} € ${tr('bezahlen')}'
+                    ? '${widget.store.priceForRecipe(r, targetVolumeMl: selectedSizeMl).toStringAsFixed(2).replaceAll('.', ',')} € ${tr('bezahlen')}'
                     : '${selectedSizeMl.toStringAsFixed(0)} ml ${tr('zubereiten')}',
             style: const TextStyle(fontWeight: FontWeight.w800),
           ),
@@ -7487,10 +7783,10 @@ class _RecipeDetailPageState extends State<RecipeDetailPage> {
     );
 
     if (!mounted || shouldPrepare != true) return;
-    await _make();
+    await _make(paid: true);
   }
 
-  Future<void> _make() async {
+  Future<void> _make({bool paid = false}) async {
     final messenger = ScaffoldMessenger.of(context);
     final rootNavigator = Navigator.of(context, rootNavigator: true);
     final recipe = widget.recipe;
@@ -7552,6 +7848,12 @@ class _RecipeDetailPageState extends State<RecipeDetailPage> {
         recipe,
         targetVolumeMl: selectedSizeMl,
         targetAlcoholPercent: selectedAlcoholPercentForPreparation,
+        salePriceEur: paid
+            ? widget.store.priceForRecipe(
+                recipe,
+                targetVolumeMl: selectedSizeMl,
+              )
+            : null,
         onStatus: (status) {
           if (!mounted) return;
 
@@ -11217,7 +11519,51 @@ class _ServingSizesPageState extends State<ServingSizesPage> {
   }
 }
 
-class ConsumptionStatisticsPage extends StatelessWidget {
+enum _StatisticsPeriod { today, sevenDays, thirtyDays, party, all }
+enum _StatisticsView { cocktails, ingredients }
+enum _StatisticsSort { frequency, cost, name, recent }
+
+class _SizeConsumptionAggregate {
+  _SizeConsumptionAggregate(this.sizeMl);
+  final double sizeMl;
+  int count = 0;
+  double totalCost = 0;
+  double revenue = 0;
+  int missingPriceCount = 0;
+
+  double get averageCost => count == 0 ? 0 : totalCost / count;
+}
+
+class _RecipeConsumptionAggregate {
+  _RecipeConsumptionAggregate({
+    required this.recipeId,
+    required this.name,
+    required this.category,
+  });
+
+  final String recipeId;
+  final String name;
+  final DrinkCategory category;
+  int count = 0;
+  double totalCost = 0;
+  double totalVolumeMl = 0;
+  double revenue = 0;
+  int missingPriceCount = 0;
+  DateTime? lastPreparedAt;
+  final Map<int, _SizeConsumptionAggregate> sizes = {};
+
+  double get averageCost => count == 0 ? 0 : totalCost / count;
+}
+
+class _IngredientConsumptionAggregate {
+  _IngredientConsumptionAggregate(this.ingredientId);
+  final String ingredientId;
+  double amountMl = 0;
+  double totalCost = 0;
+  int missingPriceUses = 0;
+}
+
+class ConsumptionStatisticsPage extends StatefulWidget {
   const ConsumptionStatisticsPage({
     super.key,
     required this.store,
@@ -11225,213 +11571,495 @@ class ConsumptionStatisticsPage extends StatelessWidget {
 
   final MachineStore store;
 
+  @override
+  State<ConsumptionStatisticsPage> createState() =>
+      _ConsumptionStatisticsPageState();
+}
+
+class _ConsumptionStatisticsPageState extends State<ConsumptionStatisticsPage> {
+  _StatisticsPeriod period = _StatisticsPeriod.all;
+  _StatisticsView view = _StatisticsView.cocktails;
+  _StatisticsSort sort = _StatisticsSort.frequency;
+
+  MachineStore get store => widget.store;
+
   String _money(double value) =>
       '${value.toStringAsFixed(2).replaceAll('.', ',')} €';
 
   String _ml(double value) {
     if (value >= 1000) {
-      return '${(value / 1000).toStringAsFixed(2).replaceAll('.', ',')} L';
+      final decimals = value >= 10000 ? 1 : 2;
+      return '${(value / 1000).toStringAsFixed(decimals).replaceAll('.', ',')} L';
     }
     return '${value.toStringAsFixed(0)} ml';
   }
 
-  Recipe? _recipeById(String id) =>
-      store.recipes.where((recipe) => recipe.id == id).firstOrNull;
+  String _periodLabel(_StatisticsPeriod value) => switch (value) {
+        _StatisticsPeriod.today => tr('Heute'),
+        _StatisticsPeriod.sevenDays => tr('7 Tage'),
+        _StatisticsPeriod.thirtyDays => tr('30 Tage'),
+        _StatisticsPeriod.party => tr('Party'),
+        _StatisticsPeriod.all => tr('Gesamt'),
+      };
+
+  String _sortLabel(_StatisticsSort value) => switch (value) {
+        _StatisticsSort.frequency => tr('Häufigkeit'),
+        _StatisticsSort.cost => tr('Kosten'),
+        _StatisticsSort.name => tr('Name'),
+        _StatisticsSort.recent => tr('Zuletzt'),
+      };
+
+  String? _partySessionIdForFilter() {
+    final active = store.activePartySession();
+    if (active != null) return active.id;
+    final sessions = store.partySessions.toList()
+      ..sort((a, b) => b.startedAt.compareTo(a.startedAt));
+    return sessions.firstOrNull?.id;
+  }
+
+  List<ConsumptionRecord> _filteredRecords() {
+    final now = DateTime.now();
+    switch (period) {
+      case _StatisticsPeriod.today:
+        final start = DateTime(now.year, now.month, now.day);
+        return store.consumptionHistory
+            .where((event) => !event.timestamp.isBefore(start))
+            .toList();
+      case _StatisticsPeriod.sevenDays:
+        final start = now.subtract(const Duration(days: 7));
+        return store.consumptionHistory
+            .where((event) => !event.timestamp.isBefore(start))
+            .toList();
+      case _StatisticsPeriod.thirtyDays:
+        final start = now.subtract(const Duration(days: 30));
+        return store.consumptionHistory
+            .where((event) => !event.timestamp.isBefore(start))
+            .toList();
+      case _StatisticsPeriod.party:
+        final partyId = _partySessionIdForFilter();
+        if (partyId == null) return [];
+        return store.consumptionHistory
+            .where((event) => event.partySessionId == partyId)
+            .toList();
+      case _StatisticsPeriod.all:
+        return List<ConsumptionRecord>.from(store.consumptionHistory);
+    }
+  }
+
+  List<_RecipeConsumptionAggregate> _recipeAggregates(
+    List<ConsumptionRecord> records,
+  ) {
+    final data = <String, _RecipeConsumptionAggregate>{};
+    for (final event in records) {
+      final current = data.putIfAbsent(
+        event.recipeId,
+        () => _RecipeConsumptionAggregate(
+          recipeId: event.recipeId,
+          name: event.recipeName,
+          category: event.category,
+        ),
+      );
+      current.count++;
+      current.totalCost += event.totalCostEur;
+      current.totalVolumeMl += event.sizeMl;
+      current.revenue += event.salePriceEur ?? 0;
+      if (event.missingPriceIngredientIds.isNotEmpty) {
+        current.missingPriceCount++;
+      }
+      if (current.lastPreparedAt == null ||
+          event.timestamp.isAfter(current.lastPreparedAt!)) {
+        current.lastPreparedAt = event.timestamp;
+      }
+      final sizeKey = event.sizeMl.round();
+      final size = current.sizes.putIfAbsent(
+        sizeKey,
+        () => _SizeConsumptionAggregate(event.sizeMl),
+      );
+      size.count++;
+      size.totalCost += event.totalCostEur;
+      size.revenue += event.salePriceEur ?? 0;
+      if (event.missingPriceIngredientIds.isNotEmpty) {
+        size.missingPriceCount++;
+      }
+    }
+
+    final result = data.values.toList();
+    switch (sort) {
+      case _StatisticsSort.frequency:
+        result.sort((a, b) => b.count.compareTo(a.count));
+        break;
+      case _StatisticsSort.cost:
+        result.sort((a, b) => b.totalCost.compareTo(a.totalCost));
+        break;
+      case _StatisticsSort.name:
+        result.sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+        break;
+      case _StatisticsSort.recent:
+        result.sort((a, b) => (b.lastPreparedAt ?? DateTime(1970))
+            .compareTo(a.lastPreparedAt ?? DateTime(1970)));
+        break;
+    }
+    return result;
+  }
+
+  List<_IngredientConsumptionAggregate> _ingredientAggregates(
+    List<ConsumptionRecord> records,
+  ) {
+    final data = <String, _IngredientConsumptionAggregate>{};
+    for (final event in records) {
+      for (final entry in event.ingredientAmountsMl.entries) {
+        final item = data.putIfAbsent(
+          entry.key,
+          () => _IngredientConsumptionAggregate(entry.key),
+        );
+        item.amountMl += entry.value;
+        item.totalCost += event.ingredientCostsEur[entry.key] ?? 0;
+        if (event.missingPriceIngredientIds.contains(entry.key)) {
+          item.missingPriceUses++;
+        }
+      }
+    }
+    final result = data.values.toList()
+      ..sort((a, b) => b.amountMl.compareTo(a.amountMl));
+    return result;
+  }
+
+  String _categoryName(DrinkCategory category) => switch (category) {
+        DrinkCategory.cocktail => tr('Cocktail'),
+        DrinkCategory.mocktail => tr('Alkoholfrei'),
+        DrinkCategory.shot => tr('Shot'),
+      };
+
+  Future<void> _reset() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(tr('Statistik zurücksetzen?')),
+        content: Text(
+          tr('Cocktail-Ranking, Größenstatistik, Kostenhistorie und Zutatenverbrauch werden gelöscht. Füllstände und Kalibrierungen bleiben erhalten.'),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: Text(tr('Abbrechen')),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: Text(tr('Zurücksetzen')),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true) {
+      await store.resetConsumptionStatistics();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    final recipeRanking = store.recipeDrinkCounts.entries.toList()
-      ..sort((a, b) => b.value.compareTo(a.value));
-
-    final sizeRanking = store.servingSizeCounts.entries.toList()
-      ..sort((a, b) => b.value.compareTo(a.value));
-
-    final ingredientRanking = store.ingredientUsageMl.entries.toList()
-      ..sort((a, b) => b.value.compareTo(a.value));
-
-    final recipeCosts = store.recipes.toList()
-      ..sort(
-        (a, b) => store
-            .recipeCost(b)
-            .compareTo(store.recipeCost(a)),
-      );
-
-    return PageFrame(title: tr('Verbrauchsstatistik'),
+    return PageFrame(
+      title: tr('Verbrauchsstatistik'),
       actions: [
         IconButton(
           tooltip: tr('Statistik zurücksetzen'),
-          onPressed: () async {
-            final confirmed = await showDialog<bool>(
-              context: context,
-              builder: (dialogContext) => AlertDialog(
-                title: const T('Statistik zurücksetzen?'),
-                content: const T('Cocktail-Ranking, Größenstatistik und '
-                  'Zutatenverbrauch werden gelöscht. Füllstände und '
-                  'Kalibrierungen bleiben erhalten.',
-                ),
-                actions: [
-                  TextButton(
-                    onPressed: () =>
-                        Navigator.pop(dialogContext, false),
-                    child: const T('Abbrechen'),
-                  ),
-                  FilledButton(
-                    onPressed: () =>
-                        Navigator.pop(dialogContext, true),
-                    child: const T('Zurücksetzen'),
-                  ),
-                ],
-              ),
-            );
-
-            if (confirmed == true) {
-              await store.resetConsumptionStatistics();
-            }
-          },
+          onPressed: _reset,
           icon: const Icon(Icons.restart_alt),
         ),
       ],
       child: AnimatedBuilder(
         animation: store,
-        builder: (context, _) => ListView(
-          padding: const EdgeInsets.all(20),
-          children: [
-            Wrap(
-              spacing: 12,
-              runSpacing: 12,
-              children: [
-                _StatSummaryCard(
-                  title: tr('Getrunkene Cocktails'),
-                  value: store.totalDrinksConsumed.toString(),
-                  icon: Icons.local_bar,
-                  color: store.appColors.accentColor,
-                ),
-                _StatSummaryCard(
-                  title: tr('Verbrauch gesamt'),
-                  value: _ml(store.totalIngredientsUsedMl),
-                  icon: Icons.water_drop_outlined,
-                  color: const Color(0xFF38BDF8),
-                ),
-                _StatSummaryCard(
-                  title: tr('Kosten gesamt'),
-                  value: _money(store.totalConsumptionCost),
-                  icon: Icons.euro,
-                  color: const Color(0xFFFFC857),
+        builder: (context, _) {
+          final records = _filteredRecords();
+          final recipes = _recipeAggregates(records);
+          final ingredients = _ingredientAggregates(records);
+          final totalCost = records.fold<double>(
+            0,
+            (sum, item) => sum + item.totalCostEur,
+          );
+          final totalVolume = records.fold<double>(
+            0,
+            (sum, item) => sum + item.sizeMl,
+          );
+          final totalRevenue = records.fold<double>(
+            0,
+            (sum, item) => sum + (item.salePriceEur ?? 0),
+          );
+          final paidCount = records.where((item) => item.paid).length;
+          final missingPriceEvents = records
+              .where((item) => item.missingPriceIngredientIds.isNotEmpty)
+              .length;
+          final averageCost = records.isEmpty ? 0 : totalCost / records.length;
+          final topRecipe = recipes.isEmpty
+              ? null
+              : recipes.reduce((a, b) => a.count >= b.count ? a : b);
+          final sizeCounts = <int, int>{};
+          for (final event in records) {
+            sizeCounts.update(
+              event.sizeMl.round(),
+              (value) => value + 1,
+              ifAbsent: () => 1,
+            );
+          }
+          final sizeEntries = sizeCounts.entries.toList()
+            ..sort((a, b) => b.value.compareTo(a.value));
+          final topSize = sizeEntries.firstOrNull;
+          final legacyCount = period == _StatisticsPeriod.all
+              ? math.max(0, store.totalDrinksConsumed - store.consumptionHistory.length)
+              : 0;
+          final displayedDrinkCount = period == _StatisticsPeriod.all
+              ? store.totalDrinksConsumed
+              : records.length;
+
+          return ListView(
+            padding: const EdgeInsets.fromLTRB(18, 16, 18, 24),
+            children: [
+              _StatisticsControlCard(
+                store: store,
+                period: period,
+                view: view,
+                onPeriodChanged: (value) => setState(() => period = value),
+                onViewChanged: (value) => setState(() => view = value),
+              ),
+              const SizedBox(height: 12),
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final columns = constraints.maxWidth >= 760 ? 4 : 2;
+                  final gap = 10.0;
+                  final width =
+                      (constraints.maxWidth - gap * (columns - 1)) / columns;
+                  return Wrap(
+                    spacing: gap,
+                    runSpacing: gap,
+                    children: [
+                      _StatSummaryCard(
+                        width: width,
+                        title: tr('Zubereitet'),
+                        value: displayedDrinkCount.toString(),
+                        icon: Icons.local_bar,
+                        color: store.appColors.accentColor,
+                      ),
+                      _StatSummaryCard(
+                        width: width,
+                        title: tr('Gesamtkosten'),
+                        value: _money(totalCost),
+                        icon: Icons.account_balance_wallet_outlined,
+                        color: store.appColors.warningColor,
+                      ),
+                      _StatSummaryCard(
+                        width: width,
+                        title: tr('Ø Kosten / Cocktail'),
+                        value: _money(averageCost),
+                        icon: Icons.calculate_outlined,
+                        color: store.appColors.secondaryAccentColor,
+                      ),
+                      _StatSummaryCard(
+                        width: width,
+                        title: tr('Ausgegeben'),
+                        value: _ml(totalVolume),
+                        icon: Icons.water_drop_outlined,
+                        color: store.appColors.successColor,
+                      ),
+                    ],
+                  );
+                },
+              ),
+              if (totalRevenue > 0) ...[
+                const SizedBox(height: 10),
+                _PaymentStatisticsStrip(
+                  store: store,
+                  paidCount: paidCount,
+                  revenue: totalRevenue,
+                  ingredientCost: records
+                      .where((item) => item.paid)
+                      .fold<double>(0, (sum, item) => sum + item.totalCostEur),
                 ),
               ],
-            ),
-            const SizedBox(height: 18),
-            _StatSection(
-              title: tr('Cocktail-Ranking'),
-              emptyText: tr('Noch keine Cocktails zubereitet'),
-              children: recipeRanking.asMap().entries.map((entry) {
-                final rank = entry.key + 1;
-                final recipeEntry = entry.value;
-                final recipe = _recipeById(recipeEntry.key);
-                final recipeName = recipe == null
-                    ? tr('Gelöschtes Rezept')
-                    : store.displayRecipeName(recipe);
-
-                return ListTile(
-                  leading: CircleAvatar(child: T('$rank')),
-                  title: Text(recipeName),
-                  subtitle: recipe == null
-                      ? const T('Rezept nicht mehr vorhanden')
-                      : Text('${tr('Kosten pro Standardgröße')}: '
-                          '${_money(store.recipeCost(recipe))}',
+              if (topRecipe != null || topSize != null) ...[
+                const SizedBox(height: 10),
+                _StatisticsInsights(
+                  store: store,
+                  topRecipe: topRecipe?.name,
+                  topRecipeCount: topRecipe?.count ?? 0,
+                  topSizeMl: topSize?.key,
+                  topSizeCount: topSize?.value ?? 0,
+                ),
+              ],
+              if (missingPriceEvents > 0) ...[
+                const SizedBox(height: 10),
+                _StatisticsNotice(
+                  icon: Icons.warning_amber_rounded,
+                  color: store.appColors.warningColor,
+                  text: '${tr('Bei')} $missingPriceEvents ${tr('Zubereitungen fehlen Zutatenpreise. Die angezeigten Kosten sind deshalb unvollständig.')}',
+                ),
+              ],
+              if (legacyCount > 0) ...[
+                const SizedBox(height: 10),
+                _StatisticsNotice(
+                  icon: Icons.history,
+                  color: store.appColors.secondaryAccentColor,
+                  text: '$legacyCount ${tr('ältere Zubereitungen sind nicht in der Detailhistorie enthalten. Anzahl und bisheriger Gesamtverbrauch bleiben gespeichert; Größen- und historische Kostenanalyse gilt für die vorhandene V28-Detailhistorie.')}',
+                ),
+              ],
+              const SizedBox(height: 14),
+              if (view == _StatisticsView.cocktails) ...[
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        tr('Cocktails im Detail'),
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w900,
+                          fontSize: 18,
                         ),
-                  trailing: T('${recipeEntry.value}×',
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w900,
-                      fontSize: 16,
-                    ),
-                  ),
-                );
-              }).toList(),
-            ),
-            const SizedBox(height: 14),
-            _StatSection(
-              title: tr('Meistgenutzte Cocktailgrößen'),
-              emptyText: tr('Noch keine Größenstatistik vorhanden'),
-              children: sizeRanking.map((entry) {
-                return ListTile(
-                  leading: const Icon(Icons.straighten),
-                  title: Text(entry.key),
-                  trailing: T('${entry.value}×',
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w900,
-                      fontSize: 16,
-                    ),
-                  ),
-                );
-              }).toList(),
-            ),
-            const SizedBox(height: 14),
-            _StatSection(
-              title: tr('Zutatenverbrauch'),
-              emptyText: tr('Noch kein Zutatenverbrauch vorhanden'),
-              children: ingredientRanking.map((entry) {
-                final ingredient = store.ingredientById(entry.key);
-                final name = ingredient == null
-                    ? tr('Gelöschte Zutat')
-                    : store.displayIngredientName(ingredient);
-                final cost = store.totalIngredientCost(entry.key);
-
-                return ListTile(
-                  leading: const Icon(Icons.local_drink_outlined),
-                  title: Text(name),
-                  subtitle: Text('${tr('Literpreis')}: '
-                    '${ingredient == null ? '—' : _money(ingredient.pricePerLiter)} / L',
-                  ),
-                  trailing: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      Text(
-                        _ml(entry.value),
-                        style: const TextStyle(fontWeight: FontWeight.w900),
                       ),
-                      Text(_money(cost)),
-                    ],
-                  ),
-                );
-              }).toList(),
-            ),
-            const SizedBox(height: 14),
-            _StatSection(
-              title: tr('Cocktailkosten nach aktuellem Rezept'),
-              emptyText: tr('Noch keine Rezepte vorhanden'),
-              children: recipeCosts.map((recipe) {
-                final cost = store.recipeCost(recipe);
-                final size = store.defaultSizeFor(recipe.category);
-
-                return ListTile(
-                  leading: Icon(
-                    switch (recipe.category) {
-                      DrinkCategory.cocktail => Icons.local_bar,
-                      DrinkCategory.mocktail => Icons.local_drink,
-                      DrinkCategory.shot => Icons.liquor,
-                    },
-                  ),
-                  title: Text(store.displayRecipeName(recipe)),
-                  subtitle:
-                      Text('${size.toStringAsFixed(0)} ml ${tr('Standardgröße')}'),
-                  trailing: Text(
-                    _money(cost),
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w900,
-                      fontSize: 15,
+                    ),
+                    PopupMenuButton<_StatisticsSort>(
+                      tooltip: tr('Sortierung'),
+                      initialValue: sort,
+                      onSelected: (value) => setState(() => sort = value),
+                      itemBuilder: (context) => _StatisticsSort.values
+                          .map(
+                            (value) => PopupMenuItem<_StatisticsSort>(
+                              value: value,
+                              child: Row(
+                                children: [
+                                  if (value == sort)
+                                    Icon(Icons.check,
+                                        size: 18,
+                                        color: store.appColors.accentColor)
+                                  else
+                                    const SizedBox(width: 18),
+                                  const SizedBox(width: 8),
+                                  Text(_sortLabel(value)),
+                                ],
+                              ),
+                            ),
+                          )
+                          .toList(),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 8,
+                        ),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: store.appColors.borderColor),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.sort, size: 18),
+                            const SizedBox(width: 6),
+                            Text(_sortLabel(sort)),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                if (recipes.isEmpty)
+                  _StatisticsEmpty(store: store)
+                else
+                  ...recipes.map(
+                    (item) => _RecipeStatisticsCard(
+                      store: store,
+                      data: item,
+                      money: _money,
+                      ml: _ml,
+                      categoryName: _categoryName(item.category),
                     ),
                   ),
-                );
-              }).toList(),
+              ] else ...[
+                Text(
+                  tr('Zutatenverbrauch'),
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w900,
+                    fontSize: 18,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                if (ingredients.isEmpty)
+                  _StatisticsEmpty(store: store)
+                else
+                  ...ingredients.map(
+                    (item) => _IngredientStatisticsCard(
+                      store: store,
+                      data: item,
+                      money: _money,
+                      ml: _ml,
+                    ),
+                  ),
+              ],
+            ],
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _StatisticsControlCard extends StatelessWidget {
+  const _StatisticsControlCard({
+    required this.store,
+    required this.period,
+    required this.view,
+    required this.onPeriodChanged,
+    required this.onViewChanged,
+  });
+
+  final MachineStore store;
+  final _StatisticsPeriod period;
+  final _StatisticsView view;
+  final ValueChanged<_StatisticsPeriod> onPeriodChanged;
+  final ValueChanged<_StatisticsView> onViewChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          children: [
+            SizedBox(
+              width: double.infinity,
+              child: SegmentedButton<_StatisticsPeriod>(
+                segments: [
+                  ButtonSegment(value: _StatisticsPeriod.today, label: Text(tr('Heute'))),
+                  ButtonSegment(value: _StatisticsPeriod.sevenDays, label: Text(tr('7 Tage'))),
+                  ButtonSegment(value: _StatisticsPeriod.thirtyDays, label: Text(tr('30 Tage'))),
+                  ButtonSegment(value: _StatisticsPeriod.party, label: Text(tr('Party'))),
+                  ButtonSegment(value: _StatisticsPeriod.all, label: Text(tr('Gesamt'))),
+                ],
+                selected: {period},
+                showSelectedIcon: false,
+                onSelectionChanged: (value) {
+                  if (value.isNotEmpty) onPeriodChanged(value.first);
+                },
+              ),
             ),
-            const SizedBox(height: 12),
-            T('Hinweis: Verbrauch und Kosten werden aus den Rezeptmengen '
-              'und den eingetragenen Literpreisen berechnet. Manuelle '
-              'Zutaten werden in der Statistik mitgezählt, sofern sie im '
-              'Rezept als Zutat hinterlegt sind.',
-              style: TextStyle(color: store.appColors.textSecondaryColor),
+            const SizedBox(height: 10),
+            SizedBox(
+              width: double.infinity,
+              child: SegmentedButton<_StatisticsView>(
+                segments: [
+                  ButtonSegment(
+                    value: _StatisticsView.cocktails,
+                    icon: const Icon(Icons.local_bar, size: 18),
+                    label: Text(tr('Cocktails')),
+                  ),
+                  ButtonSegment(
+                    value: _StatisticsView.ingredients,
+                    icon: const Icon(Icons.inventory_2_outlined, size: 18),
+                    label: Text(tr('Zutaten')),
+                  ),
+                ],
+                selected: {view},
+                showSelectedIcon: false,
+                onSelectionChanged: (value) {
+                  if (value.isNotEmpty) onViewChanged(value.first);
+                },
+              ),
             ),
           ],
         ),
@@ -11442,12 +12070,14 @@ class ConsumptionStatisticsPage extends StatelessWidget {
 
 class _StatSummaryCard extends StatelessWidget {
   const _StatSummaryCard({
+    required this.width,
     required this.title,
     required this.value,
     required this.icon,
     required this.color,
   });
 
+  final double width;
   final String title;
   final String value;
   final IconData icon;
@@ -11456,26 +12086,44 @@ class _StatSummaryCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      width: 185,
+      width: width,
       child: Card(
+        margin: EdgeInsets.zero,
         child: Padding(
-          padding: const EdgeInsets.all(15),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          padding: const EdgeInsets.fromLTRB(13, 12, 13, 11),
+          child: Row(
             children: [
-              Icon(icon, color: color),
-              const SizedBox(height: 10),
-              Text(
-                value,
-                style: const TextStyle(
-                  fontWeight: FontWeight.w900,
-                  fontSize: 24,
+              Container(
+                width: 39,
+                height: 39,
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: .13),
+                  borderRadius: BorderRadius.circular(11),
                 ),
+                child: Icon(icon, color: color, size: 21),
               ),
-              const SizedBox(height: 4),
-              Text(
-                title,
-                style: const TextStyle(fontSize: 12),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      value,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w900,
+                        fontSize: 20,
+                      ),
+                    ),
+                    Text(
+                      title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontSize: 11.5),
+                    ),
+                  ],
+                ),
               ),
             ],
           ),
@@ -11485,48 +12133,446 @@ class _StatSummaryCard extends StatelessWidget {
   }
 }
 
-class _StatSection extends StatelessWidget {
-  const _StatSection({
-    required this.title,
-    required this.emptyText,
-    required this.children,
+class _PaymentStatisticsStrip extends StatelessWidget {
+  const _PaymentStatisticsStrip({
+    required this.store,
+    required this.paidCount,
+    required this.revenue,
+    required this.ingredientCost,
   });
 
-  final String title;
-  final String emptyText;
-  final List<Widget> children;
+  final MachineStore store;
+  final int paidCount;
+  final double revenue;
+  final double ingredientCost;
+
+  String _money(double value) =>
+      '${value.toStringAsFixed(2).replaceAll('.', ',')} €';
 
   @override
   Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+      decoration: BoxDecoration(
+        color: store.appColors.successColor.withValues(alpha: .08),
+        borderRadius: BorderRadius.circular(13),
+        border: Border.all(
+          color: store.appColors.successColor.withValues(alpha: .35),
+        ),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.payments_outlined, color: store.appColors.successColor),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              '$paidCount× ${tr('PayPal')} · ${tr('Einnahmen')} ${_money(revenue)} · ${tr('Einnahmen − Zutatenkosten')} ${_money(revenue - ingredientCost)}',
+              style: const TextStyle(fontWeight: FontWeight.w800),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _StatisticsInsights extends StatelessWidget {
+  const _StatisticsInsights({
+    required this.store,
+    required this.topRecipe,
+    required this.topRecipeCount,
+    required this.topSizeMl,
+    required this.topSizeCount,
+  });
+
+  final MachineStore store;
+  final String? topRecipe;
+  final int topRecipeCount;
+  final int? topSizeMl;
+  final int topSizeCount;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(
+          child: _InsightTile(
+            store: store,
+            icon: Icons.emoji_events_outlined,
+            title: tr('Beliebtester Cocktail'),
+            value: topRecipe == null ? '—' : '${tr(topRecipe!)} · $topRecipeCount×',
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: _InsightTile(
+            store: store,
+            icon: Icons.straighten,
+            title: tr('Beliebteste Größe'),
+            value: topSizeMl == null ? '—' : '$topSizeMl ml · $topSizeCount×',
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _InsightTile extends StatelessWidget {
+  const _InsightTile({
+    required this.store,
+    required this.icon,
+    required this.title,
+    required this.value,
+  });
+  final MachineStore store;
+  final IconData icon;
+  final String title;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(11),
+      decoration: BoxDecoration(
+        color: store.appColors.surfaceColor,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: store.appColors.borderColor),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: store.appColors.accentColor, size: 20),
+          const SizedBox(width: 9),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, style: const TextStyle(fontSize: 11)),
+                const SizedBox(height: 2),
+                Text(
+                  value,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontWeight: FontWeight.w900),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _StatisticsNotice extends StatelessWidget {
+  const _StatisticsNotice({
+    required this.icon,
+    required this.color,
+    required this.text,
+  });
+  final IconData icon;
+  final Color color;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(11),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: .08),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withValues(alpha: .3)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: color, size: 19),
+          const SizedBox(width: 9),
+          Expanded(child: Text(text, style: const TextStyle(fontSize: 12))),
+        ],
+      ),
+    );
+  }
+}
+
+class _RecipeStatisticsCard extends StatelessWidget {
+  const _RecipeStatisticsCard({
+    required this.store,
+    required this.data,
+    required this.money,
+    required this.ml,
+    required this.categoryName,
+  });
+
+  final MachineStore store;
+  final _RecipeConsumptionAggregate data;
+  final String Function(double) money;
+  final String Function(double) ml;
+  final String categoryName;
+
+  @override
+  Widget build(BuildContext context) {
+    final sizeItems = data.sizes.values.toList()
+      ..sort((a, b) => a.sizeMl.compareTo(b.sizeMl));
     return Card(
+      margin: const EdgeInsets.only(bottom: 10),
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(8, 14, 8, 8),
+        padding: const EdgeInsets.all(14),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
-              child: Text(
-                title,
-                style: const TextStyle(
-                  fontWeight: FontWeight.w900,
-                  fontSize: 17,
+            Row(
+              children: [
+                Container(
+                  width: 36,
+                  height: 36,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: store.appColors.accentColor.withValues(alpha: .12),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(
+                    data.category == DrinkCategory.shot
+                        ? Icons.liquor
+                        : Icons.local_bar,
+                    size: 20,
+                    color: store.appColors.accentColor,
+                  ),
                 ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        tr(data.name),
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w900,
+                          fontSize: 16,
+                        ),
+                      ),
+                      Text(
+                        categoryName,
+                        style: TextStyle(
+                          color: store.appColors.textSecondaryColor,
+                          fontSize: 11.5,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: store.appColors.accentColor.withValues(alpha: .12),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    '${data.count}×',
+                    style: TextStyle(
+                      color: store.appColors.accentColor,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 11),
+            Row(
+              children: [
+                Expanded(child: _MiniMetric(label: tr('Gesamtkosten'), value: money(data.totalCost))),
+                Expanded(child: _MiniMetric(label: tr('Ø Kosten'), value: money(data.averageCost))),
+                Expanded(child: _MiniMetric(label: tr('Gesamtmenge'), value: ml(data.totalVolumeMl))),
+                if (data.revenue > 0)
+                  Expanded(child: _MiniMetric(label: tr('Einnahmen'), value: money(data.revenue))),
+              ],
+            ),
+            const SizedBox(height: 11),
+            Text(
+              tr('Nach Größe'),
+              style: TextStyle(
+                color: store.appColors.textSecondaryColor,
+                fontWeight: FontWeight.w800,
+                fontSize: 11.5,
               ),
             ),
-            if (children.isEmpty)
-              Padding(
-                padding: const EdgeInsets.all(12),
-                child: Text(emptyText),
-              )
-            else
-              ...children,
+            const SizedBox(height: 7),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: sizeItems.map((item) {
+                return Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: store.appColors.surfaceColor,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: store.appColors.borderColor),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '${item.sizeMl.toStringAsFixed(0)} ml · ${item.count}×',
+                        style: const TextStyle(fontWeight: FontWeight.w900),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        '${tr('Ø')} ${money(item.averageCost)} · ${tr('Gesamt')} ${money(item.totalCost)}',
+                        style: TextStyle(
+                          color: store.appColors.textSecondaryColor,
+                          fontSize: 11,
+                        ),
+                      ),
+                      if (item.revenue > 0)
+                        Text(
+                          '${tr('Verkauf')} ${money(item.revenue)}',
+                          style: TextStyle(
+                            color: store.appColors.successColor,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                    ],
+                  ),
+                );
+              }).toList(),
+            ),
+            if (data.missingPriceCount > 0) ...[
+              const SizedBox(height: 8),
+              Text(
+                '${data.missingPriceCount}× ${tr('Kosten unvollständig – mindestens eine Zutat ohne Literpreis')}',
+                style: TextStyle(
+                  color: store.appColors.warningColor,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
           ],
         ),
       ),
     );
   }
 }
+
+class _MiniMetric extends StatelessWidget {
+  const _MiniMetric({required this.label, required this.value});
+  final String label;
+  final String value;
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(right: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label, style: const TextStyle(fontSize: 10.5)),
+          const SizedBox(height: 2),
+          Text(
+            value,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 13),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _IngredientStatisticsCard extends StatelessWidget {
+  const _IngredientStatisticsCard({
+    required this.store,
+    required this.data,
+    required this.money,
+    required this.ml,
+  });
+  final MachineStore store;
+  final _IngredientConsumptionAggregate data;
+  final String Function(double) money;
+  final String Function(double) ml;
+
+  @override
+  Widget build(BuildContext context) {
+    final ingredient = store.ingredientById(data.ingredientId);
+    final name = ingredient == null
+        ? tr('Gelöschte Zutat')
+        : store.displayIngredientName(ingredient);
+    return Card(
+      margin: const EdgeInsets.only(bottom: 8),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+        child: Row(
+          children: [
+            Icon(Icons.local_drink_outlined,
+                color: store.appColors.secondaryAccentColor),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(name, style: const TextStyle(fontWeight: FontWeight.w900)),
+                  const SizedBox(height: 2),
+                  Text(
+                    ingredient == null || ingredient.pricePerLiter <= 0
+                        ? tr('Kein Literpreis hinterlegt')
+                        : '${tr('Literpreis')}: ${money(ingredient.pricePerLiter)} / L',
+                    style: TextStyle(
+                      color: ingredient == null || ingredient.pricePerLiter <= 0
+                          ? store.appColors.warningColor
+                          : store.appColors.textSecondaryColor,
+                      fontSize: 11.5,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text(ml(data.amountMl),
+                    style: const TextStyle(fontWeight: FontWeight.w900)),
+                Text(
+                  money(data.totalCost),
+                  style: TextStyle(color: store.appColors.textSecondaryColor),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _StatisticsEmpty extends StatelessWidget {
+  const _StatisticsEmpty({required this.store});
+  final MachineStore store;
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(24),
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: store.appColors.surfaceColor,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: store.appColors.borderColor),
+      ),
+      child: Column(
+        children: [
+          Icon(Icons.query_stats,
+              size: 38, color: store.appColors.textSecondaryColor),
+          const SizedBox(height: 8),
+          Text(
+            tr('Für diesen Zeitraum sind noch keine Zubereitungen vorhanden.'),
+            textAlign: TextAlign.center,
+            style: TextStyle(color: store.appColors.textSecondaryColor),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 
 class IngredientPage extends StatefulWidget {
   const IngredientPage({
@@ -12430,17 +13476,23 @@ class _CocktailPricesPageState extends State<CocktailPricesPage> {
         DrinkCategory.shot => widget.store.t('Shots'),
       };
 
-  TextEditingController _controllerFor(Recipe recipe) {
+  List<double> _sizesFor(Recipe recipe) => widget.store.sizesFor(recipe.category);
+
+  String _key(Recipe recipe, double size) => '${recipe.id}|${size.round()}';
+
+  TextEditingController _controllerFor(Recipe recipe, double size) {
     return controllers.putIfAbsent(
-      recipe.id,
+      _key(recipe, size),
       () => TextEditingController(
-        text: widget.store.priceForRecipe(recipe).toStringAsFixed(2),
+        text: widget.store
+            .priceForRecipe(recipe, targetVolumeMl: size)
+            .toStringAsFixed(2),
       ),
     );
   }
 
-  Future<void> _saveRecipePrice(Recipe recipe) async {
-    final controller = _controllerFor(recipe);
+  Future<void> _saveRecipeSizePrice(Recipe recipe, double size) async {
+    final controller = _controllerFor(recipe, size);
     final parsed = double.tryParse(controller.text.replaceAll(',', '.').trim());
     if (parsed == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -12448,23 +13500,23 @@ class _CocktailPricesPageState extends State<CocktailPricesPage> {
       );
       return;
     }
-
-    await widget.store.setRecipePrice(recipe, parsed);
+    await widget.store.setRecipeSizePrice(recipe, size, parsed);
     if (!mounted) return;
     setState(() {
-      controller.text = widget.store.priceForRecipe(recipe).toStringAsFixed(2);
+      controller.text = widget.store
+          .priceForRecipe(recipe, targetVolumeMl: size)
+          .toStringAsFixed(2);
     });
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('${widget.store.displayRecipeName(recipe)}: ${parsed.toStringAsFixed(2).replaceAll('.', ',')} €')),
-    );
   }
 
-  Future<void> _resetRecipePrice(Recipe recipe) async {
-    await widget.store.setRecipePrice(recipe, null);
-    final controller = _controllerFor(recipe);
+  Future<void> _resetRecipeSizePrice(Recipe recipe, double size) async {
+    await widget.store.setRecipeSizePrice(recipe, size, null);
+    final controller = _controllerFor(recipe, size);
     if (!mounted) return;
     setState(() {
-      controller.text = widget.store.priceForRecipe(recipe).toStringAsFixed(2);
+      controller.text = widget.store
+          .priceForRecipe(recipe, targetVolumeMl: size)
+          .toStringAsFixed(2);
     });
   }
 
@@ -12477,143 +13529,193 @@ class _CocktailPricesPageState extends State<CocktailPricesPage> {
     return PageFrame(
       title: tr('Cocktailpreise'),
       child: ListView(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(18),
         children: [
           Card(
             child: Padding(
-              padding: const EdgeInsets.all(18),
+              padding: const EdgeInsets.all(16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    tr('Einzelpreise pro Cocktail'),
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w900,
-                      fontSize: 18,
-                    ),
+                  Row(
+                    children: [
+                      Icon(Icons.sell_outlined,
+                          color: widget.store.appColors.accentColor),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          tr('Verkaufspreise nach Cocktailgröße'),
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w900,
+                            fontSize: 18,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 7),
                   Text(
-                    tr('Hier legst du die Verkaufspreise pro Cocktail fest. Ohne Einzelpreis gilt der Standardpreis aus dem PayPal Kassenmodus.'),
+                    tr('Für jede aktivierte Größe kann ein eigener Preis hinterlegt werden. Ohne Einzelpreis gilt der Standardpreis dieser Größe aus dem PayPal-Kassenmodus.'),
                     style: TextStyle(
                       color: widget.store.appColors.textSecondaryColor,
                       height: 1.35,
                     ),
                   ),
-                  const SizedBox(height: 14),
-                  DropdownButtonFormField<DrinkCategory>(
-                    value: selectedCategory,
-                    decoration: InputDecoration(
-                      labelText: tr('Liste auswählen'),
-                    ),
-                    items: DrinkCategory.values
+                  const SizedBox(height: 12),
+                  SegmentedButton<DrinkCategory>(
+                    segments: DrinkCategory.values
                         .map(
-                          (category) => DropdownMenuItem<DrinkCategory>(
+                          (category) => ButtonSegment<DrinkCategory>(
                             value: category,
-                            child: Text(_categoryLabel(category)),
+                            label: Text(_categoryLabel(category)),
                           ),
                         )
                         .toList(),
-                    onChanged: (category) {
-                      if (category == null) return;
-                      setState(() => selectedCategory = category);
+                    selected: {selectedCategory},
+                    showSelectedIcon: false,
+                    onSelectionChanged: (value) {
+                      if (value.isEmpty) return;
+                      setState(() => selectedCategory = value.first);
                     },
                   ),
                 ],
               ),
             ),
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 12),
           ...recipes.map((recipe) {
-            final controller = _controllerFor(recipe);
-            final customPrice = widget.store.recipePricesEur.containsKey(recipe.id);
-            final standardPrice =
-                widget.store.categoryPriceFor(recipe.category);
-
+            final sizes = _sizesFor(recipe);
             return Card(
               margin: const EdgeInsets.only(bottom: 10),
               child: Padding(
                 padding: const EdgeInsets.all(14),
-                child: LayoutBuilder(
-                  builder: (context, constraints) {
-                    final narrow = constraints.maxWidth < 520;
-
-                    final nameBlock = Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          widget.store.displayRecipeName(recipe),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            fontWeight: FontWeight.w900,
-                            fontSize: 15,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          customPrice
-                              ? tr('Eigener Preis aktiv')
-                              : '${tr('Standardpreis')}: ${standardPrice.toStringAsFixed(2).replaceAll('.', ',')} €',
-                          style: TextStyle(
-                            color: widget.store.appColors.textSecondaryColor,
-                            fontSize: 12,
-                          ),
-                        ),
-                      ],
-                    );
-
-                    final inputBlock = Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        SizedBox(
-                          width: 105,
-                          child: TextField(
-                            controller: controller,
-                            keyboardType:
-                                const TextInputType.numberWithOptions(
-                              decimal: true,
-                            ),
-                            decoration: const InputDecoration(
-                              suffixText: '€',
-                            ),
-                            onSubmitted: (_) => _saveRecipePrice(recipe),
-                          ),
-                        ),
-                        IconButton(
-                          tooltip: tr('Speichern'),
-                          onPressed: () => _saveRecipePrice(recipe),
-                          icon: const Icon(Icons.save_outlined),
-                        ),
-                        IconButton(
-                          tooltip: tr('Standardpreis verwenden'),
-                          onPressed: customPrice
-                              ? () => _resetRecipePrice(recipe)
-                              : null,
-                          icon: const Icon(Icons.undo),
-                        ),
-                      ],
-                    );
-
-                    if (narrow) {
-                      return Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          nameBlock,
-                          const SizedBox(height: 10),
-                          inputBlock,
-                        ],
-                      );
-                    }
-
-                    return Row(
-                      children: [
-                        Expanded(child: nameBlock),
-                        const SizedBox(width: 12),
-                        inputBlock,
-                      ],
-                    );
-                  },
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      widget.store.displayRecipeName(recipe),
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w900,
+                        fontSize: 16,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      tr('Nur die in den Größeneinstellungen aktivierten Größen werden angezeigt.'),
+                      style: TextStyle(
+                        color: widget.store.appColors.textSecondaryColor,
+                        fontSize: 11.5,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    LayoutBuilder(
+                      builder: (context, constraints) {
+                        final columns = constraints.maxWidth >= 720
+                            ? 3
+                            : constraints.maxWidth >= 460
+                                ? 2
+                                : 1;
+                        final gap = 10.0;
+                        final cellWidth =
+                            (constraints.maxWidth - gap * (columns - 1)) /
+                                columns;
+                        return Wrap(
+                          spacing: gap,
+                          runSpacing: gap,
+                          children: sizes.map((size) {
+                            final controller = _controllerFor(recipe, size);
+                            final custom =
+                                widget.store.hasRecipeSizePrice(recipe, size);
+                            final fallback = widget.store.categoryPriceForSize(
+                              recipe.category,
+                              size,
+                            );
+                            return SizedBox(
+                              width: cellWidth,
+                              child: Container(
+                                padding: const EdgeInsets.all(10),
+                                decoration: BoxDecoration(
+                                  color: widget.store.appColors.surfaceColor,
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                    color: custom
+                                        ? widget.store.appColors.accentColor
+                                        : widget.store.appColors.borderColor,
+                                  ),
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Text(
+                                          '${size.toStringAsFixed(0)} ml',
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight.w900,
+                                          ),
+                                        ),
+                                        const Spacer(),
+                                        if (custom)
+                                          Icon(
+                                            Icons.check_circle,
+                                            size: 17,
+                                            color: widget
+                                                .store.appColors.successColor,
+                                          ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Row(
+                                      children: [
+                                        Expanded(
+                                          child: TextField(
+                                            controller: controller,
+                                            keyboardType: const TextInputType
+                                                .numberWithOptions(decimal: true),
+                                            decoration: const InputDecoration(
+                                              suffixText: '€',
+                                              isDense: true,
+                                            ),
+                                            onSubmitted: (_) =>
+                                                _saveRecipeSizePrice(recipe, size),
+                                          ),
+                                        ),
+                                        IconButton(
+                                          tooltip: tr('Speichern'),
+                                          onPressed: () =>
+                                              _saveRecipeSizePrice(recipe, size),
+                                          icon: const Icon(Icons.save_outlined),
+                                        ),
+                                        IconButton(
+                                          tooltip: tr('Standardpreis verwenden'),
+                                          onPressed: custom
+                                              ? () => _resetRecipeSizePrice(
+                                                  recipe, size)
+                                              : null,
+                                          icon: const Icon(Icons.undo),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      custom
+                                          ? tr('Eigener Preis für diese Größe')
+                                          : '${tr('Standardpreis')}: ${fallback.toStringAsFixed(2).replaceAll('.', ',')} €',
+                                      style: TextStyle(
+                                        color: widget
+                                            .store.appColors.textSecondaryColor,
+                                        fontSize: 11,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            );
+                          }).toList(),
+                        );
+                      },
+                    ),
+                  ],
                 ),
               ),
             );
@@ -12637,16 +13739,7 @@ class _PaymentSettingsPageState extends State<PaymentSettingsPage> {
   late bool enabled;
   late final machineIdController =
       TextEditingController(text: widget.store.paymentMachineId);
-  late final cocktailPriceController = TextEditingController(
-    text: widget.store.cocktailPriceEur.toStringAsFixed(2),
-  );
-  late final mocktailPriceController = TextEditingController(
-    text: widget.store.mocktailPriceEur.toStringAsFixed(2),
-  );
-  late final shotPriceController = TextEditingController(
-    text: widget.store.shotPriceEur.toStringAsFixed(2),
-  );
-  final recipePriceControllers = <String, TextEditingController>{};
+  final priceControllers = <String, TextEditingController>{};
   bool? backendReady;
   String backendState = tr('Lokales Zahlungsbackend wird geprüft …');
 
@@ -12660,13 +13753,39 @@ class _PaymentSettingsPageState extends State<PaymentSettingsPage> {
   @override
   void dispose() {
     machineIdController.dispose();
-    cocktailPriceController.dispose();
-    mocktailPriceController.dispose();
-    shotPriceController.dispose();
-    for (final controller in recipePriceControllers.values) {
+    for (final controller in priceControllers.values) {
       controller.dispose();
     }
     super.dispose();
+  }
+
+  String _categoryLabel(DrinkCategory category) => switch (category) {
+        DrinkCategory.cocktail => tr('Cocktails'),
+        DrinkCategory.mocktail => tr('Alkoholfrei'),
+        DrinkCategory.shot => tr('Shots'),
+      };
+
+  List<double> _sizes(DrinkCategory category) => widget.store.sizesFor(category);
+
+  String _key(DrinkCategory category, double size) =>
+      '${category.name}|${size.round()}';
+
+  TextEditingController _controller(DrinkCategory category, double size) {
+    return priceControllers.putIfAbsent(
+      _key(category, size),
+      () => TextEditingController(
+        text: widget.store
+            .categoryPriceForSize(category, size)
+            .toStringAsFixed(2),
+      ),
+    );
+  }
+
+  double _read(DrinkCategory category, double size) {
+    return double.tryParse(
+          _controller(category, size).text.replaceAll(',', '.').trim(),
+        ) ??
+        widget.store.categoryPriceForSize(category, size);
   }
 
   Future<void> _refreshBackendStatus() async {
@@ -12691,45 +13810,30 @@ class _PaymentSettingsPageState extends State<PaymentSettingsPage> {
     }
   }
 
-  double _readPrice(TextEditingController controller, double fallback) {
-    return double.tryParse(controller.text.replaceAll(',', '.').trim()) ??
-        fallback;
-  }
-
-  TextEditingController _recipePriceController(Recipe recipe) {
-    return recipePriceControllers.putIfAbsent(
-      recipe.id,
-      () => TextEditingController(
-        text: widget.store.priceForRecipe(recipe).toStringAsFixed(2),
-      ),
-    );
-  }
-
-  Future<void> _saveRecipePrice(Recipe recipe) async {
-    final controller = _recipePriceController(recipe);
-    final parsed = double.tryParse(controller.text.replaceAll(',', '.').trim());
-    if (parsed == null) return;
-    await widget.store.setRecipePrice(recipe, parsed);
-    if (!mounted) return;
-    setState(() {});
-  }
-
-  Future<void> _resetRecipePrice(Recipe recipe) async {
-    await widget.store.setRecipePrice(recipe, null);
-    final controller = _recipePriceController(recipe);
-    controller.text = widget.store.priceForRecipe(recipe).toStringAsFixed(2);
-    if (!mounted) return;
-    setState(() {});
-  }
-
   Future<void> _save() async {
     try {
+      final values = <String, double>{};
+      for (final category in DrinkCategory.values) {
+        for (final size in _sizes(category)) {
+          values[_key(category, size)] = _read(category, size);
+        }
+      }
       await widget.store.savePaymentSettings(
         enabled: enabled,
         machineId: machineIdController.text,
-        cocktailPrice: _readPrice(cocktailPriceController, 6.50),
-        mocktailPrice: _readPrice(mocktailPriceController, 4.50),
-        shotPrice: _readPrice(shotPriceController, 3.00),
+        cocktailPrice: _read(
+          DrinkCategory.cocktail,
+          widget.store.defaultServingSizeMl,
+        ),
+        mocktailPrice: _read(
+          DrinkCategory.mocktail,
+          widget.store.defaultServingSizeMl,
+        ),
+        shotPrice: _read(
+          DrinkCategory.shot,
+          widget.store.defaultShotSizeMl,
+        ),
+        sizePrices: values,
       );
       await _refreshBackendStatus();
       if (!mounted) return;
@@ -12742,6 +13846,53 @@ class _PaymentSettingsPageState extends State<PaymentSettingsPage> {
         SnackBar(content: Text('${tr('Speichern fehlgeschlagen')}: $error')),
       );
     }
+  }
+
+  Widget _categoryPriceCard(DrinkCategory category) {
+    final sizes = _sizes(category);
+    return Card(
+      margin: const EdgeInsets.only(bottom: 10),
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              _categoryLabel(category),
+              style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16),
+            ),
+            const SizedBox(height: 9),
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final columns = constraints.maxWidth >= 680 ? 3 : 2;
+                final gap = 10.0;
+                final width =
+                    (constraints.maxWidth - gap * (columns - 1)) / columns;
+                return Wrap(
+                  spacing: gap,
+                  runSpacing: gap,
+                  children: sizes.map((size) {
+                    return SizedBox(
+                      width: width,
+                      child: TextField(
+                        controller: _controller(category, size),
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
+                        ),
+                        decoration: InputDecoration(
+                          labelText: '${size.toStringAsFixed(0)} ml',
+                          suffixText: '€',
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                );
+              },
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   @override
@@ -12762,11 +13913,11 @@ class _PaymentSettingsPageState extends State<PaymentSettingsPage> {
     return PageFrame(
       title: tr('PayPal Kassenmodus'),
       child: ListView(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(18),
         children: [
           Card(
             child: Padding(
-              padding: const EdgeInsets.all(18),
+              padding: const EdgeInsets.all(16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -12782,12 +13933,11 @@ class _PaymentSettingsPageState extends State<PaymentSettingsPage> {
                     tr('Bestellungen und Zahlungsstatus laufen direkt über den Raspberry Pi. Es wird kein Cloudflare-Backend benötigt. PayPal-Client-ID und Secret werden ausschließlich auf dem Raspberry gespeichert.'),
                     style: TextStyle(
                       color: widget.store.appColors.textSecondaryColor,
-                      height: 1.4,
+                      height: 1.35,
                     ),
                   ),
                   const SizedBox(height: 12),
                   Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Icon(
                         backendReady == true
@@ -12812,15 +13962,6 @@ class _PaymentSettingsPageState extends State<PaymentSettingsPage> {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 6),
-                  SelectableText(
-                    'Raspberry-Konfiguration: sudo cocktailbot-paypal-config',
-                    style: TextStyle(
-                      color: widget.store.appColors.textSecondaryColor,
-                      fontSize: 12,
-                    ),
-                  ),
-                  const SizedBox(height: 14),
                   SwitchListTile(
                     contentPadding: EdgeInsets.zero,
                     title: Text(tr('PayPal-Zahlung vor Zubereitung erzwingen')),
@@ -12832,66 +13973,64 @@ class _PaymentSettingsPageState extends State<PaymentSettingsPage> {
                     value: enabled,
                     onChanged: (value) => setState(() => enabled = value),
                   ),
-                  const SizedBox(height: 12),
                   TextField(
                     controller: machineIdController,
                     readOnly: true,
                     decoration: InputDecoration(
                       labelText: tr('Geräte-ID für Zahlungen'),
-                      helperText: tr('Wird automatisch aus der hardwaregebundenen CocktailBot Geräte-ID übernommen.'),
                       suffixIcon: const Icon(Icons.lock_outline),
-                    ),
-                  ),
-                  const SizedBox(height: 18),
-                  Text(
-                    tr('Preise'),
-                    style: const TextStyle(fontWeight: FontWeight.w900),
-                  ),
-                  const SizedBox(height: 10),
-                  TextField(
-                    controller: cocktailPriceController,
-                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                    decoration: InputDecoration(
-                      labelText: tr('Cocktail Preis EUR'),
-                      suffixText: '€',
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  TextField(
-                    controller: mocktailPriceController,
-                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                    decoration: InputDecoration(
-                      labelText: tr('Alkoholfrei Preis EUR'),
-                      suffixText: '€',
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  TextField(
-                    controller: shotPriceController,
-                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                    decoration: InputDecoration(
-                      labelText: tr('Shot Preis EUR'),
-                      suffixText: '€',
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  SizedBox(
-                    width: double.infinity,
-                    child: FilledButton.icon(
-                      onPressed: _save,
-                      icon: const Icon(Icons.save_outlined),
-                      label: Text(tr('Zahlungseinstellungen speichern')),
                     ),
                   ),
                 ],
               ),
             ),
           ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Icon(Icons.payments_outlined,
+                  color: widget.store.appColors.accentColor),
+              const SizedBox(width: 9),
+              Expanded(
+                child: Text(
+                  tr('Standardpreise nach Größe'),
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w900,
+                    fontSize: 18,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 5),
+          Text(
+            tr('Diese Preise gelten, wenn für einen einzelnen Cocktail und diese Größe kein eigener Preis gesetzt wurde.'),
+            style: TextStyle(color: widget.store.appColors.textSecondaryColor),
+          ),
+          const SizedBox(height: 10),
+          _categoryPriceCard(DrinkCategory.cocktail),
+          _categoryPriceCard(DrinkCategory.mocktail),
+          _categoryPriceCard(DrinkCategory.shot),
+          const SizedBox(height: 6),
+          SizedBox(
+            height: 50,
+            child: FilledButton.icon(
+              onPressed: _save,
+              icon: const Icon(Icons.save_outlined),
+              label: Text(tr('Zahlungseinstellungen speichern')),
+            ),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            tr('Einzelpreise pro Cocktail und Größe stellst du im Menü „Cocktailpreise“ ein.'),
+            style: TextStyle(color: widget.store.appColors.textSecondaryColor),
+          ),
         ],
       ),
     );
   }
 }
+
 
 class PaymentCheckoutPage extends StatefulWidget {
   const PaymentCheckoutPage({
@@ -13016,7 +14155,10 @@ class _PaymentCheckoutPageState extends State<PaymentCheckoutPage> {
 
   @override
   Widget build(BuildContext context) {
-    final price = widget.store.priceForRecipe(widget.recipe);
+    final price = widget.store.priceForRecipe(
+      widget.recipe,
+      targetVolumeMl: widget.targetVolumeMl,
+    );
     return PageFrame(
       title: tr('PayPal Zahlung'),
       child: ListView(

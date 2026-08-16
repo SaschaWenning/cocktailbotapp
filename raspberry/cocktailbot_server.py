@@ -440,15 +440,33 @@ class PaypalPaymentBackend:
         mocktail_cents = parse_money(defaults.get("mocktail"), "mocktail", allow_zero=True)
         shot_cents = parse_money(defaults.get("shot"), "shot", allow_zero=True)
 
-        recipe_prices_raw = payload.get("recipePrices", {})
-        if not isinstance(recipe_prices_raw, dict):
-            raise ValidationError("Rezeptpreise sind ungültig")
-        recipe_prices: dict[str, int] = {}
-        for recipe_id, value in recipe_prices_raw.items():
-            key = str(recipe_id).strip()
-            if not key or len(key) > 120:
-                raise ValidationError("Ungültige Rezept-ID in den Preisen")
-            recipe_prices[key] = parse_money(value, f"recipe:{key}", allow_zero=True)
+        def parse_price_map(raw: Any, label: str) -> dict[str, int]:
+            if raw is None:
+                return {}
+            if not isinstance(raw, dict):
+                raise ValidationError(f"{label} sind ungültig")
+            result: dict[str, int] = {}
+            for raw_key, value in raw.items():
+                key = str(raw_key).strip()
+                if not key or len(key) > 160:
+                    raise ValidationError(f"Ungültiger Schlüssel in {label}")
+                result[key] = parse_money(value, f"{label}:{key}", allow_zero=True)
+            return result
+
+        recipe_prices = parse_price_map(payload.get("recipePrices", {}), "Rezeptpreise")
+        default_size_prices = parse_price_map(
+            payload.get("defaultSizePrices", {}),
+            "Standardpreise nach Größe",
+        )
+        recipe_size_prices = parse_price_map(
+            payload.get("recipeSizePrices", {}),
+            "Rezeptpreise nach Größe",
+        )
+        price_config_json = {
+            "recipePrices": recipe_prices,
+            "defaultSizePrices": default_size_prices,
+            "recipeSizePrices": recipe_size_prices,
+        }
 
         with self._db() as db:
             db.execute(
@@ -472,7 +490,7 @@ class PaypalPaymentBackend:
                     cocktail_cents,
                     mocktail_cents,
                     shot_cents,
-                    json.dumps(recipe_prices, separators=(",", ":")),
+                    json.dumps(price_config_json, separators=(",", ":")),
                     utc_iso(),
                 ),
             )
@@ -481,6 +499,8 @@ class PaypalPaymentBackend:
             "machineId": machine_id,
             "currency": currency,
             "recipePriceCount": len(recipe_prices),
+            "defaultSizePriceCount": len(default_size_prices),
+            "recipeSizePriceCount": len(recipe_size_prices),
         }
 
     def _price_config(self) -> sqlite3.Row:
@@ -493,17 +513,50 @@ class PaypalPaymentBackend:
             )
         return row
 
-    def _server_price(self, machine_id: str, recipe_id: str, category: str) -> tuple[int, str]:
+    def _server_price(
+        self,
+        machine_id: str,
+        recipe_id: str,
+        category: str,
+        size_ml: int,
+    ) -> tuple[int, str]:
         config = self._price_config()
         if machine_id != config["machine_id"]:
             raise PaymentError("Maschinen-ID stimmt nicht mit der lokalen Konfiguration überein", 409)
         try:
-            recipe_prices = json.loads(config["recipe_prices_json"] or "{}")
+            stored = json.loads(config["recipe_prices_json"] or "{}")
         except json.JSONDecodeError:
-            recipe_prices = {}
-        custom = recipe_prices.get(recipe_id)
-        if custom is not None:
-            return int(custom), str(config["currency"])
+            stored = {}
+
+        # Ab V28 werden größenabhängige Preise gemeinsam in diesem JSON-Feld
+        # gespeichert. Alte Daten bestanden direkt aus {recipeId: cents}; diese
+        # Form wird weiterhin vollständig unterstützt.
+        if isinstance(stored, dict) and any(
+            key in stored
+            for key in ("recipePrices", "defaultSizePrices", "recipeSizePrices")
+        ):
+            legacy_recipe_prices = stored.get("recipePrices", {})
+            default_size_prices = stored.get("defaultSizePrices", {})
+            recipe_size_prices = stored.get("recipeSizePrices", {})
+        else:
+            legacy_recipe_prices = stored if isinstance(stored, dict) else {}
+            default_size_prices = {}
+            recipe_size_prices = {}
+
+        recipe_size_key = f"{recipe_id}|{size_ml}"
+        custom_size = recipe_size_prices.get(recipe_size_key)
+        if custom_size is not None:
+            return int(custom_size), str(config["currency"])
+
+        legacy_custom = legacy_recipe_prices.get(recipe_id)
+        if legacy_custom is not None:
+            return int(legacy_custom), str(config["currency"])
+
+        category_size_key = f"{category}|{size_ml}"
+        default_size = default_size_prices.get(category_size_key)
+        if default_size is not None:
+            return int(default_size), str(config["currency"])
+
         column = {
             "cocktail": "cocktail_cents",
             "mocktail": "mocktail_cents",
@@ -613,7 +666,9 @@ class PaypalPaymentBackend:
         if size_ml < 1 or size_ml > 5000:
             raise ValidationError("Ungültige Cocktailgröße")
 
-        amount_cents, currency = self._server_price(machine_id, recipe_id, category)
+        amount_cents, currency = self._server_price(
+            machine_id, recipe_id, category, size_ml
+        )
         if amount_cents < 1:
             raise PaymentError("Für diesen Cocktail ist kein Verkaufspreis gesetzt", 409)
         local_request_id = uuid.uuid4().hex
