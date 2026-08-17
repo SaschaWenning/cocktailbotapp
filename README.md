@@ -240,3 +240,7 @@ install.sh                                Komplettinstallation
 - Der CocktailBot-Webserver bleibt standardmäßig auf `127.0.0.1` gebunden.
 - Die SQLite-Datenbank verhindert die erneute Verwendung einer bereits verwendeten Order.
 - Vor dem Anschluss von Flüssigkeiten jede Pumpe einzeln prüfen.
+
+## LAN / tablet access (V29)
+
+The Raspberry kiosk remains available at `http://127.0.0.1:8080`; external clients are blocked by default. On the Raspberry open **Settings → Network & tablet**, set a 4–8 digit admin PIN, enable local-network access, and use one of the displayed `http://<raspberry-ip>:8080` addresses from a device on the same private Wi-Fi/LAN. Cocktail preparation is available without the admin PIN, while remote settings and sensitive maintenance/configuration actions require an authenticated admin session. This feature is for private/local networks only and is not an Internet exposure mechanism.

@@ -2405,6 +2405,30 @@ String appText(AppLanguage language, String key) {
     },
   };
   final settingsEnglishFallback = <String, String>{
+    'Netzwerk & Tablet': 'Network & tablet',
+    'Zugriff im lokalen WLAN/LAN und Admin-PIN': 'Local Wi-Fi/LAN access and admin PIN',
+    'CocktailBot auf Tablet oder PC öffnen': 'Open CocktailBot on a tablet or PC',
+    'Der Zugriff funktioniert nur im gleichen lokalen WLAN/LAN. CocktailBot wird nicht für das Internet freigegeben.': 'Access works only on the same local Wi-Fi/LAN. CocktailBot is not exposed to the Internet.',
+    'Zugriff im lokalen Netzwerk erlauben': 'Allow access on the local network',
+    'Tablet- und PC-Zugriff ist aktiviert.': 'Tablet and PC access is enabled.',
+    'Nur der Raspberry selbst kann CocktailBot öffnen.': 'Only the Raspberry itself can open CocktailBot.',
+    'Admin-PIN': 'Admin PIN',
+    'Vom Tablet oder PC sind die Einstellungen nur nach Eingabe dieses PINs erreichbar. Cocktails können ohne Admin-PIN ausgewählt und zubereitet werden.': 'From a tablet or PC, settings are available only after entering this PIN. Cocktails can be selected and prepared without the admin PIN.',
+    'Admin-PIN ändern': 'Change admin PIN',
+    'Admin-PIN festlegen': 'Set admin PIN',
+    'Leer lassen, wenn der vorhandene PIN bleiben soll': 'Leave empty to keep the current PIN',
+    '4 bis 8 Ziffern': '4 to 8 digits',
+    'Adresse für Tablet oder PC': 'Address for tablet or PC',
+    'Keine Netzwerkadresse erkannt.': 'No network address detected.',
+    'Adresse kopiert': 'Address copied',
+    'Netzwerkfehler': 'Network error',
+    'Netzwerkeinstellungen gespeichert': 'Network settings saved',
+    'Netzwerkstatus aktualisieren': 'Refresh network status',
+    'Bitte zuerst einen Admin-PIN festlegen': 'Please set an admin PIN first',
+    'Admin-PIN muss aus 4 bis 8 Ziffern bestehen': 'Admin PIN must contain 4 to 8 digits',
+    'Für Einstellungen vom Tablet oder PC bitte den Admin-PIN eingeben.': 'Enter the admin PIN to access settings from a tablet or PC.',
+    'Falscher Admin-PIN': 'Incorrect admin PIN',
+    'Speichere …': 'Saving …',
     'Diese Einstellungen gelten für Cocktails, alkoholfreie Cocktails und Shots. Auf den Cocktail-Seiten selbst wird die obere Navigation angezeigt.': 'These settings apply to cocktails, alcohol-free cocktails and shots. The top navigation is shown on the cocktail pages.',
     'Laden': 'Load',
     'Rezepte': 'Recipes',
@@ -3348,6 +3372,11 @@ class MachineStore extends ChangeNotifier {
   bool alcoholStrengthSliderEnabled = false;
   bool settingsLockEnabled = false;
   String settingsPassword = '';
+  bool networkAccessEnabled = false;
+  bool networkAdminPinConfigured = false;
+  List<String> networkAccessUrls = [];
+  String _networkAdminToken = '';
+  DateTime? _networkAdminExpiresAt;
   bool commercialLicenseActive = false;
   String commercialLicenseCode = '';
   String commercialLicensedMachineId = '';
@@ -3408,7 +3437,7 @@ class MachineStore extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> load() async {
+  Future<void> load({bool skipConnect = false}) async {
     final p = await SharedPreferences.getInstance();
     var storedCatalogVersion = 0;
     final raw = p.getString('machine_state');
@@ -3683,7 +3712,9 @@ class MachineStore extends ChangeNotifier {
     _activeAppLanguage = appLanguage;
     loaded = true;
     notifyListeners();
-    unawaited(connect());
+    if (!skipConnect) {
+      unawaited(connect());
+    }
   }
 
   void _installDefaultCatalog() {
@@ -4439,10 +4470,8 @@ class MachineStore extends ChangeNotifier {
       ]);
   }
 
-  Future<void> save() async {
-    notifyListeners();
-    final p = await SharedPreferences.getInstance();
-    await p.setString('machine_state', jsonEncode({
+  Map<String, dynamic> _persistentStateJson() {
+    return {
       'catalogVersion': defaultCatalogVersion,
       'ingredients': ingredients.map((e) => e.toJson()).toList(),
       'pumps': pumps.map((e) => e.toJson()).toList(),
@@ -4495,7 +4524,75 @@ class MachineStore extends ChangeNotifier {
       'ledIdleMode': ledIdleMode.name,
       'ledColorValue': ledColorValue,
       'ledBrightness': ledBrightness,
-    }));
+    };
+  }
+
+  Map<String, dynamic> _sharedAppStateForController() {
+    final state = Map<String, dynamic>.from(_persistentStateJson());
+    // Browser-/Lizenzgeheimnisse werden nicht an andere Geräte im LAN verteilt.
+    state.remove('settingsPassword');
+    state.remove('commercialLicenseCode');
+    // Das Tablet soll immer dieselbe Origin für Web-App und API verwenden.
+    state['wifiHost'] = '';
+    state['sharedAt'] = DateTime.now().toIso8601String();
+    return state;
+  }
+
+  Future<void> _syncAppStateToController() async {
+    if (!connected || connectionMode == ConnectionMode.bluetooth) {
+      return;
+    }
+    if (isRemoteBrowser && !remoteAdminUnlocked) {
+      return;
+    }
+    try {
+      await http
+          .post(
+            _apiUri('/api/app-state'),
+            headers: _apiHeaders(json: true),
+            body: jsonEncode({'state': _sharedAppStateForController()}),
+          )
+          .timeout(const Duration(seconds: 5));
+    } catch (_) {
+      // LAN-Snapshot ist Komfortfunktion. Lokales Speichern darf nie scheitern.
+    }
+  }
+
+  Future<bool> _loadSharedAppStateFromController() async {
+    if (connectionMode == ConnectionMode.bluetooth) {
+      return false;
+    }
+    try {
+      final response = await http
+          .get(_apiUri('/api/app-state'), headers: _apiHeaders())
+          .timeout(const Duration(seconds: 5));
+      if (response.statusCode < 200 || response.statusCode >= 300) return false;
+      final decoded = jsonDecode(response.body);
+      if (decoded is! Map || decoded['state'] is! Map) return false;
+      final state = Map<String, dynamic>.from(decoded['state'] as Map);
+      if (state.isEmpty) return false;
+      if (!isRemoteBrowser) {
+        // These values intentionally never leave the Raspberry browser.
+        state['settingsPassword'] = settingsPassword;
+        state['commercialLicenseCode'] = commercialLicenseCode;
+      }
+      final p = await SharedPreferences.getInstance();
+      await p.setString('machine_state', jsonEncode(state));
+      await load(skipConnect: true);
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<void> save() async {
+    notifyListeners();
+    final state = _persistentStateJson();
+    final p = await SharedPreferences.getInstance();
+    await p.setString('machine_state', jsonEncode(state));
+    if (connected && (!isRemoteBrowser || remoteAdminUnlocked)) {
+      unawaited(_syncAppStateToController());
+    }
   }
 
   double defaultSizeFor(DrinkCategory category) =>
@@ -5581,6 +5678,113 @@ class MachineStore extends ChangeNotifier {
         .toDouble();
   }
 
+  bool get isRemoteBrowser {
+    final host = Uri.base.host.toLowerCase().trim();
+    if (host.isEmpty) return false;
+    return host != '127.0.0.1' &&
+        host != 'localhost' &&
+        host != '::1' &&
+        host != '[::1]';
+  }
+
+  bool get remoteAdminUnlocked =>
+      _networkAdminToken.isNotEmpty &&
+      (_networkAdminExpiresAt == null ||
+          DateTime.now().isBefore(_networkAdminExpiresAt!));
+
+  Map<String, String> _apiHeaders({bool json = false}) {
+    final headers = <String, String>{};
+    if (json) headers['Content-Type'] = 'application/json';
+    if (remoteAdminUnlocked) {
+      headers['X-CocktailBot-Admin-Token'] = _networkAdminToken;
+    }
+    return headers;
+  }
+
+  Future<Map<String, dynamic>> refreshNetworkAccessStatus() async {
+    final response = await http
+        .get(_apiUri('/api/network/access'), headers: _apiHeaders())
+        .timeout(const Duration(seconds: 4));
+    final decoded = response.body.trim().isEmpty
+        ? <String, dynamic>{}
+        : jsonDecode(response.body);
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      final message = decoded is Map ? decoded['error']?.toString() : null;
+      throw Exception(message ?? 'Netzwerkstatus HTTP ${response.statusCode}');
+    }
+    if (decoded is! Map) {
+      throw Exception('Ungültige Netzwerkstatus-Antwort');
+    }
+    final data = Map<String, dynamic>.from(decoded);
+    networkAccessEnabled = data['lanEnabled'] == true;
+    networkAdminPinConfigured = data['adminPinConfigured'] == true;
+    networkAccessUrls = ((data['urls'] as List?) ?? const [])
+        .map((item) => item.toString())
+        .where((item) => item.isNotEmpty)
+        .toList();
+    notifyListeners();
+    return data;
+  }
+
+  Future<bool> unlockRemoteAdmin(String pin) async {
+    try {
+      final response = await http
+          .post(
+            _apiUri('/api/network/admin-login'),
+            headers: _apiHeaders(json: true),
+            body: jsonEncode({'pin': pin.trim()}),
+          )
+          .timeout(const Duration(seconds: 4));
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        return false;
+      }
+      final decoded = jsonDecode(response.body);
+      if (decoded is! Map || decoded['ok'] != true) return false;
+      _networkAdminToken = decoded['token']?.toString() ?? '';
+      final ttl = (decoded['expiresInSeconds'] as num?)?.toInt() ?? 1800;
+      _networkAdminExpiresAt = DateTime.now().add(Duration(seconds: ttl));
+      notifyListeners();
+      return remoteAdminUnlocked;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<Map<String, dynamic>> saveNetworkAccessSettings({
+    required bool enabled,
+    String adminPin = '',
+  }) async {
+    final response = await http
+        .post(
+          _apiUri('/api/network/access'),
+          headers: _apiHeaders(json: true),
+          body: jsonEncode({
+            'lanEnabled': enabled,
+            'adminPin': adminPin.trim(),
+          }),
+        )
+        .timeout(const Duration(seconds: 5));
+    final decoded = response.body.trim().isEmpty
+        ? <String, dynamic>{}
+        : jsonDecode(response.body);
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      final message = decoded is Map ? decoded['error']?.toString() : null;
+      throw Exception(message ?? 'Netzwerkeinstellungen HTTP ${response.statusCode}');
+    }
+    if (decoded is! Map) {
+      throw Exception('Ungültige Antwort der Netzwerkeinstellungen');
+    }
+    final data = Map<String, dynamic>.from(decoded);
+    networkAccessEnabled = data['lanEnabled'] == true;
+    networkAdminPinConfigured = data['adminPinConfigured'] == true;
+    networkAccessUrls = ((data['urls'] as List?) ?? const [])
+        .map((item) => item.toString())
+        .where((item) => item.isNotEmpty)
+        .toList();
+    notifyListeners();
+    return data;
+  }
+
   bool validateSettingsPassword(String value) {
     final entered = value.trim();
     if (entered.toLowerCase() == 'cocktailbot') {
@@ -5721,6 +5925,22 @@ class MachineStore extends ChangeNotifier {
     // Gesamtzaehler bleiben davon unberuehrt.
     if (consumptionHistory.length > 5000) {
       consumptionHistory.removeRange(0, consumptionHistory.length - 5000);
+    }
+  }
+
+  Future<void> _syncRemoteConsumptionEvent(ConsumptionRecord record) async {
+    if (!connected || !isRemoteBrowser || remoteAdminUnlocked) return;
+    try {
+      await http
+          .post(
+            _apiUri('/api/usage/record'),
+            headers: _apiHeaders(json: true),
+            body: jsonEncode({'record': record.toJson()}),
+          )
+          .timeout(const Duration(seconds: 5));
+    } catch (_) {
+      // Die Zubereitung selbst ist bereits abgeschlossen. Statistik-Sync darf
+      // deshalb niemals den erfolgreichen Cocktail nachträglich als Fehler markieren.
     }
   }
 
@@ -5917,7 +6137,7 @@ class MachineStore extends ChangeNotifier {
     final response = await http
         .post(
           _apiUri('/api/command'),
-          headers: const {'Content-Type': 'application/json'},
+          headers: _apiHeaders(json: true),
           body: jsonEncode(command),
         )
         .timeout(const Duration(seconds: 8));
@@ -6000,6 +6220,10 @@ class MachineStore extends ChangeNotifier {
     notifyListeners();
 
     if (connected) {
+      final sharedLoaded = await _loadSharedAppStateFromController();
+      if (!sharedLoaded && !isRemoteBrowser) {
+        await _syncAppStateToController();
+      }
       try {
         await sendLedSettings();
       } catch (_) {
@@ -6092,6 +6316,27 @@ class MachineStore extends ChangeNotifier {
       await sendCommand({
         'action': 'save_machine_state',
         'machineState': machineStateForController(),
+      });
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<bool> syncFillLevelsToController() async {
+    if (!connected || connectionMode == ConnectionMode.bluetooth) {
+      return false;
+    }
+
+    try {
+      await sendCommand({
+        'action': 'save_fill_state',
+        'pumps': pumps
+            .map((pump) => {
+                  'number': pump.number,
+                  'remainingMl': pump.remainingMl,
+                })
+            .toList(),
       });
       return true;
     } catch (_) {
@@ -6231,7 +6476,10 @@ class MachineStore extends ChangeNotifier {
     );
 
     await save();
-    await syncMachineStateToController();
+    if (consumptionHistory.isNotEmpty) {
+      await _syncRemoteConsumptionEvent(consumptionHistory.last);
+    }
+    await syncFillLevelsToController();
     notifyListeners();
   }
 }
@@ -8001,8 +8249,12 @@ class _SettingsLockGateState extends State<SettingsLockGate> {
     super.dispose();
   }
 
-  void _unlock() {
-    if (widget.store.validateSettingsPassword(passwordController.text)) {
+  Future<void> _unlock() async {
+    final success = widget.store.isRemoteBrowser
+        ? await widget.store.unlockRemoteAdmin(passwordController.text)
+        : widget.store.validateSettingsPassword(passwordController.text);
+    if (!mounted) return;
+    if (success) {
       setState(() {
         unlocked = true;
         passwordController.clear();
@@ -8011,13 +8263,22 @@ class _SettingsLockGateState extends State<SettingsLockGate> {
     }
 
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(tr('Falsches Passwort'))),
+      SnackBar(
+        content: Text(
+          tr(widget.store.isRemoteBrowser
+              ? 'Falscher Admin-PIN'
+              : 'Falsches Passwort'),
+        ),
+      ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    if (!widget.store.settingsLockEnabled || unlocked) {
+    final remote = widget.store.isRemoteBrowser;
+    if ((!remote && !widget.store.settingsLockEnabled) ||
+        unlocked ||
+        (remote && widget.store.remoteAdminUnlocked)) {
       return widget.child;
     }
 
@@ -8044,7 +8305,9 @@ class _SettingsLockGateState extends State<SettingsLockGate> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    tr('Bitte Passwort eingeben. Das Notfall-Passwort cocktailbot funktioniert immer.'),
+                    tr(remote
+                        ? 'Für Einstellungen vom Tablet oder PC bitte den Admin-PIN eingeben.'
+                        : 'Bitte Passwort eingeben. Das Notfall-Passwort cocktailbot funktioniert immer.'),
                     style: TextStyle(
                       color: widget.store.appColors.textSecondaryColor,
                       height: 1.35,
@@ -8054,17 +8317,18 @@ class _SettingsLockGateState extends State<SettingsLockGate> {
                   TextField(
                     controller: passwordController,
                     obscureText: true,
+                    keyboardType: remote ? TextInputType.number : null,
                     decoration: InputDecoration(
-                      labelText: tr('Passwort'),
+                      labelText: tr(remote ? 'Admin-PIN' : 'Passwort'),
                       prefixIcon: const Icon(Icons.password),
                     ),
-                    onSubmitted: (_) => _unlock(),
+                    onSubmitted: (_) { _unlock(); },
                   ),
                   const SizedBox(height: 14),
                   SizedBox(
                     width: double.infinity,
                     child: FilledButton.icon(
-                      onPressed: _unlock,
+                      onPressed: () { _unlock(); },
                       icon: const Icon(Icons.lock_open_outlined),
                       label: Text(tr('Entsperren')),
                     ),
@@ -8104,6 +8368,7 @@ class SettingsPage extends StatelessWidget {
 
     final items = [
       (store.t('settingsConnection'), store.connected ? tr('Raspberry Pi verbunden') : tr('Lokale GPIO-Steuerung'), Icons.wifi, accent, ConnectionPage(store: store)),
+      (tr('Netzwerk & Tablet'), tr('Zugriff im lokalen WLAN/LAN und Admin-PIN'), Icons.devices, secondary, NetworkAccessSettingsPage(store: store)),
       (store.t('settingsLanguage'), '${store.t('settingsLanguageSub')}: ${store.appLanguage.nativeName}', Icons.language, secondary, LanguageSettingsPage(store: store)),
       (store.t('settingsDesign'), store.t('settingsDesignSub'), Icons.palette_outlined, accent, ThemeSettingsPage(store: store)),
       (store.t('Anzeige'), store.t('Sortierung und Cocktails pro Seite einstellen'), Icons.grid_view_outlined, mixed, CocktailDisplaySettingsPage(store: store)),
@@ -8377,6 +8642,295 @@ class _ConnectionPageState extends State<ConnectionPage> {
 }
 
 
+
+
+class NetworkAccessSettingsPage extends StatefulWidget {
+  const NetworkAccessSettingsPage({super.key, required this.store});
+  final MachineStore store;
+
+  @override
+  State<NetworkAccessSettingsPage> createState() =>
+      _NetworkAccessSettingsPageState();
+}
+
+class _NetworkAccessSettingsPageState
+    extends State<NetworkAccessSettingsPage> {
+  final pinController = TextEditingController();
+  bool enabled = false;
+  bool pinConfigured = false;
+  bool loading = true;
+  bool saving = false;
+  String? error;
+  List<String> urls = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _refresh();
+  }
+
+  @override
+  void dispose() {
+    pinController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _refresh() async {
+    try {
+      final data = await widget.store.refreshNetworkAccessStatus();
+      if (!mounted) return;
+      setState(() {
+        enabled = data['lanEnabled'] == true;
+        pinConfigured = data['adminPinConfigured'] == true;
+        urls = ((data['urls'] as List?) ?? const [])
+            .map((item) => item.toString())
+            .where((item) => item.isNotEmpty)
+            .toList();
+        loading = false;
+        error = null;
+      });
+    } catch (exc) {
+      if (!mounted) return;
+      setState(() {
+        loading = false;
+        error = exc.toString().replaceFirst('Exception: ', '');
+      });
+    }
+  }
+
+  Future<void> _save() async {
+    final pin = pinController.text.trim();
+    if (enabled && !pinConfigured && pin.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(tr('Bitte zuerst einen Admin-PIN festlegen'))),
+      );
+      return;
+    }
+    if (pin.isNotEmpty && !RegExp(r'^\d{4,8}$').hasMatch(pin)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(tr('Admin-PIN muss aus 4 bis 8 Ziffern bestehen'))),
+      );
+      return;
+    }
+
+    setState(() => saving = true);
+    try {
+      final data = await widget.store.saveNetworkAccessSettings(
+        enabled: enabled,
+        adminPin: pin,
+      );
+      if (!mounted) return;
+      pinController.clear();
+      setState(() {
+        enabled = data['lanEnabled'] == true;
+        pinConfigured = data['adminPinConfigured'] == true;
+        urls = ((data['urls'] as List?) ?? const [])
+            .map((item) => item.toString())
+            .where((item) => item.isNotEmpty)
+            .toList();
+        saving = false;
+        error = null;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(tr('Netzwerkeinstellungen gespeichert'))),
+      );
+    } catch (exc) {
+      if (!mounted) return;
+      setState(() {
+        saving = false;
+        error = exc.toString().replaceFirst('Exception: ', '');
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = widget.store.appColors;
+    return PageFrame(
+      title: tr('Netzwerk & Tablet'),
+      child: ListView(
+        padding: const EdgeInsets.all(20),
+        children: [
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(18),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Icon(Icons.tablet_android, size: 30),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          tr('CocktailBot auf Tablet oder PC öffnen'),
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w900,
+                            fontSize: 18,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          tr('Der Zugriff funktioniert nur im gleichen lokalen WLAN/LAN. CocktailBot wird nicht für das Internet freigegeben.'),
+                          style: TextStyle(
+                            color: colors.textSecondaryColor,
+                            height: 1.35,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 14),
+          Card(
+            child: SwitchListTile(
+              value: enabled,
+              onChanged: loading || saving
+                  ? null
+                  : (value) => setState(() => enabled = value),
+              secondary: Icon(enabled ? Icons.lan : Icons.lan),
+              title: Text(tr('Zugriff im lokalen Netzwerk erlauben')),
+              subtitle: Text(
+                tr(enabled
+                    ? 'Tablet- und PC-Zugriff ist aktiviert.'
+                    : 'Nur der Raspberry selbst kann CocktailBot öffnen.'),
+              ),
+            ),
+          ),
+          const SizedBox(height: 14),
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(18),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    tr('Admin-PIN'),
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w900,
+                      fontSize: 18,
+                    ),
+                  ),
+                  const SizedBox(height: 7),
+                  Text(
+                    tr('Vom Tablet oder PC sind die Einstellungen nur nach Eingabe dieses PINs erreichbar. Cocktails können ohne Admin-PIN ausgewählt und zubereitet werden.'),
+                    style: TextStyle(
+                      color: colors.textSecondaryColor,
+                      height: 1.35,
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  TextField(
+                    controller: pinController,
+                    obscureText: true,
+                    keyboardType: TextInputType.number,
+                    maxLength: 8,
+                    decoration: InputDecoration(
+                      labelText: pinConfigured
+                          ? tr('Admin-PIN ändern')
+                          : tr('Admin-PIN festlegen'),
+                      helperText: pinConfigured
+                          ? tr('Leer lassen, wenn der vorhandene PIN bleiben soll')
+                          : tr('4 bis 8 Ziffern'),
+                      prefixIcon: const Icon(Icons.dialpad),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          if (enabled) ...[
+            const SizedBox(height: 14),
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(18),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      tr('Adresse für Tablet oder PC'),
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w900,
+                        fontSize: 18,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    if (urls.isEmpty)
+                      Text(tr('Keine Netzwerkadresse erkannt.'))
+                    else
+                      ...urls.map(
+                        (url) => Padding(
+                          padding: const EdgeInsets.only(top: 8),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: SelectableText(
+                                  url,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                              ),
+                              IconButton(
+                                tooltip: tr('Kopieren'),
+                                onPressed: () async {
+                                  await Clipboard.setData(ClipboardData(text: url));
+                                  if (!mounted) return;
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(content: Text(tr('Adresse kopiert'))),
+                                  );
+                                },
+                                icon: const Icon(Icons.copy_outlined),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+          if (error != null) ...[
+            const SizedBox(height: 14),
+            Card(
+              child: ListTile(
+                leading: Icon(Icons.error_outline, color: colors.errorColor),
+                title: Text(tr('Netzwerkfehler')),
+                subtitle: Text(error!),
+              ),
+            ),
+          ],
+          const SizedBox(height: 18),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton.icon(
+              onPressed: loading || saving ? null : _save,
+              icon: saving
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.save_outlined),
+              label: Text(tr(saving ? 'Speichere …' : 'Speichern')),
+            ),
+          ),
+          const SizedBox(height: 12),
+          TextButton.icon(
+            onPressed: loading ? null : _refresh,
+            icon: const Icon(Icons.refresh),
+            label: Text(tr('Netzwerkstatus aktualisieren')),
+          ),
+        ],
+      ),
+    );
+  }
+}
 
 class SecuritySettingsPage extends StatefulWidget {
   const SecuritySettingsPage({super.key, required this.store});
@@ -10276,6 +10830,18 @@ class FillLevelsPage extends StatefulWidget {
 }
 
 class _FillLevelsPageState extends State<FillLevelsPage> {
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_refreshPumpState());
+  }
+
+  Future<void> _refreshPumpState() async {
+    if (!widget.store.connected) return;
+    await widget.store.loadMachineStateFromController();
+    if (mounted) setState(() {});
+  }
+
   Future<void> _setLowStockWarning(int value) async {
     setState(() {
       widget.store.lowStockWarningPortions = value.clamp(1, 10).toInt();
@@ -11582,6 +12148,18 @@ class _ConsumptionStatisticsPageState extends State<ConsumptionStatisticsPage> {
   _StatisticsSort sort = _StatisticsSort.frequency;
 
   MachineStore get store => widget.store;
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_refreshSharedStatistics());
+  }
+
+  Future<void> _refreshSharedStatistics() async {
+    if (!store.connected) return;
+    await store._loadSharedAppStateFromController();
+    if (mounted) setState(() {});
+  }
 
   String _money(double value) =>
       '${value.toStringAsFixed(2).replaceAll('.', ',')} €';

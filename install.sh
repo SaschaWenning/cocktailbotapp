@@ -239,6 +239,8 @@ install_runtime() {
   cat > /etc/cocktailbot/cocktailbot.env <<ENV
 COCKTAILBOT_ACTIVE_HIGH=$ACTIVE_HIGH
 COCKTAILBOT_STATE_FILE=/var/lib/cocktailbot/machine_state.json
+COCKTAILBOT_APP_STATE_FILE=/var/lib/cocktailbot/app_state.json
+COCKTAILBOT_NETWORK_ACCESS_FILE=/var/lib/cocktailbot/network_access.json
 COCKTAILBOT_PICO_PORT=$PICO_PORT
 COCKTAILBOT_PICO_BAUD=$PICO_BAUD
 COCKTAILBOT_GPIO_CHIP=$GPIO_CHIP

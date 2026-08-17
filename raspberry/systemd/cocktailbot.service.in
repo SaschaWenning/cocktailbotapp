@@ -13,7 +13,7 @@ Environment=GPIOZERO_PIN_FACTORY=lgpio
 WorkingDirectory=/var/lib/cocktailbot
 EnvironmentFile=/etc/cocktailbot/cocktailbot.env
 EnvironmentFile=-/etc/cocktailbot/paypal.env
-ExecStart=/opt/cocktailbot/venv/bin/python /opt/cocktailbot/raspberry/cocktailbot_server.py --host 127.0.0.1 --port 8080 --web-root /opt/cocktailbot/web
+ExecStart=/opt/cocktailbot/venv/bin/python /opt/cocktailbot/raspberry/cocktailbot_server.py --host 0.0.0.0 --port 8080 --web-root /opt/cocktailbot/web
 Restart=on-failure
 RestartSec=2
 TimeoutStopSec=10

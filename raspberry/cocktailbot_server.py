@@ -20,11 +20,15 @@ import atexit
 import base64
 import glob
 import hashlib
+import hmac
+import ipaddress
 import json
 import os
 import io
 import re
+import secrets
 import signal
+import socket
 import sqlite3
 import subprocess
 import threading
@@ -179,6 +183,19 @@ PAYPAL_TIMEOUT_SECONDS = float(os.getenv("COCKTAILBOT_PAYPAL_TIMEOUT_SECONDS", "
 KIOSK_STOP_FILE = Path(
     os.getenv("COCKTAILBOT_KIOSK_STOP_FILE", "/var/lib/cocktailbot/kiosk.stop")
 )
+NETWORK_ACCESS_FILE = Path(
+    os.getenv(
+        "COCKTAILBOT_NETWORK_ACCESS_FILE",
+        "/var/lib/cocktailbot/network_access.json",
+    )
+)
+APP_STATE_FILE = Path(
+    os.getenv(
+        "COCKTAILBOT_APP_STATE_FILE",
+        "/var/lib/cocktailbot/app_state.json",
+    )
+)
+NETWORK_ADMIN_TOKEN_TTL_SECONDS = 30 * 60
 LICENSE_FILE = Path(
     os.getenv("COCKTAILBOT_LICENSE_FILE", "/var/lib/cocktailbot/license.json")
 )
@@ -192,6 +209,200 @@ LICENSE_PREFIX = "CBL1-"
 LICENSE_TYPE = "COMMERCIAL"
 LICENSE_PROTOCOL_VERSION = 1
 
+
+
+class NetworkAccessManager:
+    """Persist LAN access securely without storing the admin PIN in plaintext."""
+
+    def __init__(self) -> None:
+        self._lock = threading.RLock()
+        self._tokens: dict[str, float] = {}
+        self.lan_enabled = False
+        self.pin_salt = ""
+        self.pin_hash = ""
+        self._load()
+
+    def _load(self) -> None:
+        try:
+            data = json.loads(NETWORK_ACCESS_FILE.read_text(encoding="utf-8"))
+        except (FileNotFoundError, json.JSONDecodeError, OSError):
+            data = {}
+        if not isinstance(data, dict):
+            data = {}
+        self.lan_enabled = data.get("lanEnabled") is True
+        self.pin_salt = str(data.get("pinSalt", ""))
+        self.pin_hash = str(data.get("pinHash", ""))
+        # Never expose LAN access without a configured PIN.
+        if self.lan_enabled and not self.has_pin:
+            self.lan_enabled = False
+
+    @property
+    def has_pin(self) -> bool:
+        return bool(self.pin_salt and self.pin_hash)
+
+    @staticmethod
+    def _validate_pin_format(pin: str) -> str:
+        cleaned = pin.strip()
+        if not re.fullmatch(r"\d{4,8}", cleaned):
+            raise ValidationError("Admin-PIN muss aus 4 bis 8 Ziffern bestehen")
+        return cleaned
+
+    @staticmethod
+    def _derive_pin_hash(pin: str, salt_hex: str) -> str:
+        salt = bytes.fromhex(salt_hex)
+        return hashlib.pbkdf2_hmac(
+            "sha256",
+            pin.encode("utf-8"),
+            salt,
+            180_000,
+        ).hex()
+
+    def _save(self) -> None:
+        NETWORK_ACCESS_FILE.parent.mkdir(parents=True, exist_ok=True)
+        temp = NETWORK_ACCESS_FILE.with_suffix(".tmp")
+        temp.write_text(
+            json.dumps(
+                {
+                    "lanEnabled": self.lan_enabled,
+                    "pinSalt": self.pin_salt,
+                    "pinHash": self.pin_hash,
+                },
+                ensure_ascii=False,
+                separators=(",", ":"),
+            ),
+            encoding="utf-8",
+        )
+        os.chmod(temp, 0o600)
+        temp.replace(NETWORK_ACCESS_FILE)
+        os.chmod(NETWORK_ACCESS_FILE, 0o600)
+
+    def configure(self, *, lan_enabled: bool, admin_pin: str = "") -> None:
+        with self._lock:
+            cleaned = admin_pin.strip()
+            if cleaned:
+                cleaned = self._validate_pin_format(cleaned)
+                self.pin_salt = secrets.token_hex(16)
+                self.pin_hash = self._derive_pin_hash(cleaned, self.pin_salt)
+                self._tokens.clear()
+            if lan_enabled and not self.has_pin:
+                raise ValidationError(
+                    "Für den Netzwerkzugriff muss zuerst ein Admin-PIN festgelegt werden"
+                )
+            self.lan_enabled = bool(lan_enabled)
+            self._save()
+
+    def verify_pin(self, pin: str) -> bool:
+        with self._lock:
+            if not self.has_pin:
+                return False
+            try:
+                cleaned = self._validate_pin_format(pin)
+                candidate = self._derive_pin_hash(cleaned, self.pin_salt)
+            except (ValidationError, ValueError):
+                return False
+            return hmac.compare_digest(candidate, self.pin_hash)
+
+    def create_token(self, pin: str) -> str | None:
+        if not self.verify_pin(pin):
+            return None
+        token = secrets.token_urlsafe(32)
+        with self._lock:
+            now = time.monotonic()
+            self._tokens = {
+                key: expires
+                for key, expires in self._tokens.items()
+                if expires > now
+            }
+            self._tokens[token] = now + NETWORK_ADMIN_TOKEN_TTL_SECONDS
+        return token
+
+    def valid_token(self, token: str) -> bool:
+        if not token:
+            return False
+        with self._lock:
+            expires = self._tokens.get(token)
+            if expires is None:
+                return False
+            if expires <= time.monotonic():
+                self._tokens.pop(token, None)
+                return False
+            return True
+
+    def revoke_token(self, token: str) -> None:
+        with self._lock:
+            self._tokens.pop(token, None)
+
+    @staticmethod
+    def local_ipv4_addresses() -> list[str]:
+        addresses: set[str] = set()
+        try:
+            result = subprocess.run(
+                ["hostname", "-I"],
+                check=False,
+                capture_output=True,
+                text=True,
+                timeout=2,
+            )
+            if result.returncode == 0:
+                for item in result.stdout.split():
+                    try:
+                        address = ipaddress.ip_address(item.split("%", 1)[0])
+                    except ValueError:
+                        continue
+                    if (
+                        address.version == 4
+                        and not address.is_loopback
+                        and (address.is_private or address.is_link_local)
+                    ):
+                        addresses.add(str(address))
+        except (FileNotFoundError, OSError, subprocess.TimeoutExpired):
+            pass
+
+        if not addresses:
+            try:
+                for info in socket.getaddrinfo(socket.gethostname(), None, socket.AF_INET):
+                    item = info[4][0]
+                    address = ipaddress.ip_address(item)
+                    if (
+                        not address.is_loopback
+                        and (address.is_private or address.is_link_local)
+                    ):
+                        addresses.add(str(address))
+            except (OSError, ValueError):
+                pass
+        return sorted(addresses)
+
+    def public_status(self, *, client_is_local: bool, port: int) -> dict[str, Any]:
+        addresses = self.local_ipv4_addresses()
+        return {
+            "ok": True,
+            "lanEnabled": self.lan_enabled,
+            "adminPinConfigured": self.has_pin,
+            "clientIsLocal": client_is_local,
+            "adminTokenTtlSeconds": NETWORK_ADMIN_TOKEN_TTL_SECONDS,
+            "addresses": addresses,
+            "urls": [f"http://{address}:{port}" for address in addresses],
+        }
+
+
+def _request_address() -> ipaddress._BaseAddress | None:
+    raw = (request.remote_addr or "").split("%", 1)[0].strip()
+    if not raw:
+        return None
+    try:
+        return ipaddress.ip_address(raw)
+    except ValueError:
+        return None
+
+
+def _request_is_local() -> bool:
+    address = _request_address()
+    return bool(address and address.is_loopback)
+
+
+def _request_is_private_lan() -> bool:
+    address = _request_address()
+    return bool(address and (address.is_private or address.is_link_local))
 
 
 def desktop_environment() -> dict[str, str]:
@@ -1505,10 +1716,32 @@ def build_recipe_job(payload: dict[str, Any]) -> PumpJob:
     return PumpJob("prepare_recipe", "overlapping", tuple(steps), total)
 
 
+
+def load_app_state() -> dict[str, Any]:
+    try:
+        data = json.loads(APP_STATE_FILE.read_text(encoding="utf-8"))
+    except (FileNotFoundError, json.JSONDecodeError, OSError):
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+def save_app_state(state: dict[str, Any]) -> None:
+    APP_STATE_FILE.parent.mkdir(parents=True, exist_ok=True)
+    temp = APP_STATE_FILE.with_suffix(".tmp")
+    temp.write_text(
+        json.dumps(state, ensure_ascii=False, separators=(",", ":")),
+        encoding="utf-8",
+    )
+    os.chmod(temp, 0o600)
+    temp.replace(APP_STATE_FILE)
+    os.chmod(APP_STATE_FILE, 0o600)
+
+
 def create_app(controller: PumpController, web_root: Path) -> Flask:
     app = Flask(__name__, static_folder=None)
     payment = PaypalPaymentBackend()
     licensing = LicenseManager()
+    network_access = NetworkAccessManager()
     usb_image_cache: dict[str, Path] = {}
 
     def usb_scan_roots() -> list[Path]:
@@ -1622,15 +1855,326 @@ def create_app(controller: PumpController, web_root: Path) -> Flask:
             ), 403
         return None
 
+    def remote_admin_authorized() -> bool:
+        if _request_is_local():
+            return True
+        token = request.headers.get("X-CocktailBot-Admin-Token", "").strip()
+        if not token:
+            token = request.cookies.get("cocktailbot_admin", "").strip()
+        return network_access.valid_token(token)
+
+    def network_blocked(message: str, *, disabled: bool = False):
+        if request.path.startswith("/api/"):
+            return jsonify(
+                ok=False,
+                error=message,
+                networkAccessDisabled=disabled,
+            ), 403
+        detail = (
+            "Öffne CocktailBot direkt am Raspberry und aktiviere unter "
+            "Einstellungen → Netzwerk & Tablet den Zugriff im lokalen Netzwerk."
+            if disabled
+            else "CocktailBot akzeptiert nur Verbindungen aus einem privaten lokalen Netzwerk."
+        )
+        return (
+            "<!doctype html><html lang='de'><head><meta charset='utf-8'>"
+            "<meta name='viewport' content='width=device-width,initial-scale=1'>"
+            "<title>CocktailBot – Netzwerkzugriff</title></head>"
+            "<body style='margin:0;background:#080808;color:#f4f4f4;font-family:sans-serif;"
+            "display:grid;place-items:center;min-height:100vh'>"
+            "<main style='max-width:620px;padding:28px;border:1px solid #3a3a3a;"
+            "border-radius:18px;background:#151515'>"
+            "<h1 style='margin-top:0;color:#b7ff00'>CocktailBot</h1>"
+            f"<h2>{message}</h2><p style='line-height:1.5'>{detail}</p>"
+            "</main></body></html>",
+            403,
+            {"Content-Type": "text/html; charset=utf-8"},
+        )
+
+    @app.before_request
+    def enforce_lan_access():  # type: ignore[no-untyped-def]
+        if request.method == "OPTIONS":
+            return None
+        if _request_is_local():
+            return None
+        # Never accept requests forwarded directly from a public Internet IP.
+        if not _request_is_private_lan():
+            return network_blocked("CocktailBot ist nur im lokalen Netzwerk erreichbar")
+        if not network_access.lan_enabled:
+            return network_blocked(
+                "Netzwerkzugriff ist am CocktailBot deaktiviert",
+                disabled=True,
+            )
+
+        path = request.path
+        protected_exact = {
+            "/api/network/access",
+            "/api/network/admin-logout",
+            "/api/license/activate",
+            "/api/license/deactivate",
+            "/api/payment/test",
+            "/api/payment/config",
+            "/api/kiosk/exit",
+        }
+        protected_prefixes = (
+            "/api/images/",
+            "/api/keyboard/",
+        )
+        needs_admin = path in protected_exact or any(
+            path.startswith(prefix) for prefix in protected_prefixes
+        )
+
+        if path == "/api/app-state" and request.method == "POST":
+            needs_admin = True
+
+        if path == "/api/command" and request.method == "POST":
+            payload = request.get_json(silent=True)
+            action = str(payload.get("action", "")) if isinstance(payload, dict) else ""
+            if action in {
+                "set_led",
+                "save_machine_state",
+                "run_pump",
+                "prime",
+                "clean",
+            }:
+                needs_admin = True
+
+        # Login and read-only network status must stay reachable before login.
+        if path == "/api/network/admin-login" or (
+            path == "/api/network/access" and request.method == "GET"
+        ):
+            needs_admin = False
+
+        if needs_admin and not remote_admin_authorized():
+            return jsonify(
+                ok=False,
+                error="Admin-PIN erforderlich",
+                adminPinRequired=True,
+            ), 401
+        return None
+
     @app.after_request
     def add_cors_headers(response):  # type: ignore[no-untyped-def]
         response.headers["Access-Control-Allow-Origin"] = "*"
         response.headers["Access-Control-Allow-Methods"] = "GET,POST,OPTIONS"
-        response.headers["Access-Control-Allow-Headers"] = "Content-Type"
+        response.headers["Access-Control-Allow-Headers"] = "Content-Type, X-CocktailBot-Admin-Token"
         # Lokaler Kiosk: keine alten Flutter-/500-Seiten nach einem Update cachen.
         response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
         response.headers["Pragma"] = "no-cache"
         response.headers["Expires"] = "0"
+        return response
+
+    @app.get("/api/app-state")
+    def api_app_state_get():
+        return jsonify(ok=True, state=load_app_state())
+
+    @app.route("/api/app-state", methods=["POST", "OPTIONS"])
+    def api_app_state_update():
+        if request.method == "OPTIONS":
+            return ("", 204)
+        # Local kiosk writes are always allowed. Remote writes reach this
+        # endpoint only after successful Admin-PIN authentication.
+        payload = request.get_json(silent=True)
+        if not isinstance(payload, dict):
+            return jsonify(ok=False, error="Ungültiges JSON"), 400
+        state = payload.get("state")
+        if not isinstance(state, dict):
+            return jsonify(ok=False, error="state fehlt oder ist ungültig"), 400
+        state = dict(state)
+        existing = load_app_state()
+        internal_usage_ids = existing.get("_lanUsageEventIds") if isinstance(existing, dict) else None
+        if isinstance(internal_usage_ids, list):
+            state["_lanUsageEventIds"] = internal_usage_ids[-1000:]
+        save_app_state(state)
+        return jsonify(ok=True, bytes=len(json.dumps(state, ensure_ascii=False)))
+
+    @app.route("/api/usage/record", methods=["POST", "OPTIONS"])
+    def api_usage_record():
+        if request.method == "OPTIONS":
+            return ("", 204)
+        payload = request.get_json(silent=True)
+        if not isinstance(payload, dict):
+            return jsonify(ok=False, error="Ungültiges JSON"), 400
+        record = payload.get("record")
+        if not isinstance(record, dict):
+            return jsonify(ok=False, error="record fehlt oder ist ungültig"), 400
+
+        recipe_id = str(record.get("recipeId", "")).strip()
+        if not recipe_id:
+            return jsonify(ok=False, error="recipeId fehlt"), 400
+        try:
+            size_ml = float(record.get("sizeMl", 0))
+        except (TypeError, ValueError):
+            return jsonify(ok=False, error="sizeMl ist ungültig"), 400
+        if size_ml <= 0 or size_ml > 5000:
+            return jsonify(ok=False, error="sizeMl ist außerhalb des gültigen Bereichs"), 400
+
+        raw_amounts = record.get("ingredientAmountsMl")
+        if not isinstance(raw_amounts, dict):
+            return jsonify(ok=False, error="ingredientAmountsMl fehlt"), 400
+        amounts: dict[str, float] = {}
+        try:
+            for key, value in raw_amounts.items():
+                ingredient_id = str(key).strip()
+                amount = float(value)
+                if not ingredient_id or amount < 0 or amount > 5000:
+                    raise ValueError
+                amounts[ingredient_id] = amount
+        except (TypeError, ValueError):
+            return jsonify(ok=False, error="Ungültige Zutatenmenge"), 400
+
+        canonical = json.dumps(record, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+        event_id = hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+        state = load_app_state()
+        if not state:
+            return jsonify(ok=False, error="CocktailBot-App-Status ist noch nicht initialisiert"), 409
+
+        seen = state.get("_lanUsageEventIds")
+        if not isinstance(seen, list):
+            seen = []
+        seen_ids = [str(item) for item in seen]
+        if event_id in seen_ids:
+            return jsonify(ok=True, duplicate=True, eventId=event_id)
+
+        recipe_counts = state.get("recipeDrinkCounts")
+        if not isinstance(recipe_counts, dict):
+            recipe_counts = {}
+        recipe_counts[recipe_id] = int(recipe_counts.get(recipe_id, 0) or 0) + 1
+        state["recipeDrinkCounts"] = recipe_counts
+
+        size_key = f"{round(size_ml)} ml"
+        size_counts = state.get("servingSizeCounts")
+        if not isinstance(size_counts, dict):
+            size_counts = {}
+        size_counts[size_key] = int(size_counts.get(size_key, 0) or 0) + 1
+        state["servingSizeCounts"] = size_counts
+
+        usage = state.get("ingredientUsageMl")
+        if not isinstance(usage, dict):
+            usage = {}
+        for ingredient_id, amount in amounts.items():
+            try:
+                current = float(usage.get(ingredient_id, 0) or 0)
+            except (TypeError, ValueError):
+                current = 0.0
+            usage[ingredient_id] = current + amount
+        state["ingredientUsageMl"] = usage
+
+        inventory = state.get("shoppingInventoryMl")
+        if isinstance(inventory, dict):
+            for ingredient_id, amount in amounts.items():
+                if ingredient_id not in inventory:
+                    continue
+                try:
+                    current = float(inventory.get(ingredient_id, 0) or 0)
+                except (TypeError, ValueError):
+                    current = 0.0
+                inventory[ingredient_id] = max(0.0, current - amount)
+            state["shoppingInventoryMl"] = inventory
+
+        party_session_id = str(record.get("partySessionId") or "").strip()
+        sessions = state.get("partySessions")
+        if party_session_id and isinstance(sessions, list):
+            for session in sessions:
+                if not isinstance(session, dict) or str(session.get("id", "")) != party_session_id:
+                    continue
+                drink_counts = session.get("drinkCounts")
+                if not isinstance(drink_counts, dict):
+                    drink_counts = {}
+                drink_counts[recipe_id] = int(drink_counts.get(recipe_id, 0) or 0) + 1
+                session["drinkCounts"] = drink_counts
+                party_size_counts = session.get("sizeCounts")
+                if not isinstance(party_size_counts, dict):
+                    party_size_counts = {}
+                party_size_counts[size_key] = int(party_size_counts.get(size_key, 0) or 0) + 1
+                session["sizeCounts"] = party_size_counts
+                break
+            state["partySessions"] = sessions
+
+        history = state.get("consumptionHistory")
+        if not isinstance(history, list):
+            history = []
+        history.append(record)
+        if len(history) > 5000:
+            history = history[-5000:]
+        state["consumptionHistory"] = history
+
+        seen_ids.append(event_id)
+        state["_lanUsageEventIds"] = seen_ids[-1000:]
+        state["sharedAt"] = datetime.now(timezone.utc).isoformat()
+        save_app_state(state)
+        return jsonify(ok=True, duplicate=False, eventId=event_id)
+
+    @app.get("/api/network/access")
+    def api_network_access():
+        try:
+            port = int(request.environ.get("SERVER_PORT", 8080))
+        except (TypeError, ValueError):
+            port = 8080
+        return jsonify(
+            network_access.public_status(
+                client_is_local=_request_is_local(),
+                port=port,
+            )
+        )
+
+    @app.route("/api/network/access", methods=["POST", "OPTIONS"])
+    def api_network_access_update():
+        if request.method == "OPTIONS":
+            return ("", 204)
+        payload = request.get_json(silent=True)
+        if not isinstance(payload, dict):
+            return jsonify(ok=False, error="Ungültiges JSON"), 400
+        try:
+            network_access.configure(
+                lan_enabled=payload.get("lanEnabled") is True,
+                admin_pin=str(payload.get("adminPin", "")),
+            )
+            port = int(request.environ.get("SERVER_PORT", 8080))
+            return jsonify(
+                network_access.public_status(
+                    client_is_local=_request_is_local(),
+                    port=port,
+                )
+            )
+        except ValidationError as exc:
+            return jsonify(ok=False, error=str(exc)), 400
+
+    @app.route("/api/network/admin-login", methods=["POST", "OPTIONS"])
+    def api_network_admin_login():
+        if request.method == "OPTIONS":
+            return ("", 204)
+        payload = request.get_json(silent=True)
+        if not isinstance(payload, dict):
+            return jsonify(ok=False, error="Ungültiges JSON"), 400
+        token = network_access.create_token(str(payload.get("pin", "")))
+        if token is None:
+            return jsonify(ok=False, error="Falscher Admin-PIN"), 401
+        response = jsonify(
+            ok=True,
+            token=token,
+            expiresInSeconds=NETWORK_ADMIN_TOKEN_TTL_SECONDS,
+        )
+        response.set_cookie(
+            "cocktailbot_admin",
+            token,
+            max_age=NETWORK_ADMIN_TOKEN_TTL_SECONDS,
+            httponly=True,
+            samesite="Strict",
+            secure=False,
+        )
+        return response
+
+    @app.route("/api/network/admin-logout", methods=["POST", "OPTIONS"])
+    def api_network_admin_logout():
+        if request.method == "OPTIONS":
+            return ("", 204)
+        token = request.headers.get("X-CocktailBot-Admin-Token", "").strip()
+        if not token:
+            token = request.cookies.get("cocktailbot_admin", "").strip()
+        network_access.revoke_token(token)
+        response = jsonify(ok=True)
+        response.delete_cookie("cocktailbot_admin")
         return response
 
     @app.get("/api/status")
@@ -1821,6 +2365,66 @@ def create_app(controller: PumpController, web_root: Path) -> Flask:
                 controller.save_machine_state(state)
                 return jsonify(ok=True, action=action, bytes=len(json.dumps(state)))
 
+            if action == "save_fill_state":
+                pump_updates = payload.get("pumps")
+                if not isinstance(pump_updates, list):
+                    raise ValidationError("pumps fehlt oder ist ungültig")
+                with controller._lock:
+                    state = dict(controller.machine_state)
+                current_pumps = state.get("pumps")
+                if not isinstance(current_pumps, list):
+                    current_pumps = []
+                by_number: dict[int, dict[str, Any]] = {}
+                for item in current_pumps:
+                    if not isinstance(item, dict):
+                        continue
+                    try:
+                        number = int(item.get("number", 0))
+                    except (TypeError, ValueError):
+                        continue
+                    if 1 <= number <= PUMP_COUNT:
+                        by_number[number] = dict(item)
+                for update in pump_updates:
+                    if not isinstance(update, dict):
+                        continue
+                    number = as_int(update.get("number"), "number")
+                    if number < 1 or number > PUMP_COUNT:
+                        raise ValidationError("Ungültige Pumpennummer")
+                    try:
+                        remaining = float(update.get("remainingMl", 0))
+                    except (TypeError, ValueError) as exc:
+                        raise ValidationError("remainingMl ist ungültig") from exc
+                    remaining = max(0.0, min(100000.0, remaining))
+                    item = by_number.get(number, {"number": number})
+                    item["remainingMl"] = remaining
+                    by_number[number] = item
+                state["pumps"] = [by_number[n] for n in sorted(by_number)]
+                controller.save_machine_state(state)
+
+                # Keep the read-only LAN snapshot's fill levels in step as well.
+                shared = load_app_state()
+                shared_pumps = shared.get("pumps") if isinstance(shared, dict) else None
+                if isinstance(shared_pumps, list):
+                    shared_by_number: dict[int, dict[str, Any]] = {}
+                    for item in shared_pumps:
+                        if not isinstance(item, dict):
+                            continue
+                        try:
+                            number = int(item.get("number", 0))
+                        except (TypeError, ValueError):
+                            continue
+                        if 1 <= number <= PUMP_COUNT:
+                            shared_by_number[number] = dict(item)
+                    for number, item in by_number.items():
+                        target = shared_by_number.get(number)
+                        if target is not None and "remainingMl" in item:
+                            target["remainingMl"] = item["remainingMl"]
+                    shared["pumps"] = [
+                        shared_by_number[n] for n in sorted(shared_by_number)
+                    ]
+                    save_app_state(shared)
+                return jsonify(ok=True, action=action, pumpCount=len(by_number))
+
             if action in {"stop", "all_off"}:
                 controller.stop("Not-Aus")
                 return jsonify(ok=True, action="stop", message="Alle Pumpen ausgeschaltet")
@@ -1985,7 +2589,7 @@ def create_app(controller: PumpController, web_root: Path) -> Flask:
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--host", default="127.0.0.1")
+    parser.add_argument("--host", default="0.0.0.0")
     parser.add_argument("--port", type=int, default=8080)
     parser.add_argument("--web-root", type=Path, default=Path("/opt/cocktailbot/web"))
     args = parser.parse_args()

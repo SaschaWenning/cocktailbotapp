@@ -250,3 +250,15 @@ Der private Signierschlüssel gehört ausschließlich in den Lizenzgenerator und
 ## Offline-Image-Build (V26)
 
 Für den CocktailBot-Master-Image-Builder unterstützt `install.sh` den Schalter `--image-build`. Dabei werden Dateien, Dienste, Kiosk und Displaykonfiguration vollständig vorbereitet, aber der CocktailBot-Dienst und GPIO-Hardwaretest nicht im Chroot gestartet. Auf dem echten Raspberry Pi wird `pinctrl-rp1` anschließend beim Serverstart automatisch erkannt.
+
+## LAN-/Tablet-Zugriff (V29)
+
+Der lokale Raspberry-Kiosk bleibt unter `http://127.0.0.1:8080` erreichbar. Externe Geräte sind standardmäßig gesperrt.
+
+1. CocktailBot am Raspberry öffnen.
+2. **Einstellungen → Netzwerk & Tablet** öffnen.
+3. Einen **4- bis 8-stelligen Admin-PIN** festlegen.
+4. **Zugriff im lokalen Netzwerk erlauben** aktivieren und speichern.
+5. Eine der angezeigten Adressen, z. B. `http://192.168.178.45:8080`, auf Tablet oder PC im selben WLAN/LAN öffnen.
+
+Cocktails können auf einem freigegebenen Tablet normal ausgewählt und zubereitet werden. Beim Öffnen der Einstellungen von einem externen Gerät wird der Admin-PIN verlangt. Kritische Remote-Aktionen werden zusätzlich im Raspberry-Backend geprüft. Die Freigabe ist ausschließlich für private/lokale Netze gedacht und ersetzt keine sichere Internet-Freigabe, VPN- oder Reverse-Proxy-Konfiguration.
