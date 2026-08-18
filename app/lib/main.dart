@@ -10,6 +10,10 @@ import 'package:http/http.dart' as http;
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+const int _cocktailBotUsageNoticeVersion = 1;
+const String _cocktailBotUsageNoticePreferenceKey =
+    'cocktailbot_usage_notice_hidden_version';
+
 void main() => runApp(const CocktailMachineApp());
 
 class CocktailMachineApp extends StatefulWidget {
@@ -286,7 +290,7 @@ class _CocktailMachineAppState extends State<CocktailMachineApp> {
         themeMode: store.darkMode ? ThemeMode.dark : ThemeMode.light,
         theme: buildTheme(Brightness.light, store.appColors),
         darkTheme: buildTheme(Brightness.dark, store.appColors),
-        home: HomeShell(store: store),
+        home: StartupLicenseGate(store: store),
         builder: (context, child) {
           return Stack(
             children: [
@@ -2653,6 +2657,35 @@ String appText(AppLanguage language, String key) {
     'Cocktails im Detail': 'Cocktails in detail',
     'Häufigkeit': 'Frequency',
     'Kosten': 'Cost',
+    'Info & Lizenz': 'Info & license',
+    'Copyright, Kontakt und Nutzungsbedingungen': 'Copyright, contact and terms of use',
+    'Lizenz- und Nutzungshinweis': 'License and usage notice',
+    'Private Nutzung ohne Gewerbelizenz': 'Private use without a commercial license',
+    'Die Nutzung von CocktailBot und der damit betriebenen Maschine ist ohne aktive Gewerbelizenz ausschließlich für private und nicht-kommerzielle Zwecke erlaubt.': 'Use of CocktailBot and the machine operated with it is permitted without an active commercial license only for private, non-commercial purposes.',
+    'Eine gewerbliche Nutzung – zum Beispiel in der Gastronomie, in Unternehmen, auf gewerblichen Veranstaltungen oder zur entgeltlichen Abgabe von Getränken – ist ohne entsprechende Gewerbelizenz nicht gestattet.': 'Commercial use – for example in hospitality, businesses, commercial events or for serving drinks for payment – is not permitted without the appropriate commercial license.',
+    'Für eine gewerbliche Nutzung ist eine gültige Printcore-Gewerbelizenz erforderlich.': 'A valid Printcore commercial license is required for commercial use.',
+    'Mit „Akzeptieren“ bestätigst du, dass du diesen Hinweis gelesen hast und CocktailBot ohne Gewerbelizenz nicht gewerblich nutzt.': 'By selecting “Accept”, you confirm that you have read this notice and will not use CocktailBot commercially without a commercial license.',
+    'Diesen Hinweis nicht mehr anzeigen': 'Do not show this notice again',
+    'Ablehnen': 'Decline',
+    'Akzeptieren': 'Accept',
+    'Nutzung nicht akzeptiert': 'Usage terms not accepted',
+    'Die Nutzung wurde nicht akzeptiert. Bitte schließe dieses Browserfenster. Die CocktailBot-Maschine wurde nicht beendet.': 'The usage notice was not accepted. Please close this browser window. The CocktailBot machine was not shut down.',
+    'CocktailBot wird beendet …': 'CocktailBot is closing …',
+    'CocktailBot konnte nicht automatisch beendet werden. Die Anwendung bleibt gesperrt.': 'CocktailBot could not be closed automatically. The application remains locked.',
+    'Entwicklung & Copyright': 'Development & copyright',
+    'Alle Rechte vorbehalten.': 'All rights reserved.',
+    'Kontakt': 'Contact',
+    'Nutzungsrecht': 'Right of use',
+    'Ohne Gewerbelizenz': 'Without commercial license',
+    'Nur private und nicht-kommerzielle Nutzung': 'Private, non-commercial use only',
+    'Mit gültiger Gewerbelizenz': 'With a valid commercial license',
+    'Gewerbliche Nutzung gemäß Lizenzumfang erlaubt': 'Commercial use permitted within the scope of the license',
+    'Als gewerbliche Nutzung gilt insbesondere der Einsatz im Rahmen eines Unternehmens, Gewerbes, einer Gastronomie, eines Caterings, einer gewerblichen Veranstaltung oder die entgeltliche Abgabe von Getränken oder Dienstleistungen.': 'Commercial use includes, in particular, use within a business, trade, hospitality operation, catering service, commercial event, or the provision of drinks or services for payment.',
+    'Die Software und die zugehörigen Inhalte sind urheberrechtlich geschützt. Eine unerlaubte Vervielfältigung, Weitergabe, Veröffentlichung oder kommerzielle Nutzung außerhalb des eingeräumten Lizenzumfangs ist nicht gestattet.': 'The software and associated content are protected by copyright. Unauthorized reproduction, distribution, publication or commercial use outside the granted license scope is not permitted.',
+    'Aktueller Lizenzstatus': 'Current license status',
+    'Gewerbelizenz verwalten': 'Manage commercial license',
+    'Start-Hinweis wieder anzeigen': 'Show startup notice again',
+    'Der Lizenz- und Nutzungshinweis wird beim nächsten Start wieder angezeigt.': 'The license and usage notice will be shown again the next time CocktailBot starts.',
     'Zuletzt': 'Most recent',
     'Heute': 'Today',
     '7 Tage': '7 days',
@@ -6486,6 +6519,330 @@ class MachineStore extends ChangeNotifier {
 
 extension FirstOrNull<E> on Iterable<E> { E? get firstOrNull => isEmpty ? null : first; }
 
+class StartupLicenseGate extends StatefulWidget {
+  const StartupLicenseGate({super.key, required this.store});
+
+  final MachineStore store;
+
+  @override
+  State<StartupLicenseGate> createState() => _StartupLicenseGateState();
+}
+
+class _StartupLicenseGateState extends State<StartupLicenseGate> {
+  bool _preferenceLoaded = false;
+  bool _acceptedForSession = false;
+  bool _doNotShowAgain = false;
+  bool _closing = false;
+  bool _rejected = false;
+  bool _closeFailed = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadPreference();
+  }
+
+  Future<void> _loadPreference() async {
+    final preferences = await SharedPreferences.getInstance();
+    final hiddenVersion =
+        preferences.getInt(_cocktailBotUsageNoticePreferenceKey) ?? 0;
+    if (!mounted) return;
+    setState(() {
+      _acceptedForSession = hiddenVersion >= _cocktailBotUsageNoticeVersion;
+      _preferenceLoaded = true;
+    });
+  }
+
+  Future<void> _accept() async {
+    if (_doNotShowAgain) {
+      final preferences = await SharedPreferences.getInstance();
+      await preferences.setInt(
+        _cocktailBotUsageNoticePreferenceKey,
+        _cocktailBotUsageNoticeVersion,
+      );
+    }
+    if (!mounted) return;
+    setState(() => _acceptedForSession = true);
+  }
+
+  Future<void> _decline() async {
+    if (_closing || _rejected) return;
+
+    // Ein entfernter Browser darf beim Ablehnen niemals den Chromium-Kiosk
+    // auf dem Raspberry beenden. Dort sperren wir stattdessen nur diese
+    // Browser-Sitzung. Am Raspberry selbst wird der bestehende Kiosk-Exit-
+    // Endpunkt verwendet und Chromium sauber geschlossen.
+    if (widget.store.isRemoteBrowser) {
+      setState(() => _rejected = true);
+      return;
+    }
+
+    setState(() => _closing = true);
+    final closed = await widget.store.closeKioskApp();
+    if (!mounted || closed) return;
+    setState(() {
+      _closing = false;
+      _rejected = true;
+      _closeFailed = true;
+    });
+  }
+
+  Widget _loadingView() {
+    return Scaffold(
+      backgroundColor: Colors.transparent,
+      body: Center(
+        child: CircularProgressIndicator(color: widget.store.appColors.accentColor),
+      ),
+    );
+  }
+
+  Widget _noticeCard(BuildContext context) {
+    final colors = widget.store.appColors;
+    final size = MediaQuery.sizeOf(context);
+    final maxWidth = math.min(760.0, size.width - 28).toDouble();
+    final maxHeight = math.min(620.0, size.height - 32).toDouble();
+
+    if (_rejected) {
+      return ConstrainedBox(
+        constraints: BoxConstraints(maxWidth: maxWidth),
+        child: Card(
+          elevation: 28,
+          margin: EdgeInsets.zero,
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.block, color: colors.errorColor, size: 46),
+                const SizedBox(height: 14),
+                Text(
+                  tr('Nutzung nicht akzeptiert'),
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  tr(_closeFailed
+                      ? 'CocktailBot konnte nicht automatisch beendet werden. Die Anwendung bleibt gesperrt.'
+                      : 'Die Nutzung wurde nicht akzeptiert. Bitte schließe dieses Browserfenster. Die CocktailBot-Maschine wurde nicht beendet.'),
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: colors.textSecondaryColor, height: 1.45),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    return SizedBox(
+      width: maxWidth,
+      height: maxHeight,
+      child: Card(
+        elevation: 28,
+        margin: EdgeInsets.zero,
+        clipBehavior: Clip.antiAlias,
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(22, 20, 22, 12),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      color: colors.warningColor.withValues(alpha: .14),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: Icon(
+                      Icons.gavel,
+                      color: colors.warningColor,
+                      size: 27,
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          tr('Lizenz- und Nutzungshinweis'),
+                          style: const TextStyle(
+                            fontSize: 22,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Printcore · Sascha Wenning',
+                          style: TextStyle(
+                            color: colors.textSecondaryColor,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Divider(height: 1, color: colors.borderColor),
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(22, 18, 22, 14),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      tr('Private Nutzung ohne Gewerbelizenz'),
+                      style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w900),
+                    ),
+                    const SizedBox(height: 10),
+                    Text(
+                      tr('Die Nutzung von CocktailBot und der damit betriebenen Maschine ist ohne aktive Gewerbelizenz ausschließlich für private und nicht-kommerzielle Zwecke erlaubt.'),
+                      style: const TextStyle(height: 1.45),
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      tr('Eine gewerbliche Nutzung – zum Beispiel in der Gastronomie, in Unternehmen, auf gewerblichen Veranstaltungen oder zur entgeltlichen Abgabe von Getränken – ist ohne entsprechende Gewerbelizenz nicht gestattet.'),
+                      style: const TextStyle(height: 1.45),
+                    ),
+                    const SizedBox(height: 12),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: colors.warningColor.withValues(alpha: .10),
+                        border: Border.all(
+                          color: colors.warningColor.withValues(alpha: .45),
+                        ),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        tr('Für eine gewerbliche Nutzung ist eine gültige Printcore-Gewerbelizenz erforderlich.'),
+                        style: const TextStyle(fontWeight: FontWeight.w800, height: 1.4),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      tr('Mit „Akzeptieren“ bestätigst du, dass du diesen Hinweis gelesen hast und CocktailBot ohne Gewerbelizenz nicht gewerblich nutzt.'),
+                      style: const TextStyle(height: 1.45),
+                    ),
+                    const SizedBox(height: 14),
+                    Text(
+                      'Printcore · Sascha Wenning\nPrintcore@outlook.de',
+                      style: TextStyle(
+                        color: colors.textSecondaryColor,
+                        fontWeight: FontWeight.w700,
+                        height: 1.45,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            Divider(height: 1, color: colors.borderColor),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(14, 8, 14, 14),
+              child: Column(
+                children: [
+                  CheckboxListTile(
+                    dense: true,
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 4),
+                    value: _doNotShowAgain,
+                    onChanged: _closing
+                        ? null
+                        : (value) => setState(
+                              () => _doNotShowAgain = value == true,
+                            ),
+                    title: Text(
+                      tr('Diesen Hinweis nicht mehr anzeigen'),
+                      style: const TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                    controlAffinity: ListTileControlAffinity.leading,
+                  ),
+                  const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: _closing ? null : _decline,
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: colors.errorColor,
+                            side: BorderSide(color: colors.errorColor),
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                          ),
+                          icon: _closing
+                              ? const SizedBox(
+                                  width: 18,
+                                  height: 18,
+                                  child: CircularProgressIndicator(strokeWidth: 2),
+                                )
+                              : const Icon(Icons.close),
+                          label: Text(
+                            tr(_closing ? 'CocktailBot wird beendet …' : 'Ablehnen'),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: FilledButton.icon(
+                          onPressed: _closing ? null : _accept,
+                          style: FilledButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                          ),
+                          icon: const Icon(Icons.check),
+                          label: Text(tr('Akzeptieren')),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!_preferenceLoaded || !widget.store.loaded) {
+      return _loadingView();
+    }
+    if (_acceptedForSession) {
+      return HomeShell(store: widget.store);
+    }
+
+    return PopScope(
+      canPop: false,
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        body: Stack(
+          children: [
+            Positioned.fill(child: HomeShell(store: widget.store)),
+            const Positioned.fill(
+              child: ModalBarrier(
+                dismissible: false,
+                color: Color(0xB3000000),
+              ),
+            ),
+            Positioned.fill(
+              child: SafeArea(
+                minimum: const EdgeInsets.all(14),
+                child: Center(child: _noticeCard(context)),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class HomeShell extends StatefulWidget {
   const HomeShell({super.key, required this.store});
   final MachineStore store;
@@ -8382,6 +8739,8 @@ class SettingsPage extends StatelessWidget {
       (store.t('settingsIngredients'), store.t('settingsIngredientsSub'), Icons.local_drink_outlined, success, IngredientPage(store: store)),
       (store.t('settingsRecipes'), store.t('settingsRecipesSub'), Icons.receipt_long_outlined, secondary, RecipeManagementPage(store: store)),
 
+      (tr('Info & Lizenz'), tr('Copyright, Kontakt und Nutzungsbedingungen'), Icons.info_outline, accent, InfoAndLicensePage(store: store)),
+
       // Lizenzbereich: alle lizenzpflichtigen Funktionen stehen gesammelt unten.
       (store.t('Gewerbelizenz'), store.commercialLicenseStatusText, Icons.verified_user_outlined, store.commercialLicenseActive ? success : warning, CommercialLicensePage(store: store)),
       (store.t('Verbrauchsstatistik'), commercialSubtitle(store.t('Cocktail-Ranking, Kosten und Zutatenverbrauch')), Icons.bar_chart_outlined, success, commercialPage(store.t('Verbrauchsstatistik'), ConsumptionStatisticsPage(store: store))),
@@ -8643,6 +9002,246 @@ class _ConnectionPageState extends State<ConnectionPage> {
 
 
 
+
+class InfoAndLicensePage extends StatelessWidget {
+  const InfoAndLicensePage({super.key, required this.store});
+
+  final MachineStore store;
+
+  Widget _sectionCard({
+    required BuildContext context,
+    required IconData icon,
+    required String title,
+    required Widget child,
+  }) {
+    final colors = store.appColors;
+    return Card(
+      margin: EdgeInsets.zero,
+      child: Padding(
+        padding: const EdgeInsets.all(18),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(icon, color: colors.accentColor),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    title,
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
+            child,
+          ],
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = store.appColors;
+    final statusColor = store.commercialLicenseActive
+        ? colors.successColor
+        : colors.warningColor;
+
+    return PageFrame(
+      title: tr('Info & Lizenz'),
+      child: ListView(
+        padding: const EdgeInsets.all(18),
+        children: [
+          _sectionCard(
+            context: context,
+            icon: Icons.copyright,
+            title: tr('Entwicklung & Copyright'),
+            child: Text(
+              '© 2026 Sascha Wenning / Printcore\n${tr('Alle Rechte vorbehalten.')}',
+              style: const TextStyle(height: 1.5, fontWeight: FontWeight.w700),
+            ),
+          ),
+          const SizedBox(height: 12),
+          _sectionCard(
+            context: context,
+            icon: Icons.mail_outline,
+            title: tr('Kontakt'),
+            child: SelectableText(
+              'Sascha Wenning\nPrintcore\nPrintcore@outlook.de',
+              style: const TextStyle(height: 1.55),
+            ),
+          ),
+          const SizedBox(height: 12),
+          _sectionCard(
+            context: context,
+            icon: Icons.policy,
+            title: tr('Nutzungsrecht'),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _LicenseUseRow(
+                  icon: Icons.person_outline,
+                  title: tr('Ohne Gewerbelizenz'),
+                  text: tr('Nur private und nicht-kommerzielle Nutzung'),
+                  color: colors.warningColor,
+                ),
+                const SizedBox(height: 12),
+                _LicenseUseRow(
+                  icon: Icons.business_center,
+                  title: tr('Mit gültiger Gewerbelizenz'),
+                  text: tr('Gewerbliche Nutzung gemäß Lizenzumfang erlaubt'),
+                  color: colors.successColor,
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  tr('Die Nutzung von CocktailBot und der damit betriebenen Maschine ist ohne aktive Gewerbelizenz ausschließlich für private und nicht-kommerzielle Zwecke erlaubt.'),
+                  style: const TextStyle(height: 1.5),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  tr('Als gewerbliche Nutzung gilt insbesondere der Einsatz im Rahmen eines Unternehmens, Gewerbes, einer Gastronomie, eines Caterings, einer gewerblichen Veranstaltung oder die entgeltliche Abgabe von Getränken oder Dienstleistungen.'),
+                  style: const TextStyle(height: 1.5),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  tr('Die Software und die zugehörigen Inhalte sind urheberrechtlich geschützt. Eine unerlaubte Vervielfältigung, Weitergabe, Veröffentlichung oder kommerzielle Nutzung außerhalb des eingeräumten Lizenzumfangs ist nicht gestattet.'),
+                  style: const TextStyle(height: 1.5),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+          Card(
+            margin: EdgeInsets.zero,
+            child: Padding(
+              padding: const EdgeInsets.all(18),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    tr('Aktueller Lizenzstatus'),
+                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
+                  ),
+                  const SizedBox(height: 12),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: statusColor.withValues(alpha: .10),
+                      border: Border.all(color: statusColor.withValues(alpha: .40)),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          store.commercialLicenseActive
+                              ? Icons.verified
+                              : Icons.lock_outline,
+                          color: statusColor,
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            store.commercialLicenseStatusText,
+                            style: const TextStyle(fontWeight: FontWeight.w800),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton.icon(
+                      onPressed: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => CommercialLicensePage(store: store),
+                        ),
+                      ),
+                      icon: const Icon(Icons.verified_user_outlined),
+                      label: Text(tr('Gewerbelizenz verwalten')),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed: () async {
+                        final preferences = await SharedPreferences.getInstance();
+                        await preferences.remove(
+                          _cocktailBotUsageNoticePreferenceKey,
+                        );
+                        if (!context.mounted) return;
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              tr('Der Lizenz- und Nutzungshinweis wird beim nächsten Start wieder angezeigt.'),
+                            ),
+                          ),
+                        );
+                      },
+                      icon: const Icon(Icons.restart_alt),
+                      label: Text(tr('Start-Hinweis wieder anzeigen')),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _LicenseUseRow extends StatelessWidget {
+  const _LicenseUseRow({
+    required this.icon,
+    required this.title,
+    required this.text,
+    required this.color,
+  });
+
+  final IconData icon;
+  final String title;
+  final String text;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: 40,
+          height: 40,
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: .12),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Icon(icon, color: color, size: 22),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(title, style: const TextStyle(fontWeight: FontWeight.w900)),
+              const SizedBox(height: 3),
+              Text(text, style: const TextStyle(height: 1.35)),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
 
 class NetworkAccessSettingsPage extends StatefulWidget {
   const NetworkAccessSettingsPage({super.key, required this.store});

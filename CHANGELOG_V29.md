@@ -14,3 +14,11 @@
 - Die Statistik lädt beim Öffnen den aktuellen gemeinsamen Zustand; die Füllstandsseite aktualisiert die Pumpenzustände vom Raspberry.
 - Der lokale Kiosk bleibt unverändert auf `http://127.0.0.1:8080` und funktioniert auch bei deaktiviertem LAN-Zugriff.
 
+
+### Ergänzung – Lizenz- und Nutzungshinweis (18.08.2026)
+
+- Neuer Bereich **Einstellungen → Info & Lizenz** mit Copyright, Kontakt zu Sascha Wenning / Printcore und den Nutzungsbedingungen für Privat- und Gewerbebetrieb.
+- Beim Start erscheint ein nicht wegklickbarer Lizenz- und Nutzungshinweis, solange der Nutzer ihn nicht mit **„Akzeptieren“** bestätigt hat.
+- Optional kann **„Diesen Hinweis nicht mehr anzeigen“** aktiviert werden; die Bestätigung wird versionsgebunden in den lokalen App-Einstellungen gespeichert.
+- Über **Info & Lizenz → Start-Hinweis wieder anzeigen** kann die gespeicherte Ausblendung jederzeit zurückgesetzt werden.
+- **„Ablehnen“** beendet am Raspberry den Chromium-Kiosk über den vorhandenen sicheren Kiosk-Exit-Endpunkt. Auf einem entfernten Tablet/PC wird nur die dortige Sitzung gesperrt, damit ein Remote-Nutzer nicht den Raspberry-Kiosk abschalten kann.
