@@ -11,7 +11,7 @@ VENV_DIR="$INSTALL_ROOT/venv"
 FLUTTER_DIR="${COCKTAILBOT_FLUTTER_DIR:-/opt/flutter}"
 ACTIVE_HIGH="${COCKTAILBOT_ACTIVE_HIGH:-0}"
 KIOSK_DELAY="${COCKTAILBOT_KIOSK_DELAY_SECONDS:-30}"
-BUILD_MODE="${COCKTAILBOT_BUILD_MODE:-source}"
+BUILD_MODE="${COCKTAILBOT_BUILD_MODE:-auto}"
 SKIP_APT="${COCKTAILBOT_SKIP_APT:-0}"
 REBOOT_AFTER=0
 USE_LOCAL_SOURCE=0
@@ -36,10 +36,10 @@ Optionen:
   --active-high 0|1         Relaislogik; Standard: 0 (LOW = EIN, HIGH = AUS)
   --kiosk-delay SEKUNDEN    Wartezeit bis Chromium startet; Standard: 30
   --build-mode auto|release|source
-                            Standard: source (aktuellen Quellcode lokal bauen)
-                            auto: web-release bevorzugen, sonst lokal bauen
+                            Standard: auto (web-release bevorzugt)
+                            auto: web-release bevorzugen; lokaler Build nur auf kompatiblem 64-Bit-System
                             release: nur GitHub-Branch web-release verwenden
-                            source: Flutter-App auf dem Raspberry bauen
+                            source: Flutter-App lokal bauen (64-Bit-Userland erforderlich)
   --user BENUTZER           Desktop-/Kioskbenutzer festlegen
   --repo URL                GitHub-Repository ändern
   --branch NAME             Git-Branch ändern; Standard: main
@@ -188,6 +188,11 @@ install_flutter() {
 }
 
 build_web() {
+  local userland_arch
+  userland_arch="$(dpkg --print-architecture 2>/dev/null || true)"
+  if [[ "$userland_arch" == "armhf" ]]; then
+    die "Lokaler Flutter-Build ist auf Raspberry Pi OS 32-Bit (armhf) nicht möglich. Nutze --build-mode release/auto oder installiere Raspberry Pi OS 64-Bit (arm64)."
+  fi
   install_flutter
   log "Baue Flutter-Web-App auf dem Raspberry Pi"
   chown -R "$TARGET_USER:$TARGET_GROUP" "$SOURCE_DIR/app"
@@ -613,7 +618,10 @@ if [[ "$BUILD_MODE" == "release" ]]; then
   install_prebuilt_web || die "Branch web-release fehlt. Warte auf die GitHub-Action oder nutze --build-mode source."
 elif [[ "$BUILD_MODE" == "auto" ]]; then
   if ! install_prebuilt_web; then
-    warn "Kein web-release vorhanden; die App wird jetzt auf dem Raspberry Pi gebaut."
+    if [[ "$(dpkg --print-architecture 2>/dev/null || true)" == "armhf" ]]; then
+      die "Kein web-release vorhanden und Raspberry Pi OS läuft mit 32-Bit-Userland (armhf). Ein lokaler Flutter-Build ist hier nicht möglich."
+    fi
+    warn "Kein web-release vorhanden; die App wird jetzt lokal gebaut."
     build_web
   fi
 else

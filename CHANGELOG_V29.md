@@ -22,3 +22,17 @@
 - Optional kann **„Diesen Hinweis nicht mehr anzeigen“** aktiviert werden; die Bestätigung wird versionsgebunden in den lokalen App-Einstellungen gespeichert.
 - Über **Info & Lizenz → Start-Hinweis wieder anzeigen** kann die gespeicherte Ausblendung jederzeit zurückgesetzt werden.
 - **„Ablehnen“** beendet am Raspberry den Chromium-Kiosk über den vorhandenen sicheren Kiosk-Exit-Endpunkt. Auf einem entfernten Tablet/PC wird nur die dortige Sitzung gesperrt, damit ein Remote-Nutzer nicht den Raspberry-Kiosk abschalten kann.
+
+## Installer-Fix Raspberry Pi OS 32-Bit
+- Standard-Buildmodus auf `auto` geändert: vorhandener `web-release` wird bevorzugt.
+- Lokaler Flutter-Build wird auf `armhf` früh mit verständlicher Meldung abgebrochen.
+- Verhindert den ARM64-Dart-SDK-Fehler auf Raspberry Pi OS 32-Bit mit 64-Bit-Kernel.
+
+## Separate Installer für Raspberry Pi 4 und 5
+- `install_pi4.sh` für Raspberry Pi 4, Pi 400 und Compute Module 4 ergänzt.
+- `install_pi5.sh` für Raspberry Pi 5, Pi 500 und Compute Module 5 ergänzt.
+- Beide Skripte prüfen vor der Installation das erkannte Hardwaremodell und weisen bei einem falschen Skript auf den korrekten Installer hin.
+- Modell, Kernel-Architektur und OS-Architektur werden vor Installationsbeginn angezeigt.
+- Beide Einstiegsskripte erzwingen den vorgebauten `web-release`, damit auf dem Raspberry Pi kein Flutter-/Dart-Build notwendig ist.
+- Pi 4 unterstützt dabei sowohl `armhf` als auch `arm64`; Pi 5 warnt bei `armhf` und empfiehlt `arm64`.
+- Das bestehende `install.sh` bleibt die gemeinsame Installationsbasis und muss dadurch nur einmal gepflegt werden.

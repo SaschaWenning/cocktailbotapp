@@ -25,12 +25,23 @@ cd cocktailbotapp
 
 ### 2. Komplettinstallation
 
+Für eine Neuinstallation gibt es jetzt zwei eindeutige Einstiegsskripte. Beide prüfen das Raspberry-Pi-Modell und verwenden den vorgebauten `web-release`, damit Flutter/Dart nicht auf dem Pi selbst kompiliert werden muss.
+
+**Raspberry Pi 4 / Pi 400 / Compute Module 4:**
+
 ```bash
-sudo ./install.sh --reboot
-
-Der Installer baut standardmäßig die aktuelle Flutter-Web-App direkt aus dem Quellcode (`source`). Dadurch wird bei einer Neuinstallation kein veralteter `web-release` verwendet.
-
+chmod +x install_pi4.sh
+sudo ./install_pi4.sh --reboot
 ```
+
+**Raspberry Pi 5 / Pi 500 / Compute Module 5:**
+
+```bash
+chmod +x install_pi5.sh
+sudo ./install_pi5.sh --reboot
+```
+
+Das bisherige `install.sh` bleibt als gemeinsamer Installer erhalten. Die Pi-spezifischen Skripte führen zuerst eine Hardware-/Architekturprüfung aus und rufen anschließend `install.sh` mit `--build-mode release` auf.
 
 Die Installation richtet ein:
 
@@ -48,10 +59,14 @@ Die Installation richtet ein:
 
 Das **lokale PayPal-Backend wird bei jeder Installation vollständig mitinstalliert**, aber der Installer fragt bewusst **keine PayPal-Zugangsdaten** ab. Dadurch kann jede Maschine mit demselben Installationsskript eingerichtet werden, auch wenn der Betreiber PayPal überhaupt nicht nutzt.
 
-Normale Installation:
+Normale Installation je nach Hardware:
 
 ```bash
-sudo ./install.sh --reboot
+# Raspberry Pi 4
+sudo ./install_pi4.sh --reboot
+
+# Raspberry Pi 5
+sudo ./install_pi5.sh --reboot
 ```
 
 Nach der Installation läuft CocktailBot vollständig; die Bezahlfunktion bleibt einfach inaktiv, solange keine PayPal-Zugangsdaten hinterlegt wurden.
@@ -229,7 +244,9 @@ raspberry/start-kiosk.sh                  Chromium-Kiosk
 firmware/pico2/main.py                    Pico-2-LED-Firmware
 tools/configure-paypal.sh                 lokale PayPal-Konfiguration
 tools/update.sh                           Update
-install.sh                                Komplettinstallation
+install_pi4.sh                            Einstieg für Raspberry Pi 4/400/CM4
+install_pi5.sh                            Einstieg für Raspberry Pi 5/500/CM5
+install.sh                                Gemeinsamer Komplettinstaller
 /etc/cocktailbot/paypal.env               PayPal-Secrets (nur auf dem Pi)
 /var/lib/cocktailbot/payments.db           SQLite-Zahlungsdatenbank
 ```
