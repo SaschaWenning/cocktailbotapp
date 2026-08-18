@@ -1,3 +1,9 @@
+
+## Display-Fix V6 – Pi 4 / doppelte Kernel-Auflösung
+- `disable_fw_kms_setup=1` wird im CocktailBot-Displayblock gesetzt.
+- Verhindert, dass die Raspberry-Pi-Firmware zusätzlich einen EDID-Modus wie `video=HDMI-A-1:1920x1080M@60` in die Kernel-Commandline einschleust.
+- `cmdline.txt` enthält weiterhin ausschließlich `video=HDMI-A-1:1024x600M@60`.
+- Relevant insbesondere für Pi 4; auf Pi 5 ist `disable_fw_kms_setup` laut Raspberry-Pi-Dokumentation bereits standardmäßig aktiv.
 ## V29 – LAN-/Tablet-Zugriff mit Admin-PIN (17.08.2026)
 
 - Neuer Bereich **Einstellungen → Netzwerk & Tablet**.
@@ -36,3 +42,15 @@
 - Beide Einstiegsskripte erzwingen den vorgebauten `web-release`, damit auf dem Raspberry Pi kein Flutter-/Dart-Build notwendig ist.
 - Pi 4 unterstützt dabei sowohl `armhf` als auch `arm64`; Pi 5 warnt bei `armhf` und empfiehlt `arm64`.
 - Das bestehende `install.sh` bleibt die gemeinsame Installationsbasis und muss dadurch nur einmal gepflegt werden.
+
+### Pi-4-/Pi-5-Installertrennung (V4)
+
+- Der neue Wayland-/kanshi-/wlr-randr-Fix für 1024x600 wird ausschließlich durch `install_pi4.sh` aktiviert.
+- `install_pi5.sh` behält die zuvor funktionierende Displaykonfiguration unverändert bei.
+- Der gemeinsame Installer entfernt beim Pi-5-Pfad nur versehentlich hinterlassene, eindeutig markierte V3-Pi-4-Displaydateien.
+
+### Raspberry Pi 4 – X11 1024x600 Fix
+- Pi 4 aktiviert jetzt vor Chromium einen getesteten XRandR-Custom-Mode `1024x600_60.00`.
+- Verwendete Modeline: `49.00 1024 1064 1168 1312 600 603 613 624 -hsync +vsync`.
+- Der Fix greift nur ueber `install_pi4.sh`; `install_pi5.sh` deaktiviert ihn explizit.
+- Ursache: Das LCD7C meldet 1024x600 nicht per EDID, wodurch `rpd-x`/X11 zuvor 1600x900 gewaehlt hat.

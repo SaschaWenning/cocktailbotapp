@@ -6,6 +6,7 @@ ACTIVE_HIGH=0
 PICO_PORT=auto
 GPIO_CHIP=auto
 DELAY=30
+FORCE_X11_1024X600=0
 
 if [[ -f /etc/cocktailbot/cocktailbot.env ]]; then
   ACTIVE_HIGH="$(grep -E '^COCKTAILBOT_ACTIVE_HIGH=' /etc/cocktailbot/cocktailbot.env | tail -1 | cut -d= -f2- || echo 0)"
@@ -15,7 +16,10 @@ fi
 
 if [[ -f /etc/cocktailbot/kiosk.env ]]; then
   DELAY="$(grep -E '^COCKTAILBOT_KIOSK_DELAY_SECONDS=' /etc/cocktailbot/kiosk.env | tail -1 | cut -d= -f2- || echo 30)"
+  FORCE_X11_1024X600="$(grep -E '^COCKTAILBOT_FORCE_X11_1024X600=' /etc/cocktailbot/kiosk.env | tail -1 | cut -d= -f2- || echo 0)"
 fi
+
+export COCKTAILBOT_FORCE_X11_1024X600="${FORCE_X11_1024X600:-0}"
 
 # Updates werden bewusst aus dem aktuellen Quellcode gebaut. Dadurch landet nicht
 # versehentlich ein veralteter GitHub-web-release-Build auf dem Raspberry.

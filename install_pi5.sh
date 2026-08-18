@@ -41,7 +41,7 @@ for arg in "$@"; do
   fi
 done
 
-[[ -x "$COMMON_INSTALLER" ]] || die "Gemeinsamer Installer fehlt oder ist nicht ausfuehrbar: $COMMON_INSTALLER"
+[[ -f "$COMMON_INSTALLER" ]] || die "Gemeinsamer Installer fehlt: $COMMON_INSTALLER"
 [[ $EUID -eq 0 ]] || die "Bitte mit sudo ausfuehren: sudo ./install_pi5.sh --reboot"
 
 MODEL="Unbekannt"
@@ -79,4 +79,5 @@ printf '  OS-Architektur:  %s\n' "$USERLAND_ARCH"
 printf '  Web-Buildmodus:  release (vorgebaut)\n'
 
 log "Der gemeinsame Installer wird jetzt mit Pi-5-sicherem Release-Build gestartet."
-exec "$COMMON_INSTALLER" "$@" --build-mode release
+export COCKTAILBOT_FORCE_X11_1024X600=0
+exec bash "$COMMON_INSTALLER" "$@" --build-mode release

@@ -41,7 +41,7 @@ for arg in "$@"; do
   fi
 done
 
-[[ -x "$COMMON_INSTALLER" ]] || die "Gemeinsamer Installer fehlt oder ist nicht ausfuehrbar: $COMMON_INSTALLER"
+[[ -f "$COMMON_INSTALLER" ]] || die "Gemeinsamer Installer fehlt: $COMMON_INSTALLER"
 [[ $EUID -eq 0 ]] || die "Bitte mit sudo ausfuehren: sudo ./install_pi4.sh --reboot"
 
 MODEL="Unbekannt"
@@ -81,4 +81,5 @@ else
   log "Raspberry Pi OS 64-Bit erkannt. Fuer eine reproduzierbare Installation wird ebenfalls der web-release verwendet."
 fi
 
-exec "$COMMON_INSTALLER" "$@" --build-mode release
+export COCKTAILBOT_FORCE_X11_1024X600=1
+exec bash "$COMMON_INSTALLER" "$@" --build-mode release

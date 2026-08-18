@@ -22,6 +22,7 @@ PICO_BAUD="${COCKTAILBOT_PICO_BAUD:-115200}"
 GPIO_CHIP="${COCKTAILBOT_GPIO_CHIP:-auto}"
 IMAGE_BUILD="${COCKTAILBOT_IMAGE_BUILD:-0}"
 LCD_REPO_URL="${COCKTAILBOT_LCD_REPO_URL:-https://github.com/goodtft/LCD-show.git}"
+FORCE_X11_1024X600="${COCKTAILBOT_FORCE_X11_1024X600:-0}"
 
 usage() {
   cat <<USAGE
@@ -87,6 +88,7 @@ die() { printf '\n\033[1;31m[CocktailBot FEHLER]\033[0m %s\n' "$*" >&2; exit 1; 
 [[ "$PICO_BAUD" =~ ^[0-9]+$ ]] || die "COCKTAILBOT_PICO_BAUD muss eine ganze Zahl sein."
 [[ "$GPIO_CHIP" == "auto" || "$GPIO_CHIP" =~ ^[0-9]+$ ]] || die "--gpio-chip muss auto oder eine ganze Chipnummer sein."
 [[ "$IMAGE_BUILD" =~ ^[01]$ ]] || die "COCKTAILBOT_IMAGE_BUILD muss 0 oder 1 sein."
+[[ "$FORCE_X11_1024X600" =~ ^[01]$ ]] || die "COCKTAILBOT_FORCE_X11_1024X600 muss 0 oder 1 sein."
 
 if [[ -z "$TARGET_USER" || "$TARGET_USER" == "root" ]]; then
   TARGET_USER="$(getent passwd | awk -F: '$3 >= 1000 && $3 < 60000 && $6 ~ /^\/home\// {print $1; exit}')"
@@ -259,6 +261,7 @@ COCKTAILBOT_KIOSK_URL=http://127.0.0.1:8080
 COCKTAILBOT_KIOSK_DELAY_SECONDS=$KIOSK_DELAY
 COCKTAILBOT_CHROMIUM_PROFILE=$TARGET_HOME/.config/cocktailbot-chromium
 COCKTAILBOT_KIOSK_STOP_FILE=/var/lib/cocktailbot/kiosk.stop
+COCKTAILBOT_FORCE_X11_1024X600=$FORCE_X11_1024X600
 ENV
   chmod 0644 /etc/cocktailbot/kiosk.env
 
@@ -375,6 +378,8 @@ out += [
     "# BEGIN COCKTAILBOT DISPLAY",
     "[all]",
     "dtoverlay=vc4-kms-v3d",
+    "disable_fw_kms_setup=1",
+    "# Prevent Raspberry Pi firmware from injecting an EDID-selected video= mode.",
     "# LCD7C native resolution is selected by the kernel command line below.",
     "# END COCKTAILBOT DISPLAY",
 ]
@@ -406,7 +411,7 @@ PY_DISPLAY
     systemctl enable lightdm.service >/dev/null 2>&1 || true
   fi
 
-  log "Boot-Displaykonfiguration gesetzt: KMS + HDMI-A-1 1024x600@60"
+  log "Boot-Displaykonfiguration gesetzt: KMS + Firmware-EDID-Override aus + HDMI-A-1 1024x600@60"
 }
 configure_pump_boot_safety() {
   # These BCM GPIOs are exclusively used by the 18 pump relays.
@@ -656,6 +661,7 @@ Pico Baudrate:     $PICO_BAUD
 GPIO-Chip:         $GPIO_CHIP (auto erkennt pinctrl-rp1 dynamisch)
 Image-Build:        $IMAGE_BUILD
 Displayziel:      1024x600
+X11-Custom-Mode:  $FORCE_X11_1024X600 (Pi 4 = aktiv)
 
 Status prüfen:
   systemctl status cocktailbot.service
