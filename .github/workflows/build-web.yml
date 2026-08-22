@@ -16,39 +16,72 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
           cache: true
-      - name: Build web
-        working-directory: app
-        run: |
-          flutter config --enable-web
-          flutter pub get
-          flutter create . --platforms web
-          flutter build web --release --no-web-resources-cdn
 
-      - name: Verify offline Flutter runtime
+      - name: Build fully offline web release
+        working-directory: app
         shell: bash
         run: |
           set -euo pipefail
-          echo "Checking build for external Flutter renderer CDN dependencies..."
-          if grep -RIEq \
-            'https://www\.gstatic\.com/flutter-canvaskit|https://storage\.googleapis\.com/flutter_infra_release/flutter_web_canvaskit' \
-            app/build/web; then
-            echo "ERROR: Flutter build still contains an external CanvasKit CDN dependency." >&2
-            exit 1
-          fi
-          echo "Offline Flutter runtime check OK."
+
+          flutter config --enable-web
+          flutter pub get
+          flutter create . --platforms web
+
+          # Force Flutter Web to use the CanvasKit files bundled inside this
+          # build instead of Flutter's default gstatic CDN.
+          cat > web/flutter_bootstrap.js <<'EOF'
+          {{flutter_js}}
+          {{flutter_build_config}}
+
+          _flutter.loader.load({
+            config: {
+              canvasKitBaseUrl: "canvaskit/",
+            },
+          });
+          EOF
+
+          flutter build web --release --no-web-resources-cdn
+
+      - name: Verify fully offline Flutter runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          test -s app/build/web/main.dart.js
+          test -s app/build/web/canvaskit/canvaskit.js
+          test -s app/build/web/canvaskit/canvaskit.wasm
+          test -s app/build/web/canvaskit/chromium/canvaskit.js
+          test -s app/build/web/canvaskit/chromium/canvaskit.wasm
+
+          # The generated loader itself always contains Flutter's generic CDN
+          # fallback code. What matters is that our effective loader call
+          # overrides canvasKitBaseUrl with the local build directory.
+          grep -Fq 'canvasKitBaseUrl: "canvaskit/"' \
+            app/build/web/flutter_bootstrap.js
+
+          echo "Offline CanvasKit configuration verified."
+
       - name: Publish web-release branch
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
         run: |
+          set -euo pipefail
           cd app/build/web
+
           git init
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
           git add .
           git commit -m "Flutter web release ${GITHUB_SHA}"
           git branch -M web-release
-          git push --force "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" web-release
+
+          git push --force \
+            "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" \
+            web-release

@@ -1,0 +1,11 @@
+CocktailBot Pi 5 Offline Fix V2
+
+V1 bundled CanvasKit locally but the generated Flutter bootstrap still used the
+default CanvasKit CDN selection unless explicitly overridden.
+
+V2 additionally forces:
+  canvasKitBaseUrl: "canvaskit/"
+
+The normal CocktailBot application logic is unchanged.
+The local backend still starts without network-online.target.
+The kiosk still waits only for http://127.0.0.1:8080.
