@@ -56,12 +56,19 @@ force_x11_1024x600() {
 
 force_x11_1024x600
 
+# Optional boot delay. This is only a visual/startup delay and must never
+# depend on WLAN or Internet connectivity.
 sleep "$DELAY"
 
-for _ in $(seq 1 60); do
-  curl -fsS --max-time 2 "$URL/api/status" >/dev/null 2>&1 && break
+# CocktailBot is a local appliance. Wait for the local backend itself instead
+# of assuming that network/WLAN is available. Do not start Chromium on an
+# unavailable localhost service, because that can leave a blank kiosk page.
+echo "CocktailBot Kiosk: waiting for local backend at $URL ..."
+until curl -fsS --max-time 2 "$URL/api/status" >/dev/null 2>&1; do
+  [[ -f "$STOP_FILE" ]] && exit 0
   sleep 1
 done
+echo "CocktailBot Kiosk: local backend ready."
 
 if command -v chromium >/dev/null 2>&1; then
   BROWSER=chromium
@@ -106,6 +113,9 @@ while [[ ! -f "$STOP_FILE" ]]; do
     --disable-infobars \
     --disable-session-crashed-bubble \
     --disable-translate \
+    --disable-background-networking \
+    --disable-component-update \
+    --disable-sync \
     --disable-pinch \
     --disable-cache \
     --disk-cache-size=1 \

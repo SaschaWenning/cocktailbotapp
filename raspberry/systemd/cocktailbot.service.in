@@ -1,7 +1,6 @@
 [Unit]
 Description=CocktailBot Raspberry GPIO, Pico LED and local PayPal service
-After=network.target
-Wants=network.target
+After=local-fs.target
 
 [Service]
 Type=simple

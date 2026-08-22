@@ -586,6 +586,11 @@ LABWC
 }
 
 start_services() {
+  # CocktailBot must boot and operate without WLAN/Internet. NetworkManager's
+  # wait-online service is therefore explicitly disabled. Network access can
+  # still become available later for Tablet/PC access or PayPal.
+  systemctl disable NetworkManager-wait-online.service >/dev/null 2>&1 || true
+
   log "Aktiviere CocktailBot-Dienst"
   systemctl daemon-reload >/dev/null 2>&1 || true
   systemctl enable cocktailbot.service

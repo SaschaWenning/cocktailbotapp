@@ -1,0 +1,11 @@
+CocktailBot Raspberry Pi 5 - Offline startup fix
+
+Changes:
+1. Flutter web build uses --no-web-resources-cdn so renderer resources are local.
+2. GitHub Action fails if known external Flutter CanvasKit CDN URLs remain.
+3. cocktailbot.service no longer orders itself after network.target.
+4. Kiosk waits for http://127.0.0.1:8080/api/status instead of depending on WLAN.
+5. NetworkManager-wait-online.service is disabled during installation.
+6. Chromium background network services are disabled; normal page requests (including PayPal when configured) remain possible.
+
+main.dart is unchanged.

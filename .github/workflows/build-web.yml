@@ -26,7 +26,20 @@ jobs:
           flutter config --enable-web
           flutter pub get
           flutter create . --platforms web
-          flutter build web --release
+          flutter build web --release --no-web-resources-cdn
+
+      - name: Verify offline Flutter runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "Checking build for external Flutter renderer CDN dependencies..."
+          if grep -RIEq \
+            'https://www\.gstatic\.com/flutter-canvaskit|https://storage\.googleapis\.com/flutter_infra_release/flutter_web_canvaskit' \
+            app/build/web; then
+            echo "ERROR: Flutter build still contains an external CanvasKit CDN dependency." >&2
+            exit 1
+          fi
+          echo "Offline Flutter runtime check OK."
       - name: Publish web-release branch
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
