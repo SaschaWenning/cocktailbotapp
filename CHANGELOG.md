@@ -1,3 +1,18 @@
+## V32 – Gewerblicher Vermietmodus
+
+- Neue Gewerbefunktion „Vermietmodus“.
+- Vermieter können für jeden Einstellungsbereich separat wählen: ausgeblendet, sichtbar oder Service-PIN-geschützt.
+- Ausgeblendete Bereiche werden in der Mieteransicht vollständig entfernt.
+- PIN-geschützte Bereiche werden nach erfolgreicher Service-PIN-Eingabe für 1, 5, 15 oder 30 Minuten freigeschaltet.
+- Eigene Eigentümeransicht mit separatem Eigentümer-Passwort; der bekannte Notfallcode `cocktailbot` entsperrt den Vermietmodus bewusst nicht.
+- „Mieteransicht testen“ ermöglicht dem Vermieter eine sofortige Vorschau.
+- Im aktiven Vermietmodus wird das globale Einstellungs-Passwort nicht vor die gesamte Einstellungsseite geschaltet; stattdessen gelten die feineren Vermietregeln.
+- Der Button „App schließen“ ist in der Mieteransicht ausgeblendet.
+- Der Vermietmodus wirkt auch auf Tablet/PC: Sichtbarkeit wird synchronisiert; Service-PIN wird dort über den Raspberry sicher geprüft und nicht im LAN-App-State gespeichert.
+- Die Eigentümer-Konfiguration ist aus Sicherheitsgründen nur direkt am CocktailBot möglich.
+- Service-PIN wird auf dem Raspberry ausschließlich als PBKDF2-Hash gespeichert.
+- Vollbackup sichert und restauriert Vermietkonfiguration und gehashten Service-PIN.
+
 ## V31.4 – Flutter Compile-Fix
 
 - Behebt den fehlgeschlagenen Web-Build aus V31.3.

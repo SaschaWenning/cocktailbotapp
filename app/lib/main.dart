@@ -1263,6 +1263,34 @@ enum RecipeSortMode { original, nameAsc, nameDesc, availability, alcoholAsc, alc
 enum IngredientKind { alcoholic, nonAlcoholic }
 enum ConnectionMode { bluetooth, wifi }
 enum LedIdleMode { solid, rainbow, breathe, blink, off }
+enum RentalSettingAccess { hidden, visible, pinProtected }
+
+const Map<String, RentalSettingAccess> _defaultRentalSettingAccess = {
+  'connection': RentalSettingAccess.hidden,
+  'network': RentalSettingAccess.hidden,
+  'language': RentalSettingAccess.visible,
+  'design': RentalSettingAccess.visible,
+  'display': RentalSettingAccess.hidden,
+  'security': RentalSettingAccess.hidden,
+  'led': RentalSettingAccess.visible,
+  'calibration': RentalSettingAccess.hidden,
+  'sizes': RentalSettingAccess.hidden,
+  'fill': RentalSettingAccess.visible,
+  'cleaning': RentalSettingAccess.visible,
+  'backup': RentalSettingAccess.hidden,
+  'priming': RentalSettingAccess.hidden,
+  'ingredients': RentalSettingAccess.hidden,
+  'recipes': RentalSettingAccess.hidden,
+  'info': RentalSettingAccess.visible,
+  'license': RentalSettingAccess.hidden,
+  'pumpFailover': RentalSettingAccess.hidden,
+  'statistics': RentalSettingAccess.pinProtected,
+  'partyCards': RentalSettingAccess.visible,
+  'partyPlanner': RentalSettingAccess.visible,
+  'shoppingList': RentalSettingAccess.visible,
+  'paypal': RentalSettingAccess.hidden,
+  'prices': RentalSettingAccess.hidden,
+};
 enum AppLanguage { de, en, es, it, nl, fr, pt, pl, tr, ru }
 
 AppLanguage _activeAppLanguage = AppLanguage.de;
@@ -2669,6 +2697,45 @@ String appText(AppLanguage language, String key) {
     },
   };
   final settingsEnglishFallback = <String, String>{
+    'Vermietmodus': 'Rental mode',
+    'Einstellungsbereiche für Vermietung freigeben oder schützen': 'Choose which settings renters can see or protect',
+    'Vermietmodus aktiv': 'Rental mode active',
+    'Mieteransicht': 'Renter view',
+    'Eigentümeransicht': 'Owner view',
+    'Eigentümer entsperren': 'Unlock owner view',
+    'Eigentümeransicht sperren': 'Lock owner view',
+    'Eigentümer-Passwort': 'Owner password',
+    'Eigentümer-Passwort festlegen': 'Set owner password',
+    'Für den Vermietmodus wird ein eigenes Eigentümer-Passwort benötigt. Der bekannte Notfallcode cocktailbot entsperrt den Vermietmodus nicht.': 'Rental mode requires a dedicated owner password. The known emergency code cocktailbot does not unlock rental mode.',
+    'Service-PIN (optional)': 'Service PIN (optional)',
+    'Service-PIN': 'Service PIN',
+    'Service-PIN festlegen oder ändern': 'Set or change service PIN',
+    'Service-PIN entfernen': 'Remove service PIN',
+    'PIN-geschützte Bereiche benötigen einen Service-PIN mit 4 bis 8 Ziffern.': 'PIN-protected sections require a 4 to 8 digit service PIN.',
+    'Entsperrdauer': 'Unlock duration',
+    'Minute': 'minute',
+    'Minuten': 'minutes',
+    'Ausgeblendet': 'Hidden',
+    'Sichtbar': 'Visible',
+    'PIN-geschützt': 'PIN protected',
+    'Zugriff für Mieter': 'Renter access',
+    'Diese Einstellung ist durch den Vermieter geschützt.': 'This setting is protected by the owner.',
+    'Falscher Service-PIN': 'Incorrect service PIN',
+    'Servicezugriff aktiv': 'Service access active',
+    'Mieter sehen nur die vom Eigentümer freigegebenen Einstellungsbereiche.': 'Renters only see settings sections released by the owner.',
+    'Im Vermietmodus werden ausgeblendete Bereiche vollständig entfernt. Sichtbare Bereiche können ohne PIN geöffnet werden; PIN-geschützte Bereiche werden erst nach Eingabe des Service-PINs freigegeben.': 'In rental mode, hidden sections are removed completely. Visible sections open without a PIN; PIN-protected sections unlock only after entering the service PIN.',
+    'Vermietmodus konfigurieren': 'Configure rental mode',
+    'Vermietmodus gespeichert': 'Rental mode saved',
+    'Bitte Eigentümer-Passwort eingeben': 'Enter owner password',
+    'Bitte ein Eigentümer-Passwort mit mindestens 4 Zeichen festlegen': 'Set an owner password with at least 4 characters',
+    'Falsches Eigentümer-Passwort': 'Incorrect owner password',
+    'Mieteransicht testen': 'Test renter view',
+    'Zuerst Vermietmodus aktivieren und speichern': 'Enable and save rental mode first',
+    'Die Eigentümer-Konfiguration ist aus Sicherheitsgründen nur direkt am CocktailBot möglich.': 'For security, owner configuration is only available directly on CocktailBot.',
+    'Service-PIN wurde entfernt': 'Service PIN removed',
+    'Alle Einstellungen': 'All settings',
+    'Nur freigegebene Einstellungen': 'Released settings only',
+    'Vermietmodus ist eine Gewerbefunktion.': 'Rental mode is a commercial feature.',
     'Netzwerk & Tablet': 'Network & tablet',
     'Zugriff im lokalen WLAN/LAN; Admin-PIN optional': 'Local Wi-Fi/LAN access; admin PIN optional',
     'CocktailBot auf Tablet oder PC öffnen': 'Open CocktailBot on a tablet or PC',
@@ -3667,6 +3734,19 @@ class MachineStore extends ChangeNotifier {
   bool alcoholStrengthSliderEnabled = false;
   bool settingsLockEnabled = false;
   String settingsPassword = '';
+
+  // V32: Gewerblicher Vermietmodus. Der Eigentümer kann jeden
+  // Einstellungsbereich ausblenden, direkt freigeben oder per Service-PIN
+  // schützen. Eigentümer-/Service-Sitzungen sind absichtlich nur flüchtig.
+  bool rentalModeEnabled = false;
+  String rentalServicePin = '';
+  bool rentalServicePinConfigured = false;
+  int rentalUnlockMinutes = 5;
+  Map<String, RentalSettingAccess> rentalSettingAccess =
+      Map<String, RentalSettingAccess>.from(_defaultRentalSettingAccess);
+  DateTime? _rentalOwnerUnlockedUntil;
+  DateTime? _rentalServiceUnlockedUntil;
+
   bool networkAccessEnabled = false;
   bool networkAdminPinConfigured = false;
   bool networkAccessStatusKnown = false;
@@ -3992,6 +4072,35 @@ class MachineStore extends ChangeNotifier {
             j['alcoholStrengthSliderEnabled'] == true;
         settingsLockEnabled = j['settingsLockEnabled'] == true;
         settingsPassword = j['settingsPassword']?.toString() ?? '';
+
+        rentalModeEnabled = j['rentalModeEnabled'] == true;
+        rentalServicePin = j['rentalServicePin']?.toString() ?? '';
+        rentalServicePinConfigured =
+            j['rentalServicePinConfigured'] == true ||
+            rentalServicePin.isNotEmpty;
+        rentalUnlockMinutes =
+            ((j['rentalUnlockMinutes'] as num?)?.toInt() ?? 5)
+                .clamp(1, 30)
+                .toInt();
+        rentalSettingAccess =
+            Map<String, RentalSettingAccess>.from(_defaultRentalSettingAccess);
+        final savedRentalAccess = j['rentalSettingAccess'];
+        if (savedRentalAccess is Map) {
+          for (final entry in savedRentalAccess.entries) {
+            final id = entry.key.toString();
+            if (!_defaultRentalSettingAccess.containsKey(id)) continue;
+            final accessName = entry.value?.toString() ?? '';
+            final access = RentalSettingAccess.values
+                .where((value) => value.name == accessName)
+                .firstOrNull;
+            if (access != null) {
+              rentalSettingAccess[id] = access;
+            }
+          }
+        }
+        _rentalOwnerUnlockedUntil = null;
+        _rentalServiceUnlockedUntil = null;
+
         // Gewerbelizenz wird nicht mehr aus SharedPreferences vertraut.
         // Autoritativ ist ausschließlich die signierte Lizenzdatei auf dem Raspberry.
         commercialLicenseActive = false;
@@ -4851,6 +4960,14 @@ class MachineStore extends ChangeNotifier {
       'alcoholStrengthSliderEnabled': alcoholStrengthSliderEnabled,
       'settingsLockEnabled': settingsLockEnabled,
       'settingsPassword': settingsPassword,
+      'rentalModeEnabled': rentalModeEnabled,
+      'rentalServicePin': rentalServicePin,
+      'rentalServicePinConfigured':
+          rentalServicePinConfigured || rentalServicePin.isNotEmpty,
+      'rentalUnlockMinutes': rentalUnlockMinutes,
+      'rentalSettingAccess': rentalSettingAccess.map(
+        (key, value) => MapEntry(key, value.name),
+      ),
       'commercialLicenseActive': commercialLicenseActive,
       'commercialLicenseCode': commercialLicenseCode,
       'commercialLicensedMachineId': commercialLicensedMachineId,
@@ -4866,6 +4983,9 @@ class MachineStore extends ChangeNotifier {
     final state = Map<String, dynamic>.from(_persistentStateJson());
     // Browser-/Lizenzgeheimnisse werden nicht an andere Geräte im LAN verteilt.
     state.remove('settingsPassword');
+    state.remove('rentalServicePin');
+    state['rentalServicePinConfigured'] =
+        rentalServicePinConfigured || rentalServicePin.isNotEmpty;
     state.remove('commercialLicenseCode');
     // Das Tablet soll immer dieselbe Origin für Web-App und API verwenden.
     state['wifiHost'] = '';
@@ -6152,6 +6272,218 @@ class MachineStore extends ChangeNotifier {
     notifyListeners();
   }
 
+  bool get rentalModeActive =>
+      commercialLicenseActive && rentalModeEnabled;
+
+  bool get rentalOwnerUnlocked {
+    final until = _rentalOwnerUnlockedUntil;
+    return until != null && DateTime.now().isBefore(until);
+  }
+
+  bool get rentalServiceUnlocked {
+    final until = _rentalServiceUnlockedUntil;
+    return until != null && DateTime.now().isBefore(until);
+  }
+
+  RentalSettingAccess rentalAccessFor(String id) =>
+      rentalSettingAccess[id] ??
+      _defaultRentalSettingAccess[id] ??
+      RentalSettingAccess.hidden;
+
+  bool validateRentalOwnerPassword(String value) {
+    final entered = value.trim();
+    // Der allgemeine Notfallcode "cocktailbot" wird hier absichtlich NICHT
+    // akzeptiert. Er ist öffentlich dokumentiert und wäre für Vermietungen
+    // deshalb kein Eigentümerschutz.
+    return settingsPassword.isNotEmpty && entered == settingsPassword;
+  }
+
+  bool unlockRentalOwnerSession(String password) {
+    if (!validateRentalOwnerPassword(password)) return false;
+    _rentalOwnerUnlockedUntil =
+        DateTime.now().add(const Duration(minutes: 30));
+    _rentalServiceUnlockedUntil = null;
+    notifyListeners();
+    return true;
+  }
+
+  void lockRentalOwnerSession() {
+    _rentalOwnerUnlockedUntil = null;
+    notifyListeners();
+  }
+
+  void lockRentalServiceSession() {
+    _rentalServiceUnlockedUntil = null;
+    notifyListeners();
+  }
+
+  Future<void> refreshRentalAccessStatus() async {
+    if (!connected || connectionMode == ConnectionMode.bluetooth) return;
+    try {
+      final response = await http
+          .get(_apiUri('/api/rental/access'))
+          .timeout(const Duration(seconds: 4));
+      if (response.statusCode < 200 || response.statusCode >= 300) return;
+      final decoded = jsonDecode(response.body);
+      if (decoded is! Map) return;
+      rentalServicePinConfigured =
+          decoded['servicePinConfigured'] == true ||
+          rentalServicePin.isNotEmpty;
+      final serverMinutes = (decoded['unlockMinutes'] as num?)?.toInt();
+      if (serverMinutes != null) {
+        rentalUnlockMinutes = serverMinutes.clamp(1, 30).toInt();
+      }
+      notifyListeners();
+    } catch (_) {
+      // Komfort-/Sicherheitsstatus; lokale Vermietkonfiguration bleibt erhalten.
+    }
+  }
+
+  Future<void> _syncRentalAccessToController() async {
+    if (!connected ||
+        connectionMode == ConnectionMode.bluetooth ||
+        isRemoteBrowser) {
+      return;
+    }
+    final response = await http
+        .post(
+          _apiUri('/api/rental/config'),
+          headers: _apiHeaders(json: true),
+          body: jsonEncode({
+            'servicePin': rentalServicePin,
+            'clearServicePin': rentalServicePin.isEmpty,
+            'unlockMinutes': rentalUnlockMinutes,
+          }),
+        )
+        .timeout(const Duration(seconds: 5));
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      String message = 'Vermietmodus-Server HTTP ${response.statusCode}';
+      try {
+        final decoded = jsonDecode(response.body);
+        if (decoded is Map && decoded['error'] != null) {
+          message = decoded['error'].toString();
+        }
+      } catch (_) {}
+      throw Exception(message);
+    }
+  }
+
+  Future<bool> unlockRentalService(String pin) async {
+    final cleaned = pin.trim();
+    if (cleaned.isEmpty) return false;
+
+    if (!isRemoteBrowser) {
+      if (rentalServicePin.isEmpty || cleaned != rentalServicePin) {
+        return false;
+      }
+      _rentalServiceUnlockedUntil =
+          DateTime.now().add(Duration(minutes: rentalUnlockMinutes));
+      notifyListeners();
+      return true;
+    }
+
+    if (!connected) return false;
+    try {
+      final response = await http
+          .post(
+            _apiUri('/api/rental/unlock'),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({'pin': cleaned}),
+          )
+          .timeout(const Duration(seconds: 5));
+      final decoded = response.body.trim().isEmpty
+          ? <String, dynamic>{}
+          : jsonDecode(response.body);
+      if (response.statusCode < 200 ||
+          response.statusCode >= 300 ||
+          decoded is! Map ||
+          decoded['ok'] != true) {
+        return false;
+      }
+      final ttlSeconds =
+          ((decoded['ttlSeconds'] as num?)?.toInt() ??
+                  rentalUnlockMinutes * 60)
+              .clamp(60, 1800)
+              .toInt();
+      _rentalServiceUnlockedUntil =
+          DateTime.now().add(Duration(seconds: ttlSeconds));
+      notifyListeners();
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<void> saveRentalModeSettings({
+    required bool enabled,
+    required Map<String, RentalSettingAccess> access,
+    required int unlockMinutes,
+    String servicePin = '',
+    bool clearServicePin = false,
+    String ownerPasswordIfUnset = '',
+  }) async {
+    if (!commercialLicenseActive) {
+      throw Exception(t('Gewerbelizenz erforderlich'));
+    }
+
+    final ownerPassword = ownerPasswordIfUnset.trim();
+    if (enabled && settingsPassword.isEmpty) {
+      if (ownerPassword.length < 4) {
+        throw Exception(
+          tr('Bitte ein Eigentümer-Passwort mit mindestens 4 Zeichen festlegen'),
+        );
+      }
+      settingsPassword = ownerPassword;
+    }
+
+    rentalModeEnabled = enabled;
+    rentalUnlockMinutes = unlockMinutes.clamp(1, 30).toInt();
+    rentalSettingAccess =
+        Map<String, RentalSettingAccess>.from(_defaultRentalSettingAccess);
+    for (final entry in access.entries) {
+      if (_defaultRentalSettingAccess.containsKey(entry.key)) {
+        rentalSettingAccess[entry.key] = entry.value;
+      }
+    }
+
+    if (clearServicePin) {
+      rentalServicePin = '';
+      rentalServicePinConfigured = false;
+      _rentalServiceUnlockedUntil = null;
+    }
+
+    final cleanedServicePin = servicePin.trim();
+    if (cleanedServicePin.isNotEmpty) {
+      if (!RegExp(r'^\d{4,8}$').hasMatch(cleanedServicePin)) {
+        throw Exception(
+          tr('PIN-geschützte Bereiche benötigen einen Service-PIN mit 4 bis 8 Ziffern.'),
+        );
+      }
+      rentalServicePin = cleanedServicePin;
+      rentalServicePinConfigured = true;
+      _rentalServiceUnlockedUntil = null;
+    }
+
+    final hasProtected = rentalSettingAccess.values
+        .any((value) => value == RentalSettingAccess.pinProtected);
+    if (enabled &&
+        hasProtected &&
+        rentalServicePin.isEmpty &&
+        !rentalServicePinConfigured) {
+      throw Exception(
+        tr('PIN-geschützte Bereiche benötigen einen Service-PIN mit 4 bis 8 Ziffern.'),
+      );
+    }
+
+    await save();
+
+    if (!isRemoteBrowser && connected) {
+      await _syncRentalAccessToController();
+    }
+
+    notifyListeners();
+  }
+
   double totalIngredientCost(String ingredientId) {
     final usedMl = ingredientUsageMl[ingredientId] ?? 0;
     return ingredientCost(ingredientId, usedMl);
@@ -6602,6 +6934,17 @@ class MachineStore extends ChangeNotifier {
       }
       await refreshCommercialLicenseStatus();
       await loadMachineStateFromController();
+
+      try {
+        if (isRemoteBrowser) {
+          await refreshRentalAccessStatus();
+        } else {
+          await _syncRentalAccessToController();
+        }
+      } catch (_) {
+        // Vermietmodus-Synchronisation darf die Pumpenverbindung nicht trennen.
+      }
+
       if (commercialLicenseActive) {
         try {
           await syncPaymentSettingsToController();
@@ -9025,6 +9368,13 @@ class _SettingsLockGateState extends State<SettingsLockGate> {
       );
     }
 
+    // Im aktiven Vermietmodus darf der Mieter die vom Eigentümer
+    // freigegebenen Einstellungen ohne globales Einstellungs-Passwort sehen.
+    // Sichtbarkeit und Service-PIN werden direkt in SettingsPage geprüft.
+    if (widget.store.rentalModeActive) {
+      return widget.child;
+    }
+
     if ((!remote && !widget.store.settingsLockEnabled) ||
         unlocked ||
         (remote && widget.store.remoteAdminAccessGranted)) {
@@ -9094,8 +9444,114 @@ class _SettingsLockGateState extends State<SettingsLockGate> {
 
 
 class SettingsPage extends StatelessWidget {
-  const SettingsPage({super.key, required this.store}); final MachineStore store;
-  @override Widget build(BuildContext context) {
+  const SettingsPage({super.key, required this.store});
+  final MachineStore store;
+
+  Future<bool> _requestOwnerUnlock(BuildContext context) async {
+    if (store.isRemoteBrowser) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            tr('Die Eigentümer-Konfiguration ist aus Sicherheitsgründen nur direkt am CocktailBot möglich.'),
+          ),
+        ),
+      );
+      return false;
+    }
+
+    final controller = TextEditingController();
+    final password = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(tr('Eigentümer entsperren')),
+        content: TextField(
+          controller: controller,
+          obscureText: true,
+          autofocus: true,
+          decoration: InputDecoration(
+            labelText: tr('Eigentümer-Passwort'),
+            prefixIcon: const Icon(Icons.admin_panel_settings_outlined),
+          ),
+          onSubmitted: (value) => Navigator.pop(dialogContext, value),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: Text(tr('Abbrechen')),
+          ),
+          FilledButton.icon(
+            onPressed: () => Navigator.pop(dialogContext, controller.text),
+            icon: const Icon(Icons.lock_open_outlined),
+            label: Text(tr('Entsperren')),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    if (password == null) return false;
+
+    final ok = store.unlockRentalOwnerSession(password);
+    if (!ok && context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(tr('Falsches Eigentümer-Passwort'))),
+      );
+    }
+    return ok;
+  }
+
+  Future<bool> _requestServiceUnlock(BuildContext context) async {
+    final controller = TextEditingController();
+    final pin = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(tr('Service-PIN')),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(tr('Diese Einstellung ist durch den Vermieter geschützt.')),
+            const SizedBox(height: 14),
+            TextField(
+              controller: controller,
+              obscureText: true,
+              keyboardType: TextInputType.number,
+              autofocus: true,
+              maxLength: 8,
+              decoration: InputDecoration(
+                labelText: tr('Service-PIN'),
+                prefixIcon: const Icon(Icons.password),
+              ),
+              onSubmitted: (value) => Navigator.pop(dialogContext, value),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: Text(tr('Abbrechen')),
+          ),
+          FilledButton.icon(
+            onPressed: () => Navigator.pop(dialogContext, controller.text),
+            icon: const Icon(Icons.lock_open_outlined),
+            label: Text(tr('Entsperren')),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    if (pin == null) return false;
+
+    final ok = await store.unlockRentalService(pin);
+    if (!ok && context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(tr('Falscher Service-PIN'))),
+      );
+    }
+    return ok;
+  }
+
+  @override
+  Widget build(BuildContext context) {
     Widget commercialPage(String featureName, Widget page) =>
         store.commercialLicenseActive
             ? page
@@ -9115,35 +9571,350 @@ class SettingsPage extends StatelessWidget {
     final error = store.appColors.errorColor;
     final mixed = Color.lerp(accent, secondary, .5)!;
 
-    final items = [
-      (store.t('settingsConnection'), store.connected ? tr('Raspberry Pi verbunden') : tr('Lokale GPIO-Steuerung'), Icons.wifi, accent, ConnectionPage(store: store)),
-      (tr('Netzwerk & Tablet'), tr('Zugriff im lokalen WLAN/LAN; Admin-PIN optional'), Icons.devices, secondary, NetworkAccessSettingsPage(store: store)),
-      (store.t('settingsLanguage'), '${store.t('settingsLanguageSub')}: ${store.appLanguage.nativeName}', Icons.language, secondary, LanguageSettingsPage(store: store)),
-      (store.t('settingsDesign'), store.t('settingsDesignSub'), Icons.palette_outlined, accent, ThemeSettingsPage(store: store)),
-      (store.t('Anzeige'), store.t('Sortierung und Cocktails pro Seite einstellen'), Icons.grid_view_outlined, mixed, CocktailDisplaySettingsPage(store: store)),
-      (store.t('Sicherheit & Freigaben'), store.t('Stärkeregler und Einstellungs-Passwort'), Icons.admin_panel_settings_outlined, success, SecuritySettingsPage(store: store)),
-      (store.t('settingsLed'), store.t('settingsLedSub'), Icons.light_mode_outlined, warning, LedSettingsPage(store: store)),
-      (store.t('settingsCalibration'), store.t('settingsCalibrationSub'), Icons.science_outlined, secondary, CalibrationPage(store: store)),
-      (store.t('settingsSizes'), store.t('settingsSizesSub'), Icons.straighten, mixed, ServingSizesPage(store: store)),
-      (store.t('settingsFill'), store.t('settingsFillSub'), Icons.inventory_2_outlined, warning, FillLevelsPage(store: store)),
-      (store.t('settingsCleaning'), store.t('settingsCleaningSub'), Icons.cleaning_services_outlined, error, SequencePage(store: store, cleaning: true)),
-      (store.t('settingsBackup'), store.t('settingsBackupSub'), Icons.backup_outlined, success, BackupRestorePage(store: store)),
-      (store.t('settingsPriming'), store.t('settingsPrimingSub'), Icons.air, error, SequencePage(store: store, cleaning: false)),
-      (store.t('settingsIngredients'), store.t('settingsIngredientsSub'), Icons.local_drink_outlined, success, IngredientPage(store: store)),
-      (store.t('settingsRecipes'), store.t('settingsRecipesSub'), Icons.receipt_long_outlined, secondary, RecipeManagementPage(store: store)),
+    final allItems =
+        <(String, String, String, IconData, Color, Widget)>[
+      (
+        'connection',
+        store.t('settingsConnection'),
+        store.connected ? tr('Raspberry Pi verbunden') : tr('Lokale GPIO-Steuerung'),
+        Icons.wifi,
+        accent,
+        ConnectionPage(store: store),
+      ),
+      (
+        'network',
+        tr('Netzwerk & Tablet'),
+        tr('Zugriff im lokalen WLAN/LAN; Admin-PIN optional'),
+        Icons.devices,
+        secondary,
+        NetworkAccessSettingsPage(store: store),
+      ),
+      (
+        'language',
+        store.t('settingsLanguage'),
+        '${store.t('settingsLanguageSub')}: ${store.appLanguage.nativeName}',
+        Icons.language,
+        secondary,
+        LanguageSettingsPage(store: store),
+      ),
+      (
+        'design',
+        store.t('settingsDesign'),
+        store.t('settingsDesignSub'),
+        Icons.palette_outlined,
+        accent,
+        ThemeSettingsPage(store: store),
+      ),
+      (
+        'display',
+        store.t('Anzeige'),
+        store.t('Sortierung und Cocktails pro Seite einstellen'),
+        Icons.grid_view_outlined,
+        mixed,
+        CocktailDisplaySettingsPage(store: store),
+      ),
+      (
+        'security',
+        store.t('Sicherheit & Freigaben'),
+        store.t('Stärkeregler und Einstellungs-Passwort'),
+        Icons.admin_panel_settings_outlined,
+        success,
+        SecuritySettingsPage(store: store),
+      ),
+      (
+        'led',
+        store.t('settingsLed'),
+        store.t('settingsLedSub'),
+        Icons.light_mode_outlined,
+        warning,
+        LedSettingsPage(store: store),
+      ),
+      (
+        'calibration',
+        store.t('settingsCalibration'),
+        store.t('settingsCalibrationSub'),
+        Icons.science_outlined,
+        secondary,
+        CalibrationPage(store: store),
+      ),
+      (
+        'sizes',
+        store.t('settingsSizes'),
+        store.t('settingsSizesSub'),
+        Icons.straighten,
+        mixed,
+        ServingSizesPage(store: store),
+      ),
+      (
+        'fill',
+        store.t('settingsFill'),
+        store.t('settingsFillSub'),
+        Icons.inventory_2_outlined,
+        warning,
+        FillLevelsPage(store: store),
+      ),
+      (
+        'cleaning',
+        store.t('settingsCleaning'),
+        store.t('settingsCleaningSub'),
+        Icons.cleaning_services_outlined,
+        error,
+        SequencePage(store: store, cleaning: true),
+      ),
+      (
+        'backup',
+        store.t('settingsBackup'),
+        store.t('settingsBackupSub'),
+        Icons.backup_outlined,
+        success,
+        BackupRestorePage(store: store),
+      ),
+      (
+        'priming',
+        store.t('settingsPriming'),
+        store.t('settingsPrimingSub'),
+        Icons.air,
+        error,
+        SequencePage(store: store, cleaning: false),
+      ),
+      (
+        'ingredients',
+        store.t('settingsIngredients'),
+        store.t('settingsIngredientsSub'),
+        Icons.local_drink_outlined,
+        success,
+        IngredientPage(store: store),
+      ),
+      (
+        'recipes',
+        store.t('settingsRecipes'),
+        store.t('settingsRecipesSub'),
+        Icons.receipt_long_outlined,
+        secondary,
+        RecipeManagementPage(store: store),
+      ),
+      (
+        'info',
+        tr('Info & Lizenz'),
+        tr('Copyright, Kontakt und Nutzungsbedingungen'),
+        Icons.info_outline,
+        accent,
+        InfoAndLicensePage(store: store),
+      ),
 
-      (tr('Info & Lizenz'), tr('Copyright, Kontakt und Nutzungsbedingungen'), Icons.info_outline, accent, InfoAndLicensePage(store: store)),
-
-      // Lizenzbereich: alle lizenzpflichtigen Funktionen stehen gesammelt unten.
-      (store.t('Gewerbelizenz'), store.commercialLicenseStatusText, Icons.verified_user_outlined, store.commercialLicenseActive ? success : warning, CommercialLicensePage(store: store)),
-      (store.t('Pumpen-Failover'), commercialSubtitle(store.t('Mehrere Pumpen pro Zutat mit automatischem Wechsel')), Icons.alt_route, secondary, commercialPage(store.t('Pumpen-Failover'), PumpFailoverPage(store: store))),
-      (store.t('Verbrauchsstatistik'), commercialSubtitle(store.t('Cocktail-Ranking, Kosten und Zutatenverbrauch')), Icons.bar_chart_outlined, success, commercialPage(store.t('Verbrauchsstatistik'), ConsumptionStatisticsPage(store: store))),
-      (store.t('Partykarten'), commercialSubtitle(store.t('Auswahl und Beliebtheit für Veranstaltungen')), Icons.fact_check_outlined, mixed, commercialPage(store.t('Partykarten'), PartyCardsPage(store: store))),
-      (store.t('Partyplaner'), commercialSubtitle(store.t('Prognose aus vergangenen Partys')), Icons.event_available_outlined, secondary, commercialPage(store.t('Partyplaner'), PartyPlannerPage(store: store))),
-      (store.t('Einkaufsliste'), commercialSubtitle(store.t('Zutatenbedarf und fehlende Mengen planen')), Icons.shopping_cart_outlined, warning, commercialPage(store.t('Einkaufsliste'), ShoppingListPage(store: store))),
-      (store.t('PayPal Kassenmodus'), commercialSubtitle(store.t('Lokale PayPal-Zahlung über den Raspberry Pi')), Icons.payments_outlined, accent, commercialPage(store.t('PayPal Kassenmodus'), PaymentSettingsPage(store: store))),
-      (store.t('Cocktailpreise'), commercialSubtitle(store.t('Einzelpreise pro Cocktail festlegen')), Icons.euro_outlined, success, commercialPage(store.t('Cocktailpreise'), CocktailPricesPage(store: store))),
+      // Gewerbliche/lizenzpflichtige Funktionen.
+      (
+        'license',
+        store.t('Gewerbelizenz'),
+        store.commercialLicenseStatusText,
+        Icons.verified_user_outlined,
+        store.commercialLicenseActive ? success : warning,
+        CommercialLicensePage(store: store),
+      ),
+      (
+        'rentalMode',
+        tr('Vermietmodus'),
+        commercialSubtitle(
+          tr('Einstellungsbereiche für Vermietung freigeben oder schützen'),
+        ),
+        Icons.manage_accounts_outlined,
+        warning,
+        commercialPage(
+          tr('Vermietmodus'),
+          RentalModePage(store: store),
+        ),
+      ),
+      (
+        'pumpFailover',
+        store.t('Pumpen-Failover'),
+        commercialSubtitle(
+          store.t('Mehrere Pumpen pro Zutat mit automatischem Wechsel'),
+        ),
+        Icons.alt_route,
+        secondary,
+        commercialPage(
+          store.t('Pumpen-Failover'),
+          PumpFailoverPage(store: store),
+        ),
+      ),
+      (
+        'statistics',
+        store.t('Verbrauchsstatistik'),
+        commercialSubtitle(
+          store.t('Cocktail-Ranking, Kosten und Zutatenverbrauch'),
+        ),
+        Icons.bar_chart_outlined,
+        success,
+        commercialPage(
+          store.t('Verbrauchsstatistik'),
+          ConsumptionStatisticsPage(store: store),
+        ),
+      ),
+      (
+        'partyCards',
+        store.t('Partykarten'),
+        commercialSubtitle(
+          store.t('Auswahl und Beliebtheit für Veranstaltungen'),
+        ),
+        Icons.fact_check_outlined,
+        mixed,
+        commercialPage(
+          store.t('Partykarten'),
+          PartyCardsPage(store: store),
+        ),
+      ),
+      (
+        'partyPlanner',
+        store.t('Partyplaner'),
+        commercialSubtitle(store.t('Prognose aus vergangenen Partys')),
+        Icons.event_available_outlined,
+        secondary,
+        commercialPage(
+          store.t('Partyplaner'),
+          PartyPlannerPage(store: store),
+        ),
+      ),
+      (
+        'shoppingList',
+        store.t('Einkaufsliste'),
+        commercialSubtitle(
+          store.t('Zutatenbedarf und fehlende Mengen planen'),
+        ),
+        Icons.shopping_cart_outlined,
+        warning,
+        commercialPage(
+          store.t('Einkaufsliste'),
+          ShoppingListPage(store: store),
+        ),
+      ),
+      (
+        'paypal',
+        store.t('PayPal Kassenmodus'),
+        commercialSubtitle(
+          store.t('Lokale PayPal-Zahlung über den Raspberry Pi'),
+        ),
+        Icons.payments_outlined,
+        accent,
+        commercialPage(
+          store.t('PayPal Kassenmodus'),
+          PaymentSettingsPage(store: store),
+        ),
+      ),
+      (
+        'prices',
+        store.t('Cocktailpreise'),
+        commercialSubtitle(store.t('Einzelpreise pro Cocktail festlegen')),
+        Icons.euro_outlined,
+        success,
+        commercialPage(
+          store.t('Cocktailpreise'),
+          CocktailPricesPage(store: store),
+        ),
+      ),
     ];
+
+    final tenantView =
+        store.rentalModeActive && !store.rentalOwnerUnlocked;
+
+    final items = tenantView
+        ? allItems.where((item) {
+            if (item.$1 == 'rentalMode') return false;
+            return store.rentalAccessFor(item.$1) !=
+                RentalSettingAccess.hidden;
+          }).toList()
+        : allItems;
+
+    Future<void> openItem(
+      (String, String, String, IconData, Color, Widget) item,
+    ) async {
+      if (tenantView &&
+          store.rentalAccessFor(item.$1) ==
+              RentalSettingAccess.pinProtected &&
+          !store.rentalServiceUnlocked) {
+        final unlocked = await _requestServiceUnlock(context);
+        if (!unlocked || !context.mounted) return;
+      }
+      if (!context.mounted) return;
+      await Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => item.$6),
+      );
+    }
+
+    Widget rentalBanner() {
+      final ownerView =
+          store.rentalModeActive && store.rentalOwnerUnlocked;
+      if (!store.rentalModeActive) return const SizedBox.shrink();
+
+      return Card(
+        color: store.appColors.cardColor,
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Icon(
+                ownerView
+                    ? Icons.admin_panel_settings_outlined
+                    : Icons.storefront_outlined,
+                color: ownerView ? success : warning,
+                size: 30,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      tr(ownerView
+                          ? 'Eigentümeransicht'
+                          : 'Vermietmodus aktiv'),
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w900,
+                        fontSize: 16,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      tr(ownerView
+                          ? 'Alle Einstellungen'
+                          : 'Mieter sehen nur die vom Eigentümer freigegebenen Einstellungsbereiche.'),
+                      style: TextStyle(
+                        color: store.appColors.textSecondaryColor,
+                        height: 1.3,
+                      ),
+                    ),
+                    if (!ownerView && store.rentalServiceUnlocked) ...[
+                      const SizedBox(height: 5),
+                      Text(
+                        tr('Servicezugriff aktiv'),
+                        style: TextStyle(
+                          color: success,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              const SizedBox(width: 10),
+              if (ownerView)
+                OutlinedButton.icon(
+                  onPressed: store.lockRentalOwnerSession,
+                  icon: const Icon(Icons.lock_outline),
+                  label: Text(tr('Mieteransicht')),
+                )
+              else
+                OutlinedButton.icon(
+                  onPressed: () => _requestOwnerUnlock(context),
+                  icon: const Icon(Icons.admin_panel_settings_outlined),
+                  label: Text(tr('Eigentümer entsperren')),
+                ),
+            ],
+          ),
+        ),
+      );
+    }
 
     return SafeArea(
       child: LayoutBuilder(
@@ -9163,6 +9934,10 @@ class SettingsPage extends StatelessWidget {
             ),
             children: [
               AppHeader(store: store, title: store.t('navSettings')),
+              if (store.rentalModeActive) ...[
+                const SizedBox(height: 14),
+                rentalBanner(),
+              ],
               const SizedBox(height: 18),
               LayoutBuilder(
                 builder: (context, gridConstraints) {
@@ -9174,7 +9949,17 @@ class SettingsPage extends StatelessWidget {
                               spacing * (safeColumns - 1)) /
                           safeColumns;
 
-                  Widget buildTile(dynamic x) {
+                  Widget buildTile(
+                    (String, String, String, IconData, Color, Widget) item,
+                  ) {
+                    final access = tenantView
+                        ? store.rentalAccessFor(item.$1)
+                        : RentalSettingAccess.visible;
+                    final protected =
+                        access == RentalSettingAccess.pinProtected;
+                    final unlocked =
+                        protected && store.rentalServiceUnlocked;
+
                     return SizedBox(
                       width: tileWidth,
                       child: Material(
@@ -9182,10 +9967,7 @@ class SettingsPage extends StatelessWidget {
                         borderRadius: BorderRadius.circular(10),
                         child: InkWell(
                           borderRadius: BorderRadius.circular(10),
-                          onTap: () => Navigator.push(
-                            context,
-                            MaterialPageRoute(builder: (_) => x.$5),
-                          ),
+                          onTap: () => openItem(item),
                           child: Padding(
                             padding: const EdgeInsets.symmetric(
                               horizontal: 15,
@@ -9194,7 +9976,7 @@ class SettingsPage extends StatelessWidget {
                             child: Row(
                               crossAxisAlignment: CrossAxisAlignment.center,
                               children: [
-                                Icon(x.$3, color: x.$4, size: 25),
+                                Icon(item.$4, color: item.$5, size: 25),
                                 const SizedBox(width: 14),
                                 Expanded(
                                   child: Column(
@@ -9202,27 +9984,46 @@ class SettingsPage extends StatelessWidget {
                                     crossAxisAlignment:
                                         CrossAxisAlignment.start,
                                     children: [
-                                      Text(
-                                        x.$1,
-                                        maxLines: 2,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: const TextStyle(
-                                          fontWeight: FontWeight.w700,
-                                          fontSize: 15,
-                                          height: 1.1,
-                                        ),
+                                      Row(
+                                        children: [
+                                          Expanded(
+                                            child: Text(
+                                              item.$2,
+                                              maxLines: 2,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: const TextStyle(
+                                                fontWeight: FontWeight.w700,
+                                                fontSize: 15,
+                                                height: 1.1,
+                                              ),
+                                            ),
+                                          ),
+                                          if (protected) ...[
+                                            const SizedBox(width: 5),
+                                            Icon(
+                                              unlocked
+                                                  ? Icons.lock_open_outlined
+                                                  : Icons.lock_outline,
+                                              size: 17,
+                                              color: unlocked
+                                                  ? success
+                                                  : warning,
+                                            ),
+                                          ],
+                                        ],
                                       ),
                                       const SizedBox(height: 5),
                                       Text(
-                                        x.$2,
+                                        protected && !unlocked
+                                            ? '${tr('PIN-geschützt')} · ${item.$3}'
+                                            : item.$3,
                                         maxLines: 3,
                                         overflow: TextOverflow.ellipsis,
                                         softWrap: true,
                                         style: TextStyle(
                                           fontSize: 12,
                                           height: 1.18,
-                                          color: x.$1 ==
-                                                      store.t('settingsConnection') &&
+                                          color: item.$1 == 'connection' &&
                                                   store.connected
                                               ? const Color(0xFF54D36C)
                                               : const Color(0xFF9CA7B1),
@@ -9232,9 +10033,13 @@ class SettingsPage extends StatelessWidget {
                                   ),
                                 ),
                                 const SizedBox(width: 8),
-                                const Icon(
-                                  Icons.chevron_right,
-                                  color: Color(0xFFB5BEC6),
+                                Icon(
+                                  protected && !unlocked
+                                      ? Icons.lock_outline
+                                      : Icons.chevron_right,
+                                  color: protected && !unlocked
+                                      ? warning
+                                      : const Color(0xFFB5BEC6),
                                 ),
                               ],
                             ),
@@ -9253,54 +10058,62 @@ class SettingsPage extends StatelessWidget {
               ),
               const SizedBox(height: 18),
               MachineStatusCard(store: store),
-              const SizedBox(height: 18),
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton.icon(
-                  style: FilledButton.styleFrom(
-                    backgroundColor: store.appColors.errorColor,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                  ),
-                  onPressed: () async {
-                    final close = await showDialog<bool>(
-                      context: context,
-                      builder: (dialogContext) => AlertDialog(
-                        title: Text(tr('App schließen')),
-                        content: Text(tr(
-                          'CocktailBot wirklich schließen und zum Raspberry-Desktop zurückkehren?',
-                        )),
-                        actions: [
-                          TextButton(
-                            onPressed: () => Navigator.pop(dialogContext, false),
-                            child: Text(tr('Abbrechen')),
-                          ),
-                          FilledButton(
-                            style: FilledButton.styleFrom(
-                              backgroundColor: store.appColors.errorColor,
+              if (!tenantView) ...[
+                const SizedBox(height: 18),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton.icon(
+                    style: FilledButton.styleFrom(
+                      backgroundColor: store.appColors.errorColor,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                    ),
+                    onPressed: () async {
+                      final close = await showDialog<bool>(
+                        context: context,
+                        builder: (dialogContext) => AlertDialog(
+                          title: Text(tr('App schließen')),
+                          content: Text(
+                            tr(
+                              'CocktailBot wirklich schließen und zum Raspberry-Desktop zurückkehren?',
                             ),
-                            onPressed: () => Navigator.pop(dialogContext, true),
-                            child: Text(tr('App schließen')),
                           ),
-                        ],
-                      ),
-                    );
-                    if (close != true) return;
-                    final ok = await store.closeKioskApp();
-                    if (!context.mounted || ok) return;
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(tr('App konnte nicht geschlossen werden.')),
-                      ),
-                    );
-                  },
-                  icon: const Icon(Icons.power_settings_new),
-                  label: Text(
-                    tr('App schließen'),
-                    style: const TextStyle(fontWeight: FontWeight.w900),
+                          actions: [
+                            TextButton(
+                              onPressed: () =>
+                                  Navigator.pop(dialogContext, false),
+                              child: Text(tr('Abbrechen')),
+                            ),
+                            FilledButton(
+                              style: FilledButton.styleFrom(
+                                backgroundColor: store.appColors.errorColor,
+                              ),
+                              onPressed: () =>
+                                  Navigator.pop(dialogContext, true),
+                              child: Text(tr('App schließen')),
+                            ),
+                          ],
+                        ),
+                      );
+                      if (close != true) return;
+                      final ok = await store.closeKioskApp();
+                      if (!context.mounted || ok) return;
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            tr('App konnte nicht geschlossen werden.'),
+                          ),
+                        ),
+                      );
+                    },
+                    icon: const Icon(Icons.power_settings_new),
+                    label: Text(
+                      tr('App schließen'),
+                      style: const TextStyle(fontWeight: FontWeight.w900),
+                    ),
                   ),
                 ),
-              ),
+              ],
             ],
           );
         },
@@ -10085,6 +10898,469 @@ class _SecuritySettingsPageState extends State<SecuritySettingsPage> {
                   ),
                 ],
               ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+
+
+class RentalModePage extends StatefulWidget {
+  const RentalModePage({super.key, required this.store});
+  final MachineStore store;
+
+  @override
+  State<RentalModePage> createState() => _RentalModePageState();
+}
+
+class _RentalModePageState extends State<RentalModePage> {
+  late bool enabled;
+  late int unlockMinutes;
+  late Map<String, RentalSettingAccess> access;
+  final servicePinController = TextEditingController();
+  final ownerPasswordController = TextEditingController();
+  bool clearServicePin = false;
+  bool busy = false;
+
+  List<(String, String, IconData)> get settingDefinitions => [
+        ('connection', widget.store.t('settingsConnection'), Icons.wifi),
+        ('network', tr('Netzwerk & Tablet'), Icons.devices),
+        ('language', widget.store.t('settingsLanguage'), Icons.language),
+        ('design', widget.store.t('settingsDesign'), Icons.palette_outlined),
+        ('display', widget.store.t('Anzeige'), Icons.grid_view_outlined),
+        ('security', widget.store.t('Sicherheit & Freigaben'), Icons.admin_panel_settings_outlined),
+        ('led', widget.store.t('settingsLed'), Icons.light_mode_outlined),
+        ('calibration', widget.store.t('settingsCalibration'), Icons.science_outlined),
+        ('sizes', widget.store.t('settingsSizes'), Icons.straighten),
+        ('fill', widget.store.t('settingsFill'), Icons.inventory_2_outlined),
+        ('cleaning', widget.store.t('settingsCleaning'), Icons.cleaning_services_outlined),
+        ('backup', widget.store.t('settingsBackup'), Icons.backup_outlined),
+        ('priming', widget.store.t('settingsPriming'), Icons.air),
+        ('ingredients', widget.store.t('settingsIngredients'), Icons.local_drink_outlined),
+        ('recipes', widget.store.t('settingsRecipes'), Icons.receipt_long_outlined),
+        ('info', tr('Info & Lizenz'), Icons.info_outline),
+        ('license', widget.store.t('Gewerbelizenz'), Icons.verified_user_outlined),
+        ('pumpFailover', widget.store.t('Pumpen-Failover'), Icons.alt_route),
+        ('statistics', widget.store.t('Verbrauchsstatistik'), Icons.bar_chart_outlined),
+        ('partyCards', widget.store.t('Partykarten'), Icons.fact_check_outlined),
+        ('partyPlanner', widget.store.t('Partyplaner'), Icons.event_available_outlined),
+        ('shoppingList', widget.store.t('Einkaufsliste'), Icons.shopping_cart_outlined),
+        ('paypal', widget.store.t('PayPal Kassenmodus'), Icons.payments_outlined),
+        ('prices', widget.store.t('Cocktailpreise'), Icons.euro_outlined),
+      ];
+
+  @override
+  void initState() {
+    super.initState();
+    enabled = widget.store.rentalModeEnabled;
+    unlockMinutes = widget.store.rentalUnlockMinutes;
+    access = Map<String, RentalSettingAccess>.from(
+      widget.store.rentalSettingAccess,
+    );
+  }
+
+  @override
+  void dispose() {
+    servicePinController.dispose();
+    ownerPasswordController.dispose();
+    super.dispose();
+  }
+
+  String accessLabel(RentalSettingAccess value) => switch (value) {
+        RentalSettingAccess.hidden => tr('Ausgeblendet'),
+        RentalSettingAccess.visible => tr('Sichtbar'),
+        RentalSettingAccess.pinProtected => tr('PIN-geschützt'),
+      };
+
+  IconData accessIcon(RentalSettingAccess value) => switch (value) {
+        RentalSettingAccess.hidden => Icons.visibility_off_outlined,
+        RentalSettingAccess.visible => Icons.visibility_outlined,
+        RentalSettingAccess.pinProtected => Icons.lock_outline,
+      };
+
+  Future<void> _save() async {
+    if (busy) return;
+
+    if (enabled && !widget.store.rentalModeEnabled) {
+      if (widget.store.settingsPassword.isEmpty) {
+        if (ownerPasswordController.text.trim().length < 4) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                tr('Bitte ein Eigentümer-Passwort mit mindestens 4 Zeichen festlegen'),
+              ),
+            ),
+          );
+          return;
+        }
+      } else if (!widget.store.validateRentalOwnerPassword(
+        ownerPasswordController.text,
+      )) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(tr('Falsches Eigentümer-Passwort'))),
+        );
+        return;
+      }
+    }
+
+    final hasProtected = access.values
+        .any((value) => value == RentalSettingAccess.pinProtected);
+    final proposedPin = servicePinController.text.trim();
+    final pinWillExist = !clearServicePin &&
+        (proposedPin.isNotEmpty ||
+            widget.store.rentalServicePin.isNotEmpty ||
+            widget.store.rentalServicePinConfigured);
+
+    if (enabled && hasProtected && !pinWillExist) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            tr('PIN-geschützte Bereiche benötigen einen Service-PIN mit 4 bis 8 Ziffern.'),
+          ),
+        ),
+      );
+      return;
+    }
+
+    setState(() => busy = true);
+    try {
+      await widget.store.saveRentalModeSettings(
+        enabled: enabled,
+        access: access,
+        unlockMinutes: unlockMinutes,
+        servicePin: proposedPin,
+        clearServicePin: clearServicePin,
+        ownerPasswordIfUnset: ownerPasswordController.text,
+      );
+
+      if (!mounted) return;
+      setState(() {
+        busy = false;
+        clearServicePin = false;
+      });
+      ownerPasswordController.clear();
+      servicePinController.clear();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(tr('Vermietmodus gespeichert'))),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => busy = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            error.toString().replaceFirst('Exception: ', ''),
+          ),
+        ),
+      );
+    }
+  }
+
+  Future<void> _testRenterView() async {
+    if (!widget.store.rentalModeActive) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(tr('Zuerst Vermietmodus aktivieren und speichern')),
+        ),
+      );
+      return;
+    }
+    widget.store.lockRentalOwnerSession();
+    if (mounted) Navigator.pop(context);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = widget.store.appColors;
+    final currentHasServicePin =
+        widget.store.rentalServicePinConfigured ||
+        widget.store.rentalServicePin.isNotEmpty;
+
+    return PageFrame(
+      title: tr('Vermietmodus'),
+      child: ListView(
+        padding: const EdgeInsets.all(20),
+        children: [
+          Card(
+            child: SwitchListTile(
+              value: enabled,
+              onChanged: busy ? null : (value) => setState(() => enabled = value),
+              secondary: Icon(
+                Icons.storefront_outlined,
+                color: enabled ? colors.successColor : colors.warningColor,
+              ),
+              title: Text(
+                tr('Vermietmodus aktiv'),
+                style: const TextStyle(fontWeight: FontWeight.w900),
+              ),
+              subtitle: Text(
+                tr('Mieter sehen nur die vom Eigentümer freigegebenen Einstellungsbereiche.'),
+              ),
+            ),
+          ),
+          const SizedBox(height: 14),
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(18),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.admin_panel_settings_outlined,
+                        color: colors.accentColor,
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          tr('Eigentümer-Passwort'),
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w900,
+                            fontSize: 18,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    tr('Für den Vermietmodus wird ein eigenes Eigentümer-Passwort benötigt. Der bekannte Notfallcode cocktailbot entsperrt den Vermietmodus nicht.'),
+                    style: TextStyle(
+                      color: colors.textSecondaryColor,
+                      height: 1.35,
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  TextField(
+                    controller: ownerPasswordController,
+                    obscureText: true,
+                    decoration: InputDecoration(
+                      labelText: widget.store.settingsPassword.isEmpty
+                          ? tr('Eigentümer-Passwort festlegen')
+                          : tr('Bitte Eigentümer-Passwort eingeben'),
+                      helperText: widget.store.settingsPassword.isEmpty
+                          ? tr('Mindestens 4 Zeichen')
+                          : tr('Nur beim erstmaligen Aktivieren erforderlich'),
+                      prefixIcon: const Icon(Icons.password),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 14),
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(18),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(Icons.key_outlined, color: colors.secondaryAccentColor),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          tr('Service-PIN (optional)'),
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w900,
+                            fontSize: 18,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    tr('PIN-geschützte Bereiche benötigen einen Service-PIN mit 4 bis 8 Ziffern.'),
+                    style: TextStyle(
+                      color: colors.textSecondaryColor,
+                      height: 1.35,
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  TextField(
+                    controller: servicePinController,
+                    obscureText: true,
+                    keyboardType: TextInputType.number,
+                    maxLength: 8,
+                    enabled: !clearServicePin,
+                    decoration: InputDecoration(
+                      labelText: tr('Service-PIN festlegen oder ändern'),
+                      helperText: currentHasServicePin && !clearServicePin
+                          ? tr('Leer lassen, wenn der vorhandene PIN bleiben soll')
+                          : tr('4 bis 8 Ziffern'),
+                      prefixIcon: const Icon(Icons.pin_outlined),
+                    ),
+                  ),
+                  if (currentHasServicePin) ...[
+                    CheckboxListTile(
+                      contentPadding: EdgeInsets.zero,
+                      value: clearServicePin,
+                      onChanged: busy
+                          ? null
+                          : (value) => setState(
+                                () => clearServicePin = value == true,
+                              ),
+                      title: Text(tr('Service-PIN entfernen')),
+                      secondary: const Icon(Icons.lock_open_outlined),
+                    ),
+                  ],
+                  const SizedBox(height: 8),
+                  DropdownButtonFormField<int>(
+                    value: unlockMinutes,
+                    decoration: InputDecoration(
+                      labelText: tr('Entsperrdauer'),
+                      prefixIcon: const Icon(Icons.timer_outlined),
+                    ),
+                    items: const [1, 5, 15, 30]
+                        .map(
+                          (minutes) => DropdownMenuItem<int>(
+                            value: minutes,
+                            child: Text('$minutes ${minutes == 1 ? tr('Minute') : tr('Minuten')}'),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: busy
+                        ? null
+                        : (value) {
+                            if (value != null) {
+                              setState(() => unlockMinutes = value);
+                            }
+                          },
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 14),
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(18),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    tr('Zugriff für Mieter'),
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w900,
+                      fontSize: 19,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    tr('Im Vermietmodus werden ausgeblendete Bereiche vollständig entfernt. Sichtbare Bereiche können ohne PIN geöffnet werden; PIN-geschützte Bereiche werden erst nach Eingabe des Service-PINs freigegeben.'),
+                    style: TextStyle(
+                      color: colors.textSecondaryColor,
+                      height: 1.4,
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  ...settingDefinitions.map((setting) {
+                    final value = access[setting.$1] ??
+                        _defaultRentalSettingAccess[setting.$1] ??
+                        RentalSettingAccess.hidden;
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 10,
+                        ),
+                        decoration: BoxDecoration(
+                          color: colors.surfaceColor,
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: colors.borderColor),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(setting.$3, size: 22),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                setting.$2,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            SizedBox(
+                              width: 175,
+                              child: DropdownButtonFormField<RentalSettingAccess>(
+                                value: value,
+                                isExpanded: true,
+                                decoration: const InputDecoration(
+                                  isDense: true,
+                                  contentPadding: EdgeInsets.symmetric(
+                                    horizontal: 10,
+                                    vertical: 10,
+                                  ),
+                                ),
+                                items: RentalSettingAccess.values
+                                    .map(
+                                      (entry) => DropdownMenuItem(
+                                        value: entry,
+                                        child: Row(
+                                          children: [
+                                            Icon(accessIcon(entry), size: 17),
+                                            const SizedBox(width: 7),
+                                            Flexible(
+                                              child: Text(
+                                                accessLabel(entry),
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    )
+                                    .toList(),
+                                onChanged: busy
+                                    ? null
+                                    : (newValue) {
+                                        if (newValue == null) return;
+                                        setState(
+                                          () => access[setting.$1] = newValue,
+                                        );
+                                      },
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  }),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton.icon(
+              onPressed: busy ? null : _save,
+              icon: busy
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.save_outlined),
+              label: Text(tr('Speichern')),
+            ),
+          ),
+          const SizedBox(height: 10),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: busy ? null : _testRenterView,
+              icon: const Icon(Icons.visibility_outlined),
+              label: Text(tr('Mieteransicht testen')),
             ),
           ),
         ],

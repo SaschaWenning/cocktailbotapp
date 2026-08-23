@@ -216,6 +216,12 @@ NETWORK_ACCESS_FILE = Path(
         "/var/lib/cocktailbot/network_access.json",
     )
 )
+RENTAL_ACCESS_FILE = Path(
+    os.getenv(
+        "COCKTAILBOT_RENTAL_ACCESS_FILE",
+        "/var/lib/cocktailbot/rental_access.json",
+    )
+)
 APP_STATE_FILE = Path(
     os.getenv(
         "COCKTAILBOT_APP_STATE_FILE",
@@ -223,6 +229,7 @@ APP_STATE_FILE = Path(
     )
 )
 NETWORK_ADMIN_TOKEN_TTL_SECONDS = 30 * 60
+RENTAL_UNLOCK_MINUTES_DEFAULT = 5
 LICENSE_FILE = Path(
     os.getenv("COCKTAILBOT_LICENSE_FILE", "/var/lib/cocktailbot/license.json")
 )
@@ -558,6 +565,112 @@ class PumpJob:
     mode: str
     steps: tuple[PumpStep, ...]
     total_duration_ms: int
+
+
+class RentalAccessManager:
+    """Service-PIN for rental mode, stored only as PBKDF2 hash."""
+
+    def __init__(self) -> None:
+        self._lock = threading.RLock()
+        self.pin_salt = ""
+        self.pin_hash = ""
+        self.unlock_minutes = RENTAL_UNLOCK_MINUTES_DEFAULT
+        self._load()
+
+    def _load(self) -> None:
+        try:
+            data = json.loads(RENTAL_ACCESS_FILE.read_text(encoding="utf-8"))
+        except (FileNotFoundError, json.JSONDecodeError, OSError):
+            data = {}
+        if not isinstance(data, dict):
+            data = {}
+        self.pin_salt = str(data.get("pinSalt", ""))
+        self.pin_hash = str(data.get("pinHash", ""))
+        try:
+            minutes = int(data.get("unlockMinutes", RENTAL_UNLOCK_MINUTES_DEFAULT))
+        except (TypeError, ValueError):
+            minutes = RENTAL_UNLOCK_MINUTES_DEFAULT
+        self.unlock_minutes = max(1, min(30, minutes))
+
+    @property
+    def has_pin(self) -> bool:
+        return bool(self.pin_salt and self.pin_hash)
+
+    @staticmethod
+    def _validate_pin_format(pin: str) -> str:
+        cleaned = pin.strip()
+        if not re.fullmatch(r"\d{4,8}", cleaned):
+            raise ValidationError("Service-PIN muss aus 4 bis 8 Ziffern bestehen")
+        return cleaned
+
+    @staticmethod
+    def _derive_pin_hash(pin: str, salt_hex: str) -> str:
+        salt = bytes.fromhex(salt_hex)
+        return hashlib.pbkdf2_hmac(
+            "sha256",
+            pin.encode("utf-8"),
+            salt,
+            180_000,
+        ).hex()
+
+    def _save(self) -> None:
+        RENTAL_ACCESS_FILE.parent.mkdir(parents=True, exist_ok=True)
+        temp = RENTAL_ACCESS_FILE.with_suffix(".tmp")
+        temp.write_text(
+            json.dumps(
+                {
+                    "pinSalt": self.pin_salt,
+                    "pinHash": self.pin_hash,
+                    "unlockMinutes": self.unlock_minutes,
+                },
+                ensure_ascii=False,
+                separators=(",", ":"),
+            ),
+            encoding="utf-8",
+        )
+        os.chmod(temp, 0o600)
+        temp.replace(RENTAL_ACCESS_FILE)
+        os.chmod(RENTAL_ACCESS_FILE, 0o600)
+
+    def configure(
+        self,
+        *,
+        service_pin: str = "",
+        clear_service_pin: bool = False,
+        unlock_minutes: int = RENTAL_UNLOCK_MINUTES_DEFAULT,
+    ) -> None:
+        with self._lock:
+            self.unlock_minutes = max(1, min(30, int(unlock_minutes)))
+            if clear_service_pin:
+                self.pin_salt = ""
+                self.pin_hash = ""
+
+            cleaned = service_pin.strip()
+            if cleaned:
+                cleaned = self._validate_pin_format(cleaned)
+                self.pin_salt = secrets.token_hex(16)
+                self.pin_hash = self._derive_pin_hash(cleaned, self.pin_salt)
+            self._save()
+
+    def verify_pin(self, pin: str) -> bool:
+        with self._lock:
+            if not self.has_pin:
+                return False
+            try:
+                cleaned = self._validate_pin_format(pin)
+                candidate = self._derive_pin_hash(cleaned, self.pin_salt)
+            except (ValidationError, ValueError):
+                return False
+            return hmac.compare_digest(candidate, self.pin_hash)
+
+    def public_status(self) -> dict[str, Any]:
+        return {
+            "ok": True,
+            "servicePinConfigured": self.has_pin,
+            "unlockMinutes": self.unlock_minutes,
+            "ttlSeconds": self.unlock_minutes * 60,
+        }
+
 
 
 class ValidationError(ValueError):
@@ -1910,6 +2023,7 @@ def create_app(controller: PumpController, web_root: Path) -> Flask:
     payment = PaypalPaymentBackend()
     licensing = LicenseManager()
     network_access = NetworkAccessManager()
+    rental_access = RentalAccessManager()
     usb_image_cache: dict[str, Path] = {}
 
     def usb_scan_roots() -> list[Path]:
@@ -2143,6 +2257,11 @@ def create_app(controller: PumpController, web_root: Path) -> Flask:
             "pinSalt": network_access.pin_salt,
             "pinHash": network_access.pin_hash,
         }
+        rental_state = {
+            "pinSalt": rental_access.pin_salt,
+            "pinHash": rental_access.pin_hash,
+            "unlockMinutes": rental_access.unlock_minutes,
+        }
         release_marker = ""
         try:
             release_marker = (web_root / ".cocktailbot-release").read_text(
@@ -2157,6 +2276,7 @@ def create_app(controller: PumpController, web_root: Path) -> Flask:
             machineState=controller.machine_state,
             sharedAppState=load_app_state(),
             networkAccess=network_state,
+            rentalAccess=rental_state,
             license=_read_json_object(LICENSE_FILE),
             paymentDatabaseBase64=(
                 base64.b64encode(payment_bytes).decode("ascii")
@@ -2216,6 +2336,25 @@ def create_app(controller: PumpController, web_root: Path) -> Flask:
             "pinSalt": str(network_state.get("pinSalt", "")),
             "pinHash": str(network_state.get("pinHash", "")),
         }
+
+        rental_raw = server_state.get("rentalAccess")
+        rental_state = dict(rental_raw) if isinstance(rental_raw, dict) else {
+            "pinSalt": "",
+            "pinHash": "",
+            "unlockMinutes": RENTAL_UNLOCK_MINUTES_DEFAULT,
+        }
+        try:
+            rental_minutes = int(
+                rental_state.get("unlockMinutes", RENTAL_UNLOCK_MINUTES_DEFAULT)
+            )
+        except (TypeError, ValueError):
+            rental_minutes = RENTAL_UNLOCK_MINUTES_DEFAULT
+        rental_state = {
+            "pinSalt": str(rental_state.get("pinSalt", "")),
+            "pinHash": str(rental_state.get("pinHash", "")),
+            "unlockMinutes": max(1, min(30, rental_minutes)),
+        }
+
         license_raw = server_state.get("license")
         license_state = dict(license_raw) if isinstance(license_raw, dict) else None
 
@@ -2248,6 +2387,10 @@ def create_app(controller: PumpController, web_root: Path) -> Flask:
         # local passwords/license material to LAN clients.
         shared_state = dict(app_state)
         shared_state.pop("settingsPassword", None)
+        shared_state.pop("rentalServicePin", None)
+        shared_state["rentalServicePinConfigured"] = bool(
+            rental_state["pinSalt"] and rental_state["pinHash"]
+        )
         shared_state.pop("commercialLicenseCode", None)
         shared_state["wifiHost"] = ""
         shared_state["sharedAt"] = datetime.now(timezone.utc).isoformat()
@@ -2260,6 +2403,10 @@ def create_app(controller: PumpController, web_root: Path) -> Flask:
             with network_access._lock:
                 network_access._tokens.clear()
                 network_access._load()
+
+            _write_private_json(RENTAL_ACCESS_FILE, rental_state)
+            with rental_access._lock:
+                rental_access._load()
 
             if payment_bytes is None:
                 try:
@@ -2308,6 +2455,7 @@ def create_app(controller: PumpController, web_root: Path) -> Flask:
                 "lanEnabled": network_access.lan_enabled,
                 "adminPinConfigured": network_access.has_pin,
             },
+            rentalAccess=rental_access.public_status(),
         )
 
     @app.get("/api/app-state")
@@ -2450,6 +2598,60 @@ def create_app(controller: PumpController, web_root: Path) -> Flask:
         state["sharedAt"] = datetime.now(timezone.utc).isoformat()
         save_app_state(state)
         return jsonify(ok=True, duplicate=False, eventId=event_id)
+
+    @app.get("/api/rental/access")
+    def api_rental_access():
+        return jsonify(**rental_access.public_status())
+
+    @app.route("/api/rental/config", methods=["POST", "OPTIONS"])
+    def api_rental_config():
+        if request.method == "OPTIONS":
+            return ("", 204)
+        # Eigentümer-Konfiguration des Vermietmodus darf ausschließlich direkt
+        # am Raspberry erfolgen. Tablet-/LAN-Clients können diesen PIN dadurch
+        # auch dann nicht umkonfigurieren, wenn der allgemeine LAN-Zugriff ohne
+        # Admin-PIN aktiviert wurde.
+        if not _request_is_local():
+            return jsonify(
+                ok=False,
+                error="Vermietmodus kann nur direkt am CocktailBot konfiguriert werden",
+            ), 403
+        license_error = require_commercial_license()
+        if license_error is not None:
+            return license_error
+        payload = request.get_json(silent=True)
+        if not isinstance(payload, dict):
+            return jsonify(ok=False, error="Ungültiges JSON"), 400
+        try:
+            rental_access.configure(
+                service_pin=str(payload.get("servicePin", "")),
+                clear_service_pin=payload.get("clearServicePin") is True,
+                unlock_minutes=int(
+                    payload.get("unlockMinutes", RENTAL_UNLOCK_MINUTES_DEFAULT)
+                ),
+            )
+        except (ValidationError, TypeError, ValueError) as exc:
+            return jsonify(ok=False, error=str(exc)), 400
+        return jsonify(**rental_access.public_status())
+
+    @app.route("/api/rental/unlock", methods=["POST", "OPTIONS"])
+    def api_rental_unlock():
+        if request.method == "OPTIONS":
+            return ("", 204)
+        license_error = require_commercial_license()
+        if license_error is not None:
+            return license_error
+        payload = request.get_json(silent=True)
+        if not isinstance(payload, dict):
+            return jsonify(ok=False, error="Ungültiges JSON"), 400
+        if not rental_access.has_pin:
+            return jsonify(ok=False, error="Kein Service-PIN konfiguriert"), 409
+        if not rental_access.verify_pin(str(payload.get("pin", ""))):
+            return jsonify(ok=False, error="Falscher Service-PIN"), 401
+        return jsonify(
+            ok=True,
+            ttlSeconds=rental_access.unlock_minutes * 60,
+        )
 
     @app.get("/api/network/access")
     def api_network_access():
