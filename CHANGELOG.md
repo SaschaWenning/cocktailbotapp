@@ -1,3 +1,25 @@
+## V31 – Gewerbliche Pumpen-Redundanz & automatisches Failover (22.08.2026)
+
+- Neue **Gewerbefunktion „Pumpen-Failover“**: dieselbe Zutat kann bei aktiver Gewerbelizenz mehreren aktiven Pumpen gleichzeitig zugeordnet werden, z. B. Wodka an Pumpe 1, 2 und 3.
+- Die Reihenfolge ergibt sich automatisch aus der Pumpennummer. CocktailBot verwendet zuerst die niedrigste kalibrierte Pumpe mit ausreichendem gespeichertem Füllstand und wechselt bei leerer bzw. für die aktuelle Dosierung nicht mehr ausreichender Pumpe automatisch zur nächsten Reservepumpe.
+- Die tatsächlich verwendete Pumpe wird nach der Zubereitung korrekt im Füllstand reduziert; die nächste Zubereitung berücksichtigt damit sofort den aktualisierten Vorrat.
+- Verfügbarkeits- und Niedrigbestandsprüfung berücksichtigt im Gewerbemodus alle zugeordneten Reservepumpen.
+- Im Privatmodus bleibt pro Zutat nur eine automatisch nutzbare Pumpe erlaubt; neue doppelte Zuordnungen werden in der Kalibrierung blockiert. Bestehende Mehrfachzuordnungen bleiben gespeichert, werden ohne Gewerbelizenz aber nicht als Failover-Kette genutzt.
+- Neuer Gewerbebereich **Einstellungen → Pumpen-Failover** zeigt die eingerichteten Pumpenketten und ihre Reihenfolge. Eine Pumpe kann dort bei einer tatsächlich vorzeitig leeren Flasche sofort **„Leer setzen“** werden.
+- Wichtiger Hardware-Hinweis: Der automatische Wechsel basiert auf dem in CocktailBot geführten Füllstand. Ohne physischen Füllstandssensor kann eine unerwartet früh leere Flasche nicht selbstständig erkannt werden.
+- Backup/Restore benötigt kein neues Datenformat: Mehrfachzuordnungen werden bereits über die vorhandenen Pumpenzuordnungen vollständig mitgesichert.
+
+## V30 – Füllstände, Pumpenauswahl bei Reinigung & Vollbackup (22.08.2026)
+
+- **Füllstände:** neuer Button **„Alle auffüllen“** setzt alle aktiven Behälter mit einem Tastendruck auf ihre gespeicherte Maximalmenge und synchronisiert die Werte mit dem Raspberry.
+- **Reinigung:** aktive Pumpen lassen sich jetzt einzeln per Chip auswählen; **Alle auswählen** und **Keine auswählen** erleichtern größere Pumpensätze. Das Reinigungsprogramm läuft nur über die ausgewählten Pumpen.
+- **Backup & Wiederherstellung:** neuer Einstellungsbereich für ein vollständiges CocktailBot-App-Datenbackup als JSON-Datei.
+- Gesichert werden unter anderem Rezepte, Zutaten, Pumpenzuordnungen, Kalibrierungen, Füllstände, Größen, Design, Sprache, Statistiken, Party-/Einkaufsdaten, Netzwerkzugang, gerätegebundene Lizenzdatei, PayPal-Zugangsdaten, Preis-/Zahlungskonfiguration und lokale Zahlungshistorie.
+- Beim Wiederherstellen werden App-Zustand und Raspberry-Zustandsdateien validiert und atomar ersetzt; die PayPal-SQLite-Datenbank wird vor dem Einspielen mit `PRAGMA integrity_check` geprüft.
+- Wiederhergestellte PayPal-Zugangsdaten werden verschlüsslungsfrei, aber mit Dateirecht `0600` unter `/var/lib/cocktailbot/paypal_credentials.json` gespeichert und beim Serverstart gegenüber der normalen `paypal.env` bevorzugt. Eine spätere manuelle PayPal-Neukonfiguration entfernt diesen Restore-Override wieder.
+- Das Backup enthält sensible Daten und muss entsprechend sicher aufbewahrt werden. Betriebssystem und installierte Programmdateien sind bewusst nicht Bestandteil des App-Datenbackups.
+- Gewerbelizenzen bleiben weiterhin hardwaregebunden: eine Lizenz aus dem Backup wird nur wieder aktiviert, wenn sie zum aktuellen Gerät passt.
+
 ## V29 – LAN-/Tablet-Zugriff mit Admin-PIN (17.08.2026)
 
 - Neuer Bereich **Einstellungen → Netzwerk & Tablet**.

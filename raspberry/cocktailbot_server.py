@@ -170,16 +170,43 @@ STATE_FILE = Path(
 )
 PICO_PORT = os.getenv("COCKTAILBOT_PICO_PORT", "auto").strip() or "auto"
 PICO_BAUD = int(os.getenv("COCKTAILBOT_PICO_BAUD", "115200"))
-PAYPAL_MODE = os.getenv("COCKTAILBOT_PAYPAL_MODE", "sandbox").strip().lower() or "sandbox"
-PAYPAL_CLIENT_ID = os.getenv("COCKTAILBOT_PAYPAL_CLIENT_ID", "").strip()
-PAYPAL_CLIENT_SECRET = os.getenv("COCKTAILBOT_PAYPAL_CLIENT_SECRET", "").strip()
+PAYPAL_CREDENTIALS_FILE = Path(
+    os.getenv(
+        "COCKTAILBOT_PAYPAL_CREDENTIALS_FILE",
+        "/var/lib/cocktailbot/paypal_credentials.json",
+    )
+)
+try:
+    _paypal_override_raw = json.loads(PAYPAL_CREDENTIALS_FILE.read_text(encoding="utf-8"))
+    PAYPAL_CREDENTIALS_OVERRIDE = (
+        _paypal_override_raw if isinstance(_paypal_override_raw, dict) else {}
+    )
+except (FileNotFoundError, json.JSONDecodeError, OSError):
+    PAYPAL_CREDENTIALS_OVERRIDE = {}
+
+def _paypal_value(key: str, env_name: str, default: str = "") -> str:
+    override = PAYPAL_CREDENTIALS_OVERRIDE.get(key)
+    if override is not None:
+        return str(override).strip()
+    return os.getenv(env_name, default).strip()
+
+PAYPAL_MODE = _paypal_value("mode", "COCKTAILBOT_PAYPAL_MODE", "sandbox").lower() or "sandbox"
+PAYPAL_CLIENT_ID = _paypal_value("clientId", "COCKTAILBOT_PAYPAL_CLIENT_ID")
+PAYPAL_CLIENT_SECRET = _paypal_value("clientSecret", "COCKTAILBOT_PAYPAL_CLIENT_SECRET")
 PAYPAL_DB_FILE = Path(
     os.getenv("COCKTAILBOT_PAYMENT_DB", "/var/lib/cocktailbot/payments.db")
 )
-PAYPAL_BRAND_NAME = os.getenv("COCKTAILBOT_PAYPAL_BRAND_NAME", "CocktailBot").strip() or "CocktailBot"
-PAYPAL_RETURN_URL = os.getenv("COCKTAILBOT_PAYPAL_RETURN_URL", "").strip()
-PAYPAL_CANCEL_URL = os.getenv("COCKTAILBOT_PAYPAL_CANCEL_URL", "").strip()
-PAYPAL_TIMEOUT_SECONDS = float(os.getenv("COCKTAILBOT_PAYPAL_TIMEOUT_SECONDS", "15"))
+PAYPAL_BRAND_NAME = _paypal_value(
+    "brandName", "COCKTAILBOT_PAYPAL_BRAND_NAME", "CocktailBot"
+) or "CocktailBot"
+PAYPAL_RETURN_URL = _paypal_value("returnUrl", "COCKTAILBOT_PAYPAL_RETURN_URL")
+PAYPAL_CANCEL_URL = _paypal_value("cancelUrl", "COCKTAILBOT_PAYPAL_CANCEL_URL")
+try:
+    PAYPAL_TIMEOUT_SECONDS = float(
+        _paypal_value("timeoutSeconds", "COCKTAILBOT_PAYPAL_TIMEOUT_SECONDS", "15")
+    )
+except ValueError:
+    PAYPAL_TIMEOUT_SECONDS = 15.0
 KIOSK_STOP_FILE = Path(
     os.getenv("COCKTAILBOT_KIOSK_STOP_FILE", "/var/lib/cocktailbot/kiosk.stop")
 )
@@ -589,6 +616,58 @@ class PaypalPaymentBackend:
     @property
     def configured(self) -> bool:
         return bool(self.client_id and self.client_secret)
+
+    def credential_snapshot(self) -> dict[str, Any]:
+        return {
+            "mode": self.mode,
+            "clientId": self.client_id,
+            "clientSecret": self.client_secret,
+            "brandName": self.brand_name,
+            "returnUrl": self.return_url,
+            "cancelUrl": self.cancel_url,
+            "timeoutSeconds": self.timeout,
+        }
+
+    def apply_credentials(self, payload: dict[str, Any]) -> dict[str, Any]:
+        mode = str(payload.get("mode", "sandbox")).strip().lower() or "sandbox"
+        if mode not in {"sandbox", "live"}:
+            raise ValidationError("PayPal-Modus im Backup ist ungültig")
+        client_id = str(payload.get("clientId", "")).strip()
+        client_secret = str(payload.get("clientSecret", "")).strip()
+        brand_name = str(payload.get("brandName", "CocktailBot")).strip() or "CocktailBot"
+        default_return = (
+            "https://www.paypal.com/"
+            if mode == "live"
+            else "https://www.sandbox.paypal.com/"
+        )
+        return_url = str(payload.get("returnUrl", "")).strip() or default_return
+        cancel_url = str(payload.get("cancelUrl", "")).strip() or return_url
+        try:
+            timeout = float(payload.get("timeoutSeconds", 15))
+        except (TypeError, ValueError):
+            timeout = 15.0
+        timeout = max(3.0, min(60.0, timeout))
+
+        for value in (client_id, client_secret, brand_name, return_url, cancel_url):
+            if "\n" in value or "\r" in value:
+                raise ValidationError("PayPal-Zugangsdaten im Backup sind ungültig")
+
+        self.mode = mode
+        self.client_id = client_id
+        self.client_secret = client_secret
+        self.api_base = (
+            "https://api-m.paypal.com"
+            if self.mode == "live"
+            else "https://api-m.sandbox.paypal.com"
+        )
+        self.return_url = return_url
+        self.cancel_url = cancel_url
+        self.brand_name = brand_name[:127]
+        self.timeout = timeout
+        with self._token_lock:
+            self._access_token = ""
+            self._access_token_until = 0.0
+        return self.credential_snapshot()
 
     def _db(self) -> sqlite3.Connection:
         self.db_file.parent.mkdir(parents=True, exist_ok=True)
@@ -1737,6 +1816,85 @@ def save_app_state(state: dict[str, Any]) -> None:
     os.chmod(APP_STATE_FILE, 0o600)
 
 
+def _read_json_object(path: Path) -> dict[str, Any] | None:
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (FileNotFoundError, json.JSONDecodeError, OSError):
+        return None
+    return data if isinstance(data, dict) else None
+
+
+def _write_private_json(path: Path, data: dict[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temp = path.with_name(f".{path.name}.{uuid.uuid4().hex}.tmp")
+    temp.write_text(
+        json.dumps(data, ensure_ascii=False, separators=(",", ":")),
+        encoding="utf-8",
+    )
+    os.chmod(temp, 0o600)
+    temp.replace(path)
+    os.chmod(path, 0o600)
+
+
+def _sqlite_backup_bytes(path: Path) -> bytes | None:
+    if not path.exists():
+        return None
+    temp = path.with_name(f".{path.name}.{uuid.uuid4().hex}.backup")
+    try:
+        with sqlite3.connect(path, timeout=10) as source:
+            with sqlite3.connect(temp, timeout=10) as target:
+                source.backup(target)
+        return temp.read_bytes()
+    finally:
+        try:
+            temp.unlink(missing_ok=True)
+        except OSError:
+            pass
+
+
+def _validate_sqlite_backup(data: bytes) -> None:
+    if not data.startswith(b"SQLite format 3\x00"):
+        raise ValidationError("Zahlungsdaten im Backup sind keine gültige SQLite-Datenbank")
+    if len(data) > 64 * 1024 * 1024:
+        raise ValidationError("Zahlungsdaten im Backup sind größer als 64 MB")
+    temp = PAYPAL_DB_FILE.with_name(f".{PAYPAL_DB_FILE.name}.{uuid.uuid4().hex}.validate")
+    try:
+        temp.parent.mkdir(parents=True, exist_ok=True)
+        temp.write_bytes(data)
+        with sqlite3.connect(temp, timeout=5) as db:
+            result = db.execute("PRAGMA integrity_check").fetchone()
+            if result is None or str(result[0]).lower() != "ok":
+                raise ValidationError("Zahlungsdaten im Backup sind beschädigt")
+            tables = {
+                str(row[0])
+                for row in db.execute(
+                    "SELECT name FROM sqlite_master WHERE type='table'"
+                ).fetchall()
+            }
+            required = {"payment_config", "payment_orders"}
+            if not required.issubset(tables):
+                raise ValidationError("Zahlungsdaten im Backup haben ein unbekanntes Format")
+    finally:
+        try:
+            temp.unlink(missing_ok=True)
+        except OSError:
+            pass
+
+
+def _replace_sqlite_file(path: Path, data: bytes) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temp = path.with_name(f".{path.name}.{uuid.uuid4().hex}.restore")
+    temp.write_bytes(data)
+    os.chmod(temp, 0o600)
+    for suffix in ("-wal", "-shm"):
+        try:
+            Path(str(path) + suffix).unlink(missing_ok=True)
+        except OSError:
+            pass
+    temp.replace(path)
+    os.chmod(path, 0o600)
+
+
 def create_app(controller: PumpController, web_root: Path) -> Flask:
     app = Flask(__name__, static_folder=None)
     payment = PaypalPaymentBackend()
@@ -1919,6 +2077,7 @@ def create_app(controller: PumpController, web_root: Path) -> Flask:
         protected_prefixes = (
             "/api/images/",
             "/api/keyboard/",
+            "/api/backup/",
         )
         needs_admin = path in protected_exact or any(
             path.startswith(prefix) for prefix in protected_prefixes
@@ -1963,6 +2122,186 @@ def create_app(controller: PumpController, web_root: Path) -> Flask:
         response.headers["Pragma"] = "no-cache"
         response.headers["Expires"] = "0"
         return response
+
+    @app.get("/api/backup/server-state")
+    def api_backup_server_state():
+        payment_bytes = _sqlite_backup_bytes(PAYPAL_DB_FILE)
+        network_state = {
+            "lanEnabled": network_access.lan_enabled,
+            "pinSalt": network_access.pin_salt,
+            "pinHash": network_access.pin_hash,
+        }
+        release_marker = ""
+        try:
+            release_marker = (web_root / ".cocktailbot-release").read_text(
+                encoding="utf-8"
+            )[:16_384]
+        except OSError:
+            pass
+
+        return jsonify(
+            ok=True,
+            schemaVersion=1,
+            machineState=controller.machine_state,
+            sharedAppState=load_app_state(),
+            networkAccess=network_state,
+            license=_read_json_object(LICENSE_FILE),
+            paymentDatabaseBase64=(
+                base64.b64encode(payment_bytes).decode("ascii")
+                if payment_bytes is not None
+                else None
+            ),
+            paymentDatabasePresent=payment_bytes is not None,
+            paypalCredentials=payment.credential_snapshot(),
+            paypalCredentialsIncluded=True,
+            releaseMarker=release_marker,
+        )
+
+    @app.route("/api/backup/restore", methods=["POST", "OPTIONS"])
+    def api_backup_restore():
+        if request.method == "OPTIONS":
+            return ("", 204)
+
+        payload = request.get_json(silent=True)
+        if not isinstance(payload, dict):
+            return jsonify(ok=False, error="Ungültiges Backup-JSON"), 400
+        if payload.get("format") != "cocktailbot-full-backup":
+            return jsonify(ok=False, error="Unbekanntes CocktailBot-Backup-Format"), 400
+        try:
+            version = int(payload.get("version", 0))
+        except (TypeError, ValueError):
+            version = 0
+        if version != 1:
+            return jsonify(ok=False, error="Diese Backup-Version wird nicht unterstützt"), 400
+
+        app_state_raw = payload.get("appState")
+        server_state_raw = payload.get("serverState")
+        if not isinstance(app_state_raw, dict) or not isinstance(server_state_raw, dict):
+            return jsonify(ok=False, error="App- oder Serverdaten fehlen im Backup"), 400
+
+        app_state = dict(app_state_raw)
+        if not isinstance(app_state.get("ingredients"), list):
+            return jsonify(ok=False, error="Zutaten fehlen im Backup"), 400
+        if not isinstance(app_state.get("pumps"), list):
+            return jsonify(ok=False, error="Pumpendaten fehlen im Backup"), 400
+        if not isinstance(app_state.get("recipes"), list):
+            return jsonify(ok=False, error="Rezeptdaten fehlen im Backup"), 400
+
+        server_state = dict(server_state_raw)
+        machine_state_raw = server_state.get("machineState")
+        machine_state = (
+            dict(machine_state_raw) if isinstance(machine_state_raw, dict) else {}
+        )
+
+        network_raw = server_state.get("networkAccess")
+        network_state = dict(network_raw) if isinstance(network_raw, dict) else {
+            "lanEnabled": False,
+            "pinSalt": "",
+            "pinHash": "",
+        }
+        network_state = {
+            "lanEnabled": network_state.get("lanEnabled") is True,
+            "pinSalt": str(network_state.get("pinSalt", "")),
+            "pinHash": str(network_state.get("pinHash", "")),
+        }
+        if network_state["lanEnabled"] and not (
+            network_state["pinSalt"] and network_state["pinHash"]
+        ):
+            return jsonify(ok=False, error="Netzwerkzugang im Backup ist unvollständig"), 400
+
+        license_raw = server_state.get("license")
+        license_state = dict(license_raw) if isinstance(license_raw, dict) else None
+
+        paypal_raw = server_state.get("paypalCredentials")
+        paypal_credentials = dict(paypal_raw) if isinstance(paypal_raw, dict) else None
+        if paypal_credentials is not None:
+            mode = str(paypal_credentials.get("mode", "sandbox")).strip().lower() or "sandbox"
+            if mode not in {"sandbox", "live"}:
+                return jsonify(ok=False, error="PayPal-Modus im Backup ist ungültig"), 400
+            for key in ("clientId", "clientSecret", "brandName", "returnUrl", "cancelUrl"):
+                value = str(paypal_credentials.get(key, ""))
+                if "\n" in value or "\r" in value:
+                    return jsonify(ok=False, error="PayPal-Zugangsdaten im Backup sind ungültig"), 400
+
+        payment_encoded = server_state.get("paymentDatabaseBase64")
+        payment_bytes: bytes | None = None
+        if payment_encoded is not None:
+            try:
+                payment_bytes = base64.b64decode(str(payment_encoded), validate=True)
+            except (ValueError, TypeError) as exc:
+                return jsonify(ok=False, error="Zahlungsdaten im Backup können nicht gelesen werden"), 400
+            try:
+                _validate_sqlite_backup(payment_bytes)
+            except ValidationError as exc:
+                return jsonify(ok=False, error=str(exc)), 400
+
+        warnings: list[str] = []
+
+        # Shared state mirrors the restored browser state but must not expose
+        # local passwords/license material to LAN clients.
+        shared_state = dict(app_state)
+        shared_state.pop("settingsPassword", None)
+        shared_state.pop("commercialLicenseCode", None)
+        shared_state["wifiHost"] = ""
+        shared_state["sharedAt"] = datetime.now(timezone.utc).isoformat()
+
+        try:
+            save_app_state(shared_state)
+            controller.save_machine_state(machine_state)
+
+            _write_private_json(NETWORK_ACCESS_FILE, network_state)
+            with network_access._lock:
+                network_access._tokens.clear()
+                network_access._load()
+
+            if payment_bytes is None:
+                try:
+                    PAYPAL_DB_FILE.unlink(missing_ok=True)
+                    Path(str(PAYPAL_DB_FILE) + "-wal").unlink(missing_ok=True)
+                    Path(str(PAYPAL_DB_FILE) + "-shm").unlink(missing_ok=True)
+                except OSError:
+                    pass
+                payment._init_db()
+            else:
+                _replace_sqlite_file(PAYPAL_DB_FILE, payment_bytes)
+                payment._init_db()
+
+            if paypal_credentials is not None:
+                normalized_credentials = payment.apply_credentials(paypal_credentials)
+                _write_private_json(PAYPAL_CREDENTIALS_FILE, normalized_credentials)
+
+            if license_state is None:
+                licensing.deactivate()
+            else:
+                code = str(license_state.get("code", "")).strip()
+                if code:
+                    valid, message = licensing.verify_code(code)
+                    if valid:
+                        licensing.activate(code)
+                    else:
+                        warnings.append(
+                            "Die Gewerbelizenz wurde nicht übernommen: " + message
+                        )
+                else:
+                    licensing.deactivate()
+        except (OSError, sqlite3.Error, ValidationError) as exc:
+            return jsonify(ok=False, error=f"Backup konnte nicht wiederhergestellt werden: {exc}"), 500
+
+        if paypal_credentials is None:
+            warnings.append(
+                "Dieses Backup enthält keine PayPal-Zugangsdaten; die vorhandene PayPal-Konfiguration wurde beibehalten."
+            )
+
+        return jsonify(
+            ok=True,
+            restored=True,
+            warnings=warnings,
+            license=licensing.status(),
+            networkAccess={
+                "lanEnabled": network_access.lan_enabled,
+                "adminPinConfigured": network_access.has_pin,
+            },
+        )
 
     @app.get("/api/app-state")
     def api_app_state_get():

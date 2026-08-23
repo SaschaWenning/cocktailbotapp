@@ -23,6 +23,8 @@ GPIO_CHIP="${COCKTAILBOT_GPIO_CHIP:-auto}"
 IMAGE_BUILD="${COCKTAILBOT_IMAGE_BUILD:-0}"
 LCD_REPO_URL="${COCKTAILBOT_LCD_REPO_URL:-https://github.com/goodtft/LCD-show.git}"
 FORCE_X11_1024X600="${COCKTAILBOT_FORCE_X11_1024X600:-0}"
+WEB_RELEASE_WAIT_SECONDS="${COCKTAILBOT_WEB_RELEASE_WAIT_SECONDS:-600}"
+WEB_RELEASE_POLL_SECONDS="${COCKTAILBOT_WEB_RELEASE_POLL_SECONDS:-10}"
 
 usage() {
   cat <<USAGE
@@ -89,6 +91,8 @@ die() { printf '\n\033[1;31m[CocktailBot FEHLER]\033[0m %s\n' "$*" >&2; exit 1; 
 [[ "$GPIO_CHIP" == "auto" || "$GPIO_CHIP" =~ ^[0-9]+$ ]] || die "--gpio-chip muss auto oder eine ganze Chipnummer sein."
 [[ "$IMAGE_BUILD" =~ ^[01]$ ]] || die "COCKTAILBOT_IMAGE_BUILD muss 0 oder 1 sein."
 [[ "$FORCE_X11_1024X600" =~ ^[01]$ ]] || die "COCKTAILBOT_FORCE_X11_1024X600 muss 0 oder 1 sein."
+[[ "$WEB_RELEASE_WAIT_SECONDS" =~ ^[0-9]+$ ]] || die "COCKTAILBOT_WEB_RELEASE_WAIT_SECONDS muss eine ganze Zahl sein."
+[[ "$WEB_RELEASE_POLL_SECONDS" =~ ^[1-9][0-9]*$ ]] || die "COCKTAILBOT_WEB_RELEASE_POLL_SECONDS muss größer als 0 sein."
 
 if [[ -z "$TARGET_USER" || "$TARGET_USER" == "root" ]]; then
   TARGET_USER="$(getent passwd | awk -F: '$3 >= 1000 && $3 < 60000 && $6 ~ /^\/home\// {print $1; exit}')"
@@ -160,19 +164,107 @@ sync_source() {
 }
 
 install_prebuilt_web() {
-  local temp_release
-  temp_release="$(mktemp -d)"
-  if git clone --quiet --depth 1 --branch web-release "$REPO_URL" "$temp_release" 2>/dev/null \
-      && [[ -f "$temp_release/index.html" ]]; then
-    log "Installiere vorgebautes Flutter-Web-Release aus Branch web-release"
-    rm -rf "$WEB_DIR"
-    install -d -m 0755 "$WEB_DIR"
-    rsync -a --delete --exclude '.git' "$temp_release/" "$WEB_DIR/"
-    rm -rf "$temp_release"
-    return 0
+  local temp_release expected_app_tree expected_workflow_sha
+  local release_app_tree release_workflow_sha release_source_sha release_built_at
+  local waited=0
+
+  expected_app_tree=""
+  expected_workflow_sha=""
+
+  if [[ -d "$SOURCE_DIR/.git" ]]; then
+    expected_app_tree="$(git -C "$SOURCE_DIR" rev-parse HEAD:app 2>/dev/null || true)"
   fi
+  if [[ -f "$SOURCE_DIR/.github/workflows/build-web.yml" ]]; then
+    expected_workflow_sha="$(sha256sum "$SOURCE_DIR/.github/workflows/build-web.yml" | awk '{print $1}')"
+  fi
+
+  temp_release="$(mktemp -d)"
+
+  log "Hole aktuellen Branch web-release"
+  if ! git clone --quiet --depth 1 --single-branch --branch web-release \
+      "$REPO_URL" "$temp_release" 2>/dev/null; then
+    rm -rf "$temp_release"
+    return 1
+  fi
+
+  while true; do
+    release_app_tree=""
+    release_workflow_sha=""
+    release_source_sha=""
+    release_built_at=""
+
+    if [[ -f "$temp_release/.cocktailbot-release" ]]; then
+      release_app_tree="$(sed -n 's/^app_tree_sha=//p' "$temp_release/.cocktailbot-release" | head -1 | tr -d '\r')"
+      release_workflow_sha="$(sed -n 's/^workflow_sha256=//p' "$temp_release/.cocktailbot-release" | head -1 | tr -d '\r')"
+      release_source_sha="$(sed -n 's/^source_sha=//p' "$temp_release/.cocktailbot-release" | head -1 | tr -d '\r')"
+      release_built_at="$(sed -n 's/^built_at_utc=//p' "$temp_release/.cocktailbot-release" | head -1 | tr -d '\r')"
+    fi
+
+    # A release is current when both the Flutter app tree and the build recipe
+    # match the current main checkout. Installer/README-only commits therefore
+    # do not force an unnecessary 100+ MB web rebuild.
+    if [[ -n "$release_app_tree" && -n "$release_workflow_sha" \
+          && ( -z "$expected_app_tree" || "$release_app_tree" == "$expected_app_tree" ) \
+          && ( -z "$expected_workflow_sha" || "$release_workflow_sha" == "$expected_workflow_sha" ) ]]; then
+      break
+    fi
+
+    if (( waited >= WEB_RELEASE_WAIT_SECONDS )); then
+      warn "web-release ist nach ${WEB_RELEASE_WAIT_SECONDS}s noch nicht passend zum aktuellen App-/Workflow-Stand."
+      [[ -n "$expected_app_tree" ]] && warn "Erwarteter app tree: ${expected_app_tree}"
+      [[ -n "$release_app_tree" ]] && warn "Release app tree:    ${release_app_tree}"
+      [[ -n "$expected_workflow_sha" ]] && warn "Erwarteter Workflow: ${expected_workflow_sha}"
+      [[ -n "$release_workflow_sha" ]] && warn "Release Workflow:    ${release_workflow_sha}"
+      rm -rf "$temp_release"
+      return 1
+    fi
+
+    if [[ ! -f "$temp_release/.cocktailbot-release" ]]; then
+      log "web-release besitzt noch keinen Versionsmarker; GitHub Action läuft vermutlich noch. Warte ${WEB_RELEASE_POLL_SECONDS}s ..."
+    else
+      log "web-release ist noch älter als der aktuelle App-/Workflow-Stand. Warte ${WEB_RELEASE_POLL_SECONDS}s auf GitHub Actions ..."
+    fi
+
+    sleep "$WEB_RELEASE_POLL_SECONDS"
+    waited=$((waited + WEB_RELEASE_POLL_SECONDS))
+
+    if ! git -C "$temp_release" fetch --quiet --depth 1 origin \
+        +refs/heads/web-release:refs/remotes/origin/web-release 2>/dev/null; then
+      warn "web-release konnte noch nicht erneut abgefragt werden; versuche es weiter."
+      continue
+    fi
+
+    git -C "$temp_release" checkout --quiet -B web-release refs/remotes/origin/web-release
+    git -C "$temp_release" reset --hard refs/remotes/origin/web-release >/dev/null
+    git -C "$temp_release" clean -fdx >/dev/null
+  done
+
+  # Fail closed: never replace a working installation with an incomplete or
+  # accidentally CDN-dependent build.
+  [[ -s "$temp_release/index.html" ]] || { warn "web-release enthält keine index.html."; rm -rf "$temp_release"; return 1; }
+  [[ -s "$temp_release/main.dart.js" ]] || { warn "web-release enthält keine main.dart.js."; rm -rf "$temp_release"; return 1; }
+  [[ -s "$temp_release/canvaskit/canvaskit.js" ]] || { warn "Lokales CanvasKit-JavaScript fehlt."; rm -rf "$temp_release"; return 1; }
+  [[ -s "$temp_release/canvaskit/canvaskit.wasm" ]] || { warn "Lokales CanvasKit-WASM fehlt."; rm -rf "$temp_release"; return 1; }
+  grep -Fq '"useLocalCanvasKit":true' "$temp_release/flutter_bootstrap.js" || {
+    warn "web-release erzwingt useLocalCanvasKit noch nicht."
+    rm -rf "$temp_release"
+    return 1
+  }
+  grep -Fq 'canvasKitBaseUrl: "canvaskit/"' "$temp_release/flutter_bootstrap.js" || {
+    warn "web-release verweist CanvasKit noch nicht explizit auf das lokale Verzeichnis."
+    rm -rf "$temp_release"
+    return 1
+  }
+
+  log "Installiere geprüften Flutter-Web-Release"
+  [[ -n "$release_source_sha" ]] && printf '  Build-Quellcommit: %.12s\n' "$release_source_sha"
+  [[ -n "$release_built_at" ]] && printf '  Build-Zeit (UTC):  %s\n' "$release_built_at"
+
+  rm -rf "$WEB_DIR"
+  install -d -m 0755 "$WEB_DIR"
+  rsync -a --delete --exclude '.git' "$temp_release/" "$WEB_DIR/"
   rm -rf "$temp_release"
-  return 1
+  return 0
 }
 
 install_flutter() {
@@ -204,8 +296,30 @@ build_web() {
     run_as_user bash -lc "cd '$SOURCE_DIR/app' && '$FLUTTER_DIR/bin/flutter' create . --platforms web"
   fi
   run_as_user bash -lc "cd '$SOURCE_DIR/app' && '$FLUTTER_DIR/bin/flutter' pub get"
-  run_as_user bash -lc "cd '$SOURCE_DIR/app' && '$FLUTTER_DIR/bin/flutter' build web --release"
+
+  # Keep source builds offline-capable as well. This prevents tools/update.sh
+  # or an explicit --build-mode source from reintroducing Flutter's CanvasKit CDN.
+  cat > "$SOURCE_DIR/app/web/flutter_bootstrap.js" <<'EOF'
+{{flutter_js}}
+{{flutter_build_config}}
+
+_flutter.loader.load({
+  config: {
+    canvasKitBaseUrl: "canvaskit/",
+  },
+});
+EOF
+  chown "$TARGET_USER:$TARGET_GROUP" "$SOURCE_DIR/app/web/flutter_bootstrap.js"
+
+  run_as_user bash -lc "cd '$SOURCE_DIR/app' && '$FLUTTER_DIR/bin/flutter' build web --release --no-web-resources-cdn"
+
   [[ -f "$SOURCE_DIR/app/build/web/index.html" ]] || die "Flutter-Build wurde nicht erzeugt."
+  [[ -s "$SOURCE_DIR/app/build/web/canvaskit/canvaskit.wasm" ]] || die "Lokales CanvasKit fehlt im Flutter-Build."
+  grep -Fq '"useLocalCanvasKit":true' "$SOURCE_DIR/app/build/web/flutter_bootstrap.js" \
+    || die "Flutter-Build aktiviert useLocalCanvasKit nicht."
+  grep -Fq 'canvasKitBaseUrl: "canvaskit/"' "$SOURCE_DIR/app/build/web/flutter_bootstrap.js" \
+    || die "Flutter-Build verweist CanvasKit nicht auf das lokale Verzeichnis."
+
   rm -rf "$WEB_DIR"
   install -d -m 0755 "$WEB_DIR"
   rsync -a --delete "$SOURCE_DIR/app/build/web/" "$WEB_DIR/"

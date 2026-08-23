@@ -50,6 +50,10 @@ COCKTAILBOT_PAYPAL_TIMEOUT_SECONDS=15
 ENV
 chmod 0600 "$ENV_FILE"
 
+# Ein manuell neu konfigurierter PayPal-Zugang hat Vorrang vor einem eventuell
+# aus einem Vollbackup wiederhergestellten Runtime-Override.
+rm -f /var/lib/cocktailbot/paypal_credentials.json
+
 systemctl restart cocktailbot.service
 sleep 2
 

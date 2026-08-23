@@ -11,11 +11,17 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: cocktailbot-web-release
+  cancel-in-progress: true
+
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
 
       - uses: subosito/flutter-action@v2
         with:
@@ -52,19 +58,39 @@ jobs:
         run: |
           set -euo pipefail
 
+          test -s app/build/web/index.html
           test -s app/build/web/main.dart.js
           test -s app/build/web/canvaskit/canvaskit.js
           test -s app/build/web/canvaskit/canvaskit.wasm
           test -s app/build/web/canvaskit/chromium/canvaskit.js
           test -s app/build/web/canvaskit/chromium/canvaskit.wasm
 
-          # The generated loader itself always contains Flutter's generic CDN
-          # fallback code. What matters is that our effective loader call
-          # overrides canvasKitBaseUrl with the local build directory.
+          grep -Fq '"useLocalCanvasKit":true' \
+            app/build/web/flutter_bootstrap.js
           grep -Fq 'canvasKitBaseUrl: "canvaskit/"' \
             app/build/web/flutter_bootstrap.js
 
           echo "Offline CanvasKit configuration verified."
+
+      - name: Write release freshness marker
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          APP_TREE_SHA="$(git rev-parse HEAD:app)"
+          WORKFLOW_SHA256="$(sha256sum .github/workflows/build-web.yml | awk '{print $1}')"
+          BUILT_AT_UTC="$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+
+          cat > app/build/web/.cocktailbot-release <<EOF
+          format=1
+          source_sha=${GITHUB_SHA}
+          app_tree_sha=${APP_TREE_SHA}
+          workflow_sha256=${WORKFLOW_SHA256}
+          built_at_utc=${BUILT_AT_UTC}
+          offline_canvas_kit=1
+          EOF
+
+          cat app/build/web/.cocktailbot-release
 
       - name: Publish web-release branch
         env:

@@ -1,0 +1,35 @@
+CocktailBot V31 – Gewerbliche Pumpen-Redundanz
+=================================================
+
+Neue Gewerbefunktion: Pumpen-Failover
+
+- Dieselbe Zutat kann mit aktiver Gewerbelizenz mehreren Pumpen zugeordnet werden.
+  Beispiel: Wodka an Pumpe 1, Pumpe 2 und Pumpe 3.
+- Priorität automatisch nach Pumpennummer: 1 -> 2 -> 3.
+- Für jeden Cocktail wählt CocktailBot die erste kalibrierte Pumpe, deren gespeicherter
+  Füllstand für die komplette benötigte Dosierung reicht.
+- Ist Pumpe 1 leer oder reicht der Rest nicht mehr für die Dosierung, wird automatisch
+  Pumpe 2 verwendet; danach entsprechend Pumpe 3.
+- Nach der Zubereitung wird nur der Füllstand der tatsächlich verwendeten Pumpe reduziert.
+- Warnungen und Cocktail-Verfügbarkeit berücksichtigen die Reservepumpen.
+- Im Bereich Einstellungen -> Pumpen-Failover werden alle eingerichteten Ketten angezeigt.
+- Eine physisch vorzeitig leere Flasche kann dort manuell sofort mit „Leer setzen“ markiert
+  werden, damit die nächste Reservepumpe verwendet wird.
+
+Lizenzierung
+------------
+- Mehrfachzuordnung/automatisches Failover ist nur mit aktiver Gewerbelizenz aktiv.
+- Im Privatmodus werden neue doppelte Zutatenzuordnungen blockiert.
+- Bereits gespeicherte Mehrfachzuordnungen werden bei fehlender Lizenz nicht gelöscht,
+  aber nur die erste Pumpe wird automatisch genutzt.
+
+Hardware-Hinweis
+----------------
+CocktailBot kennt ohne Füllstandssensor nur den berechneten/gespeicherten Füllstand.
+Eine Flasche, die physisch früher als erwartet leer wird, kann daher nicht automatisch
+erkannt werden. Dafür steht „Leer setzen“ zur Verfügung.
+
+Backup
+------
+Das vorhandene V30-Vollbackup sichert die Pumpenzuordnungen bereits mit und umfasst
+damit auch die neue Mehrfachzuordnung ohne Änderung des Backupformats.

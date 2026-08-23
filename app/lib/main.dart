@@ -3,6 +3,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:math' as math;
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:file_picker/file_picker.dart';
@@ -1558,6 +1559,25 @@ String appText(AppLanguage language, String key) {
     'settingsFillSub': {AppLanguage.de: 'Behälter & Füllstände', AppLanguage.en: 'Containers & fill levels', AppLanguage.es: 'Recipientes y niveles', AppLanguage.it: 'Contenitori e livelli', AppLanguage.nl: 'Reservoirs en vulniveaus', AppLanguage.fr: 'Réservoirs et niveaux', AppLanguage.pt: 'Recipientes e níveis', AppLanguage.pl: 'Pojemniki i poziomy', AppLanguage.tr: 'Kaplar ve seviyeler', AppLanguage.ru: 'Ёмкости и уровни'},
     'settingsCleaning': {AppLanguage.de: 'Reinigung', AppLanguage.en: 'Cleaning', AppLanguage.es: 'Limpieza', AppLanguage.it: 'Pulizia', AppLanguage.nl: 'Reiniging', AppLanguage.fr: 'Nettoyage', AppLanguage.pt: 'Limpeza', AppLanguage.pl: 'Czyszczenie', AppLanguage.tr: 'Temizlik', AppLanguage.ru: 'Очистка'},
     'settingsCleaningSub': {AppLanguage.de: 'Pumpenreinigung', AppLanguage.en: 'Pump cleaning', AppLanguage.es: 'Limpieza de bombas', AppLanguage.it: 'Pulizia pompe', AppLanguage.nl: 'Pompreiniging', AppLanguage.fr: 'Nettoyage des pompes', AppLanguage.pt: 'Limpeza das bombas', AppLanguage.pl: 'Czyszczenie pomp', AppLanguage.tr: 'Pompa temizliği', AppLanguage.ru: 'Очистка насосов'},
+    'settingsBackup': {AppLanguage.de: 'Backup & Wiederherstellung', AppLanguage.en: 'Backup & restore', AppLanguage.es: 'Copia de seguridad y restauración', AppLanguage.it: 'Backup e ripristino', AppLanguage.nl: 'Back-up & herstel', AppLanguage.fr: 'Sauvegarde et restauration', AppLanguage.pt: 'Backup e restauração', AppLanguage.pl: 'Kopia zapasowa i przywracanie', AppLanguage.tr: 'Yedekleme ve geri yükleme', AppLanguage.ru: 'Резервная копия и восстановление'},
+    'settingsBackupSub': {AppLanguage.de: 'Einstellungen und App-Daten vollständig sichern', AppLanguage.en: 'Back up settings and app data', AppLanguage.es: 'Guardar ajustes y datos de la app', AppLanguage.it: 'Salva impostazioni e dati dell’app', AppLanguage.nl: 'Instellingen en appgegevens back-uppen', AppLanguage.fr: 'Sauvegarder les réglages et données', AppLanguage.pt: 'Salvar configurações e dados do app', AppLanguage.pl: 'Kopia ustawień i danych aplikacji', AppLanguage.tr: 'Ayarları ve uygulama verilerini yedekle', AppLanguage.ru: 'Резервная копия настроек и данных'},
+    'Alle auffüllen': {AppLanguage.de: 'Alle auffüllen', AppLanguage.en: 'Refill all', AppLanguage.es: 'Rellenar todo', AppLanguage.it: 'Riempi tutto', AppLanguage.nl: 'Alles bijvullen', AppLanguage.fr: 'Tout remplir', AppLanguage.pt: 'Reabastecer tudo', AppLanguage.pl: 'Uzupełnij wszystko', AppLanguage.tr: 'Tümünü doldur', AppLanguage.ru: 'Заполнить всё'},
+    'Alle Füllstände wurden auf voll gesetzt.': {AppLanguage.de: 'Alle Füllstände wurden auf voll gesetzt.', AppLanguage.en: 'All fill levels were set to full.', AppLanguage.es: 'Todos los niveles se han marcado como llenos.', AppLanguage.it: 'Tutti i livelli sono stati impostati su pieno.', AppLanguage.nl: 'Alle vulniveaus zijn op vol gezet.', AppLanguage.fr: 'Tous les niveaux ont été réglés sur plein.', AppLanguage.pt: 'Todos os níveis foram definidos como cheios.', AppLanguage.pl: 'Wszystkie poziomy ustawiono na pełne.', AppLanguage.tr: 'Tüm dolum seviyeleri dolu olarak ayarlandı.', AppLanguage.ru: 'Все уровни заполнения установлены на полный.'},
+    'Pumpenauswahl': {AppLanguage.de: 'Pumpenauswahl', AppLanguage.en: 'Pump selection', AppLanguage.es: 'Selección de bombas', AppLanguage.it: 'Selezione pompe', AppLanguage.nl: 'Pompselectie', AppLanguage.fr: 'Sélection des pompes', AppLanguage.pt: 'Seleção de bombas', AppLanguage.pl: 'Wybór pomp', AppLanguage.tr: 'Pompa seçimi', AppLanguage.ru: 'Выбор насосов'},
+    'Alle auswählen': {AppLanguage.de: 'Alle auswählen', AppLanguage.en: 'Select all', AppLanguage.es: 'Seleccionar todas', AppLanguage.it: 'Seleziona tutte', AppLanguage.nl: 'Alles selecteren', AppLanguage.fr: 'Tout sélectionner', AppLanguage.pt: 'Selecionar todas', AppLanguage.pl: 'Zaznacz wszystkie', AppLanguage.tr: 'Tümünü seç', AppLanguage.ru: 'Выбрать все'},
+    'Keine auswählen': {AppLanguage.de: 'Keine auswählen', AppLanguage.en: 'Select none', AppLanguage.es: 'No seleccionar ninguna', AppLanguage.it: 'Deseleziona tutte', AppLanguage.nl: 'Niets selecteren', AppLanguage.fr: 'Ne rien sélectionner', AppLanguage.pt: 'Não selecionar nenhuma', AppLanguage.pl: 'Odznacz wszystkie', AppLanguage.tr: 'Hiçbirini seçme', AppLanguage.ru: 'Снять выбор'},
+    'Nur die ausgewählten aktiven Pumpen laufen nacheinander.': {AppLanguage.de: 'Nur die ausgewählten aktiven Pumpen laufen nacheinander.', AppLanguage.en: 'Only the selected active pumps run one after another.', AppLanguage.es: 'Solo las bombas activas seleccionadas funcionan una tras otra.', AppLanguage.it: 'Solo le pompe attive selezionate funzionano in sequenza.', AppLanguage.nl: 'Alleen de geselecteerde actieve pompen lopen na elkaar.', AppLanguage.fr: 'Seules les pompes actives sélectionnées fonctionnent successivement.', AppLanguage.pt: 'Somente as bombas ativas selecionadas funcionam em sequência.', AppLanguage.pl: 'Tylko wybrane aktywne pompy pracują kolejno.', AppLanguage.tr: 'Yalnızca seçilen aktif pompalar sırayla çalışır.', AppLanguage.ru: 'Последовательно работают только выбранные активные насосы.'},
+    'Wähle mindestens eine Pumpe für die Reinigung aus.': {AppLanguage.de: 'Wähle mindestens eine Pumpe für die Reinigung aus.', AppLanguage.en: 'Select at least one pump for cleaning.', AppLanguage.es: 'Selecciona al menos una bomba para la limpieza.', AppLanguage.it: 'Seleziona almeno una pompa per la pulizia.', AppLanguage.nl: 'Selecteer minimaal één pomp voor reiniging.', AppLanguage.fr: 'Sélectionnez au moins une pompe pour le nettoyage.', AppLanguage.pt: 'Selecione pelo menos uma bomba para a limpeza.', AppLanguage.pl: 'Wybierz co najmniej jedną pompę do czyszczenia.', AppLanguage.tr: 'Temizlik için en az bir pompa seçin.', AppLanguage.ru: 'Выберите хотя бы один насос для очистки.'},
+    'Vollbackup': {AppLanguage.de: 'Vollbackup', AppLanguage.en: 'Full backup', AppLanguage.es: 'Copia completa', AppLanguage.it: 'Backup completo', AppLanguage.nl: 'Volledige back-up', AppLanguage.fr: 'Sauvegarde complète', AppLanguage.pt: 'Backup completo', AppLanguage.pl: 'Pełna kopia zapasowa', AppLanguage.tr: 'Tam yedekleme', AppLanguage.ru: 'Полная резервная копия'},
+    'Backup erstellen': {AppLanguage.de: 'Backup erstellen', AppLanguage.en: 'Create backup', AppLanguage.es: 'Crear copia', AppLanguage.it: 'Crea backup', AppLanguage.nl: 'Back-up maken', AppLanguage.fr: 'Créer une sauvegarde', AppLanguage.pt: 'Criar backup', AppLanguage.pl: 'Utwórz kopię', AppLanguage.tr: 'Yedek oluştur', AppLanguage.ru: 'Создать резервную копию'},
+    'Backup wiederherstellen': {AppLanguage.de: 'Backup wiederherstellen', AppLanguage.en: 'Restore backup', AppLanguage.es: 'Restaurar copia', AppLanguage.it: 'Ripristina backup', AppLanguage.nl: 'Back-up herstellen', AppLanguage.fr: 'Restaurer la sauvegarde', AppLanguage.pt: 'Restaurar backup', AppLanguage.pl: 'Przywróć kopię', AppLanguage.tr: 'Yedeği geri yükle', AppLanguage.ru: 'Восстановить резервную копию'},
+    'Backup wurde gespeichert.': {AppLanguage.de: 'Backup wurde gespeichert.', AppLanguage.en: 'Backup was saved.', AppLanguage.es: 'La copia se ha guardado.', AppLanguage.it: 'Il backup è stato salvato.', AppLanguage.nl: 'De back-up is opgeslagen.', AppLanguage.fr: 'La sauvegarde a été enregistrée.', AppLanguage.pt: 'O backup foi salvo.', AppLanguage.pl: 'Kopia zapasowa została zapisana.', AppLanguage.tr: 'Yedek kaydedildi.', AppLanguage.ru: 'Резервная копия сохранена.'},
+    'Backup wurde wiederhergestellt.': {AppLanguage.de: 'Backup wurde wiederhergestellt.', AppLanguage.en: 'Backup was restored.', AppLanguage.es: 'La copia se ha restaurado.', AppLanguage.it: 'Il backup è stato ripristinato.', AppLanguage.nl: 'De back-up is hersteld.', AppLanguage.fr: 'La sauvegarde a été restaurée.', AppLanguage.pt: 'O backup foi restaurado.', AppLanguage.pl: 'Kopia zapasowa została przywrócona.', AppLanguage.tr: 'Yedek geri yüklendi.', AppLanguage.ru: 'Резервная копия восстановлена.'},
+    'Backup erstellen fehlgeschlagen': {AppLanguage.de: 'Backup erstellen fehlgeschlagen', AppLanguage.en: 'Backup creation failed', AppLanguage.es: 'Error al crear la copia', AppLanguage.it: 'Creazione backup non riuscita', AppLanguage.nl: 'Back-up maken mislukt', AppLanguage.fr: 'Échec de la sauvegarde', AppLanguage.pt: 'Falha ao criar backup', AppLanguage.pl: 'Tworzenie kopii nie powiodło się', AppLanguage.tr: 'Yedek oluşturulamadı', AppLanguage.ru: 'Не удалось создать резервную копию'},
+    'Wiederherstellung fehlgeschlagen': {AppLanguage.de: 'Wiederherstellung fehlgeschlagen', AppLanguage.en: 'Restore failed', AppLanguage.es: 'Error al restaurar', AppLanguage.it: 'Ripristino non riuscito', AppLanguage.nl: 'Herstellen mislukt', AppLanguage.fr: 'Échec de la restauration', AppLanguage.pt: 'Falha na restauração', AppLanguage.pl: 'Przywracanie nie powiodło się', AppLanguage.tr: 'Geri yükleme başarısız', AppLanguage.ru: 'Не удалось восстановить'},
+    'CocktailBot-Backup auswählen': {AppLanguage.de: 'CocktailBot-Backup auswählen', AppLanguage.en: 'Select CocktailBot backup', AppLanguage.es: 'Seleccionar copia de CocktailBot', AppLanguage.it: 'Seleziona backup CocktailBot', AppLanguage.nl: 'CocktailBot-back-up selecteren', AppLanguage.fr: 'Sélectionner la sauvegarde CocktailBot', AppLanguage.pt: 'Selecionar backup do CocktailBot', AppLanguage.pl: 'Wybierz kopię CocktailBot', AppLanguage.tr: 'CocktailBot yedeğini seç', AppLanguage.ru: 'Выбрать резервную копию CocktailBot'},
+    'Aktuelle Daten wirklich überschreiben?': {AppLanguage.de: 'Aktuelle Daten wirklich überschreiben?', AppLanguage.en: 'Really overwrite current data?', AppLanguage.es: '¿Sobrescribir los datos actuales?', AppLanguage.it: 'Sovrascrivere i dati attuali?', AppLanguage.nl: 'Huidige gegevens echt overschrijven?', AppLanguage.fr: 'Écraser les données actuelles ?', AppLanguage.pt: 'Substituir os dados atuais?', AppLanguage.pl: 'Nadpisać bieżące dane?', AppLanguage.tr: 'Mevcut verilerin üzerine yazılsın mı?', AppLanguage.ru: 'Перезаписать текущие данные?'},
+    'Wiederherstellen': {AppLanguage.de: 'Wiederherstellen', AppLanguage.en: 'Restore', AppLanguage.es: 'Restaurar', AppLanguage.it: 'Ripristina', AppLanguage.nl: 'Herstellen', AppLanguage.fr: 'Restaurer', AppLanguage.pt: 'Restaurar', AppLanguage.pl: 'Przywróć', AppLanguage.tr: 'Geri yükle', AppLanguage.ru: 'Восстановить'},
     'settingsPriming': {AppLanguage.de: 'Entlüften', AppLanguage.en: 'Priming', AppLanguage.es: 'Purgar', AppLanguage.it: 'Spurgo', AppLanguage.nl: 'Ontluchten', AppLanguage.fr: 'Purge', AppLanguage.pt: 'Escorvar', AppLanguage.pl: 'Odpowietrzanie', AppLanguage.tr: 'Hava alma', AppLanguage.ru: 'Прокачка'},
     'settingsPrimingSub': {AppLanguage.de: 'Schläuche entlüften', AppLanguage.en: 'Prime tubes', AppLanguage.es: 'Purgar tubos', AppLanguage.it: 'Spurga tubi', AppLanguage.nl: 'Slangen ontluchten', AppLanguage.fr: 'Purger les tuyaux', AppLanguage.pt: 'Escorvar mangueiras', AppLanguage.pl: 'Odpowietrz przewody', AppLanguage.tr: 'Hortumların havasını al', AppLanguage.ru: 'Прокачать трубки'},
     'settingsIngredients': {AppLanguage.de: 'Neue Zutaten', AppLanguage.en: 'Ingredients', AppLanguage.es: 'Ingredientes', AppLanguage.it: 'Ingredienti', AppLanguage.nl: 'Ingrediënten', AppLanguage.fr: 'Ingrédients', AppLanguage.pt: 'Ingredientes', AppLanguage.pl: 'Składniki', AppLanguage.tr: 'Malzemeler', AppLanguage.ru: 'Ингредиенты'},
@@ -2028,6 +2048,246 @@ String appText(AppLanguage language, String key) {
       AppLanguage.pl: 'Licencja komercyjna aktywna',
       AppLanguage.tr: 'Ticari lisans etkin',
       AppLanguage.ru: 'Коммерческая лицензия активна',
+    },
+    'Pumpen-Failover': {
+      AppLanguage.de: 'Pumpen-Failover',
+      AppLanguage.en: 'Pump failover',
+      AppLanguage.es: 'Conmutación de bombas',
+      AppLanguage.it: 'Failover delle pompe',
+      AppLanguage.nl: 'Pomp-failover',
+      AppLanguage.fr: 'Basculement des pompes',
+      AppLanguage.pt: 'Failover de bombas',
+      AppLanguage.pl: 'Przełączanie pomp',
+      AppLanguage.tr: 'Pompa yedekleme',
+      AppLanguage.ru: 'Переключение насосов',
+    },
+    'Mehrere Pumpen pro Zutat mit automatischem Wechsel': {
+      AppLanguage.de: 'Mehrere Pumpen pro Zutat mit automatischem Wechsel',
+      AppLanguage.en: 'Multiple pumps per ingredient with automatic failover',
+      AppLanguage.es: 'Varias bombas por ingrediente con cambio automático',
+      AppLanguage.it: 'Più pompe per ingrediente con cambio automatico',
+      AppLanguage.nl: 'Meerdere pompen per ingrediënt met automatische omschakeling',
+      AppLanguage.fr: 'Plusieurs pompes par ingrédient avec basculement automatique',
+      AppLanguage.pt: 'Várias bombas por ingrediente com troca automática',
+      AppLanguage.pl: 'Wiele pomp na składnik z automatycznym przełączaniem',
+      AppLanguage.tr: 'Malzeme başına otomatik geçişli birden fazla pompa',
+      AppLanguage.ru: 'Несколько насосов на ингредиент с автопереключением',
+    },
+    'Automatische Reservepumpen': {
+      AppLanguage.de: 'Automatische Reservepumpen',
+      AppLanguage.en: 'Automatic backup pumps',
+      AppLanguage.es: 'Bombas de reserva automáticas',
+      AppLanguage.it: 'Pompe di riserva automatiche',
+      AppLanguage.nl: 'Automatische reservepompen',
+      AppLanguage.fr: 'Pompes de secours automatiques',
+      AppLanguage.pt: 'Bombas de reserva automáticas',
+      AppLanguage.pl: 'Automatyczne pompy rezerwowe',
+      AppLanguage.tr: 'Otomatik yedek pompalar',
+      AppLanguage.ru: 'Автоматические резервные насосы',
+    },
+    'Automatisches Pumpen-Failover aktiv': {
+      AppLanguage.de: 'Automatisches Pumpen-Failover aktiv',
+      AppLanguage.en: 'Automatic pump failover active',
+      AppLanguage.es: 'Conmutación automática de bombas activa',
+      AppLanguage.it: 'Failover automatico delle pompe attivo',
+      AppLanguage.nl: 'Automatische pomp-failover actief',
+      AppLanguage.fr: 'Basculement automatique des pompes actif',
+      AppLanguage.pt: 'Failover automático de bombas ativo',
+      AppLanguage.pl: 'Automatyczne przełączanie pomp aktywne',
+      AppLanguage.tr: 'Otomatik pompa yedekleme etkin',
+      AppLanguage.ru: 'Автопереключение насосов активно',
+    },
+    'Priorität nach Pumpennummer': {
+      AppLanguage.de: 'Priorität nach Pumpennummer',
+      AppLanguage.en: 'Priority by pump number',
+      AppLanguage.es: 'Prioridad por número de bomba',
+      AppLanguage.it: 'Priorità per numero pompa',
+      AppLanguage.nl: 'Prioriteit op pompnummer',
+      AppLanguage.fr: 'Priorité selon le numéro de pompe',
+      AppLanguage.pt: 'Prioridade pelo número da bomba',
+      AppLanguage.pl: 'Priorytet według numeru pompy',
+      AppLanguage.tr: 'Pompa numarasına göre öncelik',
+      AppLanguage.ru: 'Приоритет по номеру насоса',
+    },
+    'Mehrere Pumpen pro Zutat sind eine Gewerbefunktion.': {
+      AppLanguage.de: 'Mehrere Pumpen pro Zutat sind eine Gewerbefunktion.',
+      AppLanguage.en: 'Multiple pumps per ingredient are a commercial feature.',
+      AppLanguage.es: 'Varias bombas por ingrediente son una función comercial.',
+      AppLanguage.it: 'Più pompe per ingrediente sono una funzione commerciale.',
+      AppLanguage.nl: 'Meerdere pompen per ingrediënt is een commerciële functie.',
+      AppLanguage.fr: 'Plusieurs pompes par ingrédient sont une fonction commerciale.',
+      AppLanguage.pt: 'Várias bombas por ingrediente são um recurso comercial.',
+      AppLanguage.pl: 'Wiele pomp na składnik to funkcja komercyjna.',
+      AppLanguage.tr: 'Malzeme başına birden fazla pompa ticari bir özelliktir.',
+      AppLanguage.ru: 'Несколько насосов на ингредиент — коммерческая функция.',
+    },
+    'Die Zutat ist bereits an Pumpe': {
+      AppLanguage.de: 'Die Zutat ist bereits an Pumpe',
+      AppLanguage.en: 'The ingredient is already assigned to pump',
+      AppLanguage.es: 'El ingrediente ya está asignado a la bomba',
+      AppLanguage.it: 'L’ingrediente è già assegnato alla pompa',
+      AppLanguage.nl: 'Het ingrediënt is al toegewezen aan pomp',
+      AppLanguage.fr: 'L’ingrédient est déjà affecté à la pompe',
+      AppLanguage.pt: 'O ingrediente já está atribuído à bomba',
+      AppLanguage.pl: 'Składnik jest już przypisany do pompy',
+      AppLanguage.tr: 'Malzeme zaten pompaya atanmış',
+      AppLanguage.ru: 'Ингредиент уже назначен насосу',
+    },
+    'zugeordnet': {
+      AppLanguage.de: 'zugeordnet',
+      AppLanguage.en: 'assigned',
+      AppLanguage.es: 'asignado',
+      AppLanguage.it: 'assegnato',
+      AppLanguage.nl: 'toegewezen',
+      AppLanguage.fr: 'affecté',
+      AppLanguage.pt: 'atribuído',
+      AppLanguage.pl: 'przypisany',
+      AppLanguage.tr: 'atanmış',
+      AppLanguage.ru: 'назначен',
+    },
+    'Reserve': {
+      AppLanguage.de: 'Reserve',
+      AppLanguage.en: 'Backup',
+      AppLanguage.es: 'Reserva',
+      AppLanguage.it: 'Riserva',
+      AppLanguage.nl: 'Reserve',
+      AppLanguage.fr: 'Réserve',
+      AppLanguage.pt: 'Reserva',
+      AppLanguage.pl: 'Rezerwa',
+      AppLanguage.tr: 'Yedek',
+      AppLanguage.ru: 'Резерв',
+    },
+    'Im Gewerbemodus kann dieselbe Zutat mehreren Pumpen zugeordnet werden. CocktailBot verwendet immer die Pumpe mit der niedrigsten Nummer, die kalibriert ist und genug gespeicherten Füllstand für die benötigte Menge besitzt. Ist sie leer oder reicht ihr Füllstand nicht mehr aus, wird automatisch zur nächsten Pumpe gewechselt.': {
+      AppLanguage.de: 'Im Gewerbemodus kann dieselbe Zutat mehreren Pumpen zugeordnet werden. CocktailBot verwendet immer die Pumpe mit der niedrigsten Nummer, die kalibriert ist und genug gespeicherten Füllstand für die benötigte Menge besitzt. Ist sie leer oder reicht ihr Füllstand nicht mehr aus, wird automatisch zur nächsten Pumpe gewechselt.',
+      AppLanguage.en: 'In commercial mode, the same ingredient can be assigned to multiple pumps. CocktailBot always uses the lowest-numbered pump that is calibrated and has enough stored fill level for the required amount. If it is empty or no longer contains enough, the next pump is selected automatically.',
+      AppLanguage.es: 'En modo comercial, el mismo ingrediente puede asignarse a varias bombas. CocktailBot utiliza siempre la bomba con el número más bajo que esté calibrada y tenga suficiente nivel registrado para la cantidad necesaria. Si está vacía o no alcanza, cambia automáticamente a la siguiente bomba.',
+      AppLanguage.it: 'In modalità commerciale, lo stesso ingrediente può essere assegnato a più pompe. CocktailBot usa sempre la pompa con il numero più basso che sia calibrata e abbia un livello registrato sufficiente. Se è vuota o non basta, passa automaticamente alla pompa successiva.',
+      AppLanguage.nl: 'In commerciële modus kan hetzelfde ingrediënt aan meerdere pompen worden toegewezen. CocktailBot gebruikt steeds de pomp met het laagste nummer die gekalibreerd is en genoeg opgeslagen vulniveau heeft. Is die leeg of onvoldoende gevuld, dan wordt automatisch de volgende pomp gebruikt.',
+      AppLanguage.fr: 'En mode commercial, le même ingrédient peut être affecté à plusieurs pompes. CocktailBot utilise toujours la pompe au numéro le plus bas qui est étalonnée et dispose d’un niveau enregistré suffisant. Si elle est vide ou insuffisante, la pompe suivante est sélectionnée automatiquement.',
+      AppLanguage.pt: 'No modo comercial, o mesmo ingrediente pode ser atribuído a várias bombas. O CocktailBot usa sempre a bomba de menor número que esteja calibrada e tenha nível registrado suficiente. Se estiver vazia ou insuficiente, passa automaticamente para a próxima bomba.',
+      AppLanguage.pl: 'W trybie komercyjnym ten sam składnik można przypisać do wielu pomp. CocktailBot używa zawsze pompy o najniższym numerze, która jest skalibrowana i ma wystarczający zapisany poziom. Gdy jest pusta lub ilość jest niewystarczająca, automatycznie wybierana jest następna pompa.',
+      AppLanguage.tr: 'Ticari modda aynı malzeme birden fazla pompaya atanabilir. CocktailBot her zaman kalibre edilmiş ve gereken miktar için yeterli kayıtlı doluluk seviyesine sahip en düşük numaralı pompayı kullanır. Pompa boşsa veya miktar yetmiyorsa otomatik olarak sonraki pompaya geçer.',
+      AppLanguage.ru: 'В коммерческом режиме один ингредиент можно назначить нескольким насосам. CocktailBot использует насос с наименьшим номером, который откалиброван и имеет достаточный сохранённый уровень. Если он пуст или объёма недостаточно, автоматически выбирается следующий насос.',
+    },
+    'Der automatische Wechsel basiert auf dem in CocktailBot gespeicherten Füllstand. Ohne Füllstandssensor kann eine tatsächlich vorzeitig leere Flasche nicht automatisch erkannt werden. In diesem Fall kann die betroffene Pumpe hier sofort als leer markiert werden.': {
+      AppLanguage.de: 'Der automatische Wechsel basiert auf dem in CocktailBot gespeicherten Füllstand. Ohne Füllstandssensor kann eine tatsächlich vorzeitig leere Flasche nicht automatisch erkannt werden. In diesem Fall kann die betroffene Pumpe hier sofort als leer markiert werden.',
+      AppLanguage.en: 'Automatic failover is based on the fill level stored in CocktailBot. Without a fill-level sensor, a bottle that becomes physically empty earlier cannot be detected automatically. In that case, the affected pump can be marked empty here immediately.',
+      AppLanguage.es: 'El cambio automático se basa en el nivel guardado en CocktailBot. Sin sensor de nivel, una botella que se vacíe físicamente antes no puede detectarse automáticamente. En ese caso, la bomba puede marcarse aquí como vacía.',
+      AppLanguage.it: 'Il cambio automatico si basa sul livello memorizzato in CocktailBot. Senza un sensore di livello, una bottiglia che si svuota prima non può essere rilevata automaticamente. In tal caso la pompa può essere contrassegnata qui come vuota.',
+      AppLanguage.nl: 'Automatische omschakeling is gebaseerd op het in CocktailBot opgeslagen vulniveau. Zonder niveausensor kan een fles die eerder fysiek leeg raakt niet automatisch worden gedetecteerd. In dat geval kan de pomp hier direct als leeg worden gemarkeerd.',
+      AppLanguage.fr: 'Le basculement automatique repose sur le niveau enregistré dans CocktailBot. Sans capteur de niveau, une bouteille réellement vide plus tôt ne peut pas être détectée automatiquement. La pompe concernée peut alors être marquée vide ici.',
+      AppLanguage.pt: 'A troca automática baseia-se no nível salvo no CocktailBot. Sem sensor de nível, uma garrafa que fique fisicamente vazia antes não pode ser detectada automaticamente. Nesse caso, a bomba pode ser marcada como vazia aqui.',
+      AppLanguage.pl: 'Automatyczne przełączanie opiera się na poziomie zapisanym w CocktailBot. Bez czujnika poziomu wcześniejszego fizycznego opróżnienia butelki nie da się wykryć automatycznie. W takim przypadku pompę można tutaj od razu oznaczyć jako pustą.',
+      AppLanguage.tr: 'Otomatik geçiş CocktailBot’ta kayıtlı doluluk seviyesine dayanır. Seviye sensörü olmadan fiziksel olarak daha erken boşalan bir şişe otomatik algılanamaz. Bu durumda ilgili pompa burada hemen boş olarak işaretlenebilir.',
+      AppLanguage.ru: 'Автоматическое переключение основано на уровне, сохранённом в CocktailBot. Без датчика уровня нельзя автоматически определить, что бутылка физически опустела раньше. В этом случае насос можно сразу отметить здесь как пустой.',
+    },
+    'Mehrfachzuordnung in der Kalibrierung einrichten': {
+      AppLanguage.de: 'Mehrfachzuordnung in der Kalibrierung einrichten',
+      AppLanguage.en: 'Set up multiple assignments in calibration',
+      AppLanguage.es: 'Configurar asignación múltiple en calibración',
+      AppLanguage.it: 'Configura assegnazioni multiple nella calibrazione',
+      AppLanguage.nl: 'Meervoudige toewijzing instellen bij kalibratie',
+      AppLanguage.fr: 'Configurer les affectations multiples dans l’étalonnage',
+      AppLanguage.pt: 'Configurar múltiplas atribuições na calibração',
+      AppLanguage.pl: 'Ustaw wiele przypisań w kalibracji',
+      AppLanguage.tr: 'Kalibrasyonda çoklu atama ayarla',
+      AppLanguage.ru: 'Настроить множественные назначения в калибровке',
+    },
+    'Noch keine Reservepumpen eingerichtet': {
+      AppLanguage.de: 'Noch keine Reservepumpen eingerichtet',
+      AppLanguage.en: 'No backup pumps configured yet',
+      AppLanguage.es: 'Aún no hay bombas de reserva configuradas',
+      AppLanguage.it: 'Nessuna pompa di riserva configurata',
+      AppLanguage.nl: 'Nog geen reservepompen ingesteld',
+      AppLanguage.fr: 'Aucune pompe de secours configurée',
+      AppLanguage.pt: 'Nenhuma bomba de reserva configurada',
+      AppLanguage.pl: 'Nie skonfigurowano jeszcze pomp rezerwowych',
+      AppLanguage.tr: 'Henüz yedek pompa ayarlanmadı',
+      AppLanguage.ru: 'Резервные насосы пока не настроены',
+    },
+    'Ordne in der Kalibrierung dieselbe Zutat mindestens zwei aktiven Pumpen zu. Die Reihenfolge ergibt sich automatisch aus der Pumpennummer.': {
+      AppLanguage.de: 'Ordne in der Kalibrierung dieselbe Zutat mindestens zwei aktiven Pumpen zu. Die Reihenfolge ergibt sich automatisch aus der Pumpennummer.',
+      AppLanguage.en: 'In calibration, assign the same ingredient to at least two active pumps. The order is determined automatically by pump number.',
+      AppLanguage.es: 'En calibración, asigna el mismo ingrediente a al menos dos bombas activas. El orden se determina automáticamente por el número de bomba.',
+      AppLanguage.it: 'Nella calibrazione assegna lo stesso ingrediente ad almeno due pompe attive. L’ordine viene determinato automaticamente dal numero della pompa.',
+      AppLanguage.nl: 'Wijs bij kalibratie hetzelfde ingrediënt toe aan minstens twee actieve pompen. De volgorde wordt automatisch bepaald door het pompnummer.',
+      AppLanguage.fr: 'Dans l’étalonnage, affectez le même ingrédient à au moins deux pompes actives. L’ordre est déterminé automatiquement par le numéro de pompe.',
+      AppLanguage.pt: 'Na calibração, atribua o mesmo ingrediente a pelo menos duas bombas ativas. A ordem é definida automaticamente pelo número da bomba.',
+      AppLanguage.pl: 'W kalibracji przypisz ten sam składnik do co najmniej dwóch aktywnych pomp. Kolejność jest ustalana automatycznie według numeru pompy.',
+      AppLanguage.tr: 'Kalibrasyonda aynı malzemeyi en az iki etkin pompaya atayın. Sıra pompa numarasına göre otomatik belirlenir.',
+      AppLanguage.ru: 'В калибровке назначьте один ингредиент как минимум двум активным насосам. Порядок автоматически определяется номером насоса.',
+    },
+    'Nächste Pumpe': {
+      AppLanguage.de: 'Nächste Pumpe',
+      AppLanguage.en: 'Next pump',
+      AppLanguage.es: 'Siguiente bomba',
+      AppLanguage.it: 'Pompa successiva',
+      AppLanguage.nl: 'Volgende pomp',
+      AppLanguage.fr: 'Pompe suivante',
+      AppLanguage.pt: 'Próxima bomba',
+      AppLanguage.pl: 'Następna pompa',
+      AppLanguage.tr: 'Sonraki pompa',
+      AppLanguage.ru: 'Следующий насос',
+    },
+    'Keine einsatzbereite Pumpe': {
+      AppLanguage.de: 'Keine einsatzbereite Pumpe',
+      AppLanguage.en: 'No ready pump',
+      AppLanguage.es: 'No hay bomba lista',
+      AppLanguage.it: 'Nessuna pompa pronta',
+      AppLanguage.nl: 'Geen pomp gereed',
+      AppLanguage.fr: 'Aucune pompe prête',
+      AppLanguage.pt: 'Nenhuma bomba pronta',
+      AppLanguage.pl: 'Brak gotowej pompy',
+      AppLanguage.tr: 'Hazır pompa yok',
+      AppLanguage.ru: 'Нет готового насоса',
+    },
+    'bereit': {
+      AppLanguage.de: 'bereit',
+      AppLanguage.en: 'ready',
+      AppLanguage.es: 'lista',
+      AppLanguage.it: 'pronta',
+      AppLanguage.nl: 'gereed',
+      AppLanguage.fr: 'prête',
+      AppLanguage.pt: 'pronta',
+      AppLanguage.pl: 'gotowa',
+      AppLanguage.tr: 'hazır',
+      AppLanguage.ru: 'готов',
+    },
+    'leer': {
+      AppLanguage.de: 'leer',
+      AppLanguage.en: 'empty',
+      AppLanguage.es: 'vacía',
+      AppLanguage.it: 'vuota',
+      AppLanguage.nl: 'leeg',
+      AppLanguage.fr: 'vide',
+      AppLanguage.pt: 'vazia',
+      AppLanguage.pl: 'pusta',
+      AppLanguage.tr: 'boş',
+      AppLanguage.ru: 'пуст',
+    },
+    'Leer setzen': {
+      AppLanguage.de: 'Leer setzen',
+      AppLanguage.en: 'Mark empty',
+      AppLanguage.es: 'Marcar vacía',
+      AppLanguage.it: 'Segna vuota',
+      AppLanguage.nl: 'Als leeg markeren',
+      AppLanguage.fr: 'Marquer vide',
+      AppLanguage.pt: 'Marcar vazia',
+      AppLanguage.pl: 'Oznacz jako pustą',
+      AppLanguage.tr: 'Boş işaretle',
+      AppLanguage.ru: 'Отметить пустым',
+    },
+    'wurde als leer markiert. Die nächste Reservepumpe wird automatisch verwendet.': {
+      AppLanguage.de: 'wurde als leer markiert. Die nächste Reservepumpe wird automatisch verwendet.',
+      AppLanguage.en: 'was marked empty. The next backup pump will be used automatically.',
+      AppLanguage.es: 'se marcó como vacía. La siguiente bomba de reserva se usará automáticamente.',
+      AppLanguage.it: 'è stata segnata come vuota. La pompa di riserva successiva verrà usata automaticamente.',
+      AppLanguage.nl: 'is als leeg gemarkeerd. De volgende reservepomp wordt automatisch gebruikt.',
+      AppLanguage.fr: 'a été marquée vide. La pompe de secours suivante sera utilisée automatiquement.',
+      AppLanguage.pt: 'foi marcada como vazia. A próxima bomba de reserva será usada automaticamente.',
+      AppLanguage.pl: 'została oznaczona jako pusta. Następna pompa rezerwowa zostanie użyta automatycznie.',
+      AppLanguage.tr: 'boş olarak işaretlendi. Sonraki yedek pompa otomatik kullanılacak.',
+      AppLanguage.ru: 'отмечен как пустой. Следующий резервный насос будет использован автоматически.',
     },
     'Privatmodus': {
       AppLanguage.de: 'Privatmodus',
@@ -3429,7 +3689,46 @@ class MachineStore extends ChangeNotifier {
   double ledBrightness = 0.35;
 
   Ingredient? ingredientById(String? id) => id == null ? null : ingredients.where((e) => e.id == id).firstOrNull;
-  Pump? pumpForIngredient(String id) => pumps.where((p) => p.active && p.ingredientId == id).firstOrNull;
+
+  List<Pump> pumpsForIngredient(String id) {
+    final matches = pumps
+        .where((p) => p.active && p.ingredientId == id)
+        .toList()
+      ..sort((a, b) => a.number.compareTo(b.number));
+
+    // Mehrfachzuordnung und automatisches Failover sind bewusst Teil der
+    // Gewerbelizenz. Bestehende Mehrfachzuordnungen bleiben gespeichert,
+    // werden im Privatmodus aber nicht automatisch genutzt.
+    if (!commercialLicenseActive && matches.length > 1) {
+      return [matches.first];
+    }
+    return matches;
+  }
+
+  Pump? pumpForIngredient(String id) => pumpsForIngredient(id).firstOrNull;
+
+  Pump? pumpForIngredientAmount(
+    String id,
+    double requiredMl, {
+    bool requireCalibration = true,
+    Map<int, double>? remainingOverride,
+  }) {
+    final needed = math.max(0.0, requiredMl);
+    for (final pump in pumpsForIngredient(id)) {
+      final remaining = remainingOverride?[pump.number] ?? pump.remainingMl;
+      if (requireCalibration && pump.mlPerSecond <= 0) {
+        continue;
+      }
+      if (remaining + 0.0001 >= needed) {
+        return pump;
+      }
+    }
+    return null;
+  }
+
+  bool hasCommercialPumpFailover(String ingredientId) =>
+      commercialLicenseActive && pumpsForIngredient(ingredientId).length > 1;
+
   String t(String key) => appText(appLanguage, key);
 
   String displayIngredientNameById(String? id) {
@@ -6036,22 +6335,33 @@ class MachineStore extends ChangeNotifier {
         continue;
       }
 
-      final pump = pumpForIngredient(part.ingredientId);
-
-      if (pump == null) {
+      final candidates = pumpsForIngredient(part.ingredientId);
+      if (candidates.isEmpty) {
         return RecipeAvailability.unavailable;
       }
 
-      if (pump.remainingMl + 0.0001 < requiredMl) {
+      final stockCandidates = candidates
+          .where((pump) => pump.remainingMl + 0.0001 >= requiredMl)
+          .toList();
+      if (stockCandidates.isEmpty) {
         return RecipeAvailability.unavailable;
       }
 
-      if (pump.mlPerSecond <= 0) {
+      final usableCandidates =
+          stockCandidates.where((pump) => pump.mlPerSecond > 0).toList();
+      if (usableCandidates.isEmpty) {
         calibrationMissing = true;
+        continue;
       }
 
+      // Im Gewerbemodus zählt der gesamte verwendbare Vorrat aller
+      // Reservepumpen für die Warnstufe. Für die konkrete Zubereitung wird
+      // trotzdem immer nur die erste Pumpe mit ausreichendem Vorrat gewählt.
+      final usableRemainingMl = candidates
+          .where((pump) => pump.mlPerSecond > 0)
+          .fold<double>(0.0, (sum, pump) => sum + math.max(0.0, pump.remainingMl));
       minimumPortions =
-          math.min(minimumPortions, pump.remainingMl / requiredMl);
+          math.min(minimumPortions, usableRemainingMl / requiredMl);
     }
 
     if (calibrationMissing) {
@@ -6087,19 +6397,28 @@ class MachineStore extends ChangeNotifier {
         continue;
       }
 
-      final pump = pumpForIngredient(part.ingredientId);
+      final candidates = pumpsForIngredient(part.ingredientId);
       final name = displayIngredientNameById(part.ingredientId);
 
-      if (pump == null) {
+      if (candidates.isEmpty) {
         return name;
       }
-      if (pump.remainingMl + 0.0001 < requiredMl) {
+
+      final stockCandidates = candidates
+          .where((pump) => pump.remainingMl + 0.0001 >= requiredMl)
+          .toList();
+      if (stockCandidates.isEmpty) {
         return name;
       }
-      if (pump.mlPerSecond <= 0) {
+
+      if (!stockCandidates.any((pump) => pump.mlPerSecond > 0)) {
         return name;
       }
-      final portions = pump.remainingMl / requiredMl;
+
+      final usableRemainingMl = candidates
+          .where((pump) => pump.mlPerSecond > 0)
+          .fold<double>(0.0, (sum, pump) => sum + math.max(0.0, pump.remainingMl));
+      final portions = usableRemainingMl / requiredMl;
       if (portions < lowestPortions) {
         lowestPortions = portions;
         lowestName = name;
@@ -6447,6 +6766,10 @@ class MachineStore extends ChangeNotifier {
       targetAlcoholPercent: targetAlcoholPercent,
     );
     final commands = <Map<String, dynamic>>[];
+    final selectedPumps = <RecipePart, Pump>{};
+    final virtualRemaining = <int, double>{
+      for (final pump in pumps) pump.number: pump.remainingMl,
+    };
 
     for (final part in recipe.parts.where((e) => e.automatic)) {
       final scaledAmount = amounts[part] ?? part.amountMl * scale;
@@ -6454,21 +6777,36 @@ class MachineStore extends ChangeNotifier {
         continue;
       }
 
-      final pump = pumpForIngredient(part.ingredientId);
-
-      if (pump == null) {
+      final candidates = pumpsForIngredient(part.ingredientId);
+      if (candidates.isEmpty) {
         throw Exception(
           '${t('Keine Pumpe für')} ${displayIngredientNameById(part.ingredientId)}',
         );
       }
-      if (pump.mlPerSecond <= 0) {
-        throw Exception('${t('Pumpe')} ${pump.number} ${t('ist nicht kalibriert')}');
-      }
-      if (pump.remainingMl < scaledAmount) {
+
+      final stockCandidates = candidates.where((pump) {
+        final remaining = virtualRemaining[pump.number] ?? pump.remainingMl;
+        return remaining + 0.0001 >= scaledAmount;
+      }).toList();
+
+      if (stockCandidates.isEmpty) {
         throw Exception(
           '${displayIngredientNameById(part.ingredientId)} ${t('reicht nicht aus')}',
         );
       }
+
+      final pump =
+          stockCandidates.where((candidate) => candidate.mlPerSecond > 0).firstOrNull;
+      if (pump == null) {
+        final uncalibrated = stockCandidates.first;
+        throw Exception(
+          '${t('Pumpe')} ${uncalibrated.number} ${t('ist nicht kalibriert')}',
+        );
+      }
+
+      selectedPumps[part] = pump;
+      virtualRemaining[pump.number] =
+          (virtualRemaining[pump.number] ?? pump.remainingMl) - scaledAmount;
 
       commands.add({
         'pump': pump.number,
@@ -6498,7 +6836,11 @@ class MachineStore extends ChangeNotifier {
       if (scaledAmount <= 0) {
         continue;
       }
-      pumpForIngredient(part.ingredientId)!.remainingMl -= scaledAmount;
+      final pump = selectedPumps[part];
+      if (pump == null) {
+        continue;
+      }
+      pump.remainingMl = math.max(0.0, pump.remainingMl - scaledAmount);
     }
 
     recordRecipeConsumption(
@@ -6515,6 +6857,7 @@ class MachineStore extends ChangeNotifier {
     await syncFillLevelsToController();
     notifyListeners();
   }
+
 }
 
 extension FirstOrNull<E> on Iterable<E> { E? get firstOrNull => isEmpty ? null : first; }
@@ -8735,6 +9078,7 @@ class SettingsPage extends StatelessWidget {
       (store.t('settingsSizes'), store.t('settingsSizesSub'), Icons.straighten, mixed, ServingSizesPage(store: store)),
       (store.t('settingsFill'), store.t('settingsFillSub'), Icons.inventory_2_outlined, warning, FillLevelsPage(store: store)),
       (store.t('settingsCleaning'), store.t('settingsCleaningSub'), Icons.cleaning_services_outlined, error, SequencePage(store: store, cleaning: true)),
+      (store.t('settingsBackup'), store.t('settingsBackupSub'), Icons.backup_outlined, success, BackupRestorePage(store: store)),
       (store.t('settingsPriming'), store.t('settingsPrimingSub'), Icons.air, error, SequencePage(store: store, cleaning: false)),
       (store.t('settingsIngredients'), store.t('settingsIngredientsSub'), Icons.local_drink_outlined, success, IngredientPage(store: store)),
       (store.t('settingsRecipes'), store.t('settingsRecipesSub'), Icons.receipt_long_outlined, secondary, RecipeManagementPage(store: store)),
@@ -8743,6 +9087,7 @@ class SettingsPage extends StatelessWidget {
 
       // Lizenzbereich: alle lizenzpflichtigen Funktionen stehen gesammelt unten.
       (store.t('Gewerbelizenz'), store.commercialLicenseStatusText, Icons.verified_user_outlined, store.commercialLicenseActive ? success : warning, CommercialLicensePage(store: store)),
+      (store.t('Pumpen-Failover'), commercialSubtitle(store.t('Mehrere Pumpen pro Zutat mit automatischem Wechsel')), Icons.alt_route, secondary, commercialPage(store.t('Pumpen-Failover'), PumpFailoverPage(store: store))),
       (store.t('Verbrauchsstatistik'), commercialSubtitle(store.t('Cocktail-Ranking, Kosten und Zutatenverbrauch')), Icons.bar_chart_outlined, success, commercialPage(store.t('Verbrauchsstatistik'), ConsumptionStatisticsPage(store: store))),
       (store.t('Partykarten'), commercialSubtitle(store.t('Auswahl und Beliebtheit für Veranstaltungen')), Icons.fact_check_outlined, mixed, commercialPage(store.t('Partykarten'), PartyCardsPage(store: store))),
       (store.t('Partyplaner'), commercialSubtitle(store.t('Prognose aus vergangenen Partys')), Icons.event_available_outlined, secondary, commercialPage(store.t('Partyplaner'), PartyPlannerPage(store: store))),
@@ -11189,6 +11534,284 @@ class _LedSettingsPageState extends State<LedSettingsPage> {
   }
 }
 
+
+class PumpFailoverPage extends StatefulWidget {
+  const PumpFailoverPage({super.key, required this.store});
+  final MachineStore store;
+
+  @override
+  State<PumpFailoverPage> createState() => _PumpFailoverPageState();
+}
+
+class _PumpFailoverPageState extends State<PumpFailoverPage> {
+  Future<void> _markEmpty(Pump pump) async {
+    pump.remainingMl = 0;
+    await widget.store.save();
+    await widget.store.syncFillLevelsToController();
+    if (!mounted) return;
+    setState(() {});
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          '${tr('Pumpe')} ${pump.number} ${tr('wurde als leer markiert. Die nächste Reservepumpe wird automatisch verwendet.')}',
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final groups = <(Ingredient, List<Pump>)>[];
+    for (final ingredient in widget.store.ingredients) {
+      final assigned = widget.store.pumps
+          .where(
+            (pump) =>
+                pump.active &&
+                pump.ingredientId == ingredient.id,
+          )
+          .toList()
+        ..sort((a, b) => a.number.compareTo(b.number));
+      if (assigned.length > 1) {
+        groups.add((ingredient, assigned));
+      }
+    }
+
+    return PageFrame(
+      title: tr('Pumpen-Failover'),
+      child: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.alt_route,
+                        color: widget.store.appColors.accentColor,
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          tr('Automatische Reservepumpen'),
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    tr(
+                      'Im Gewerbemodus kann dieselbe Zutat mehreren Pumpen zugeordnet werden. CocktailBot verwendet immer die Pumpe mit der niedrigsten Nummer, die kalibriert ist und genug gespeicherten Füllstand für die benötigte Menge besitzt. Ist sie leer oder reicht ihr Füllstand nicht mehr aus, wird automatisch zur nächsten Pumpe gewechselt.',
+                    ),
+                    style: TextStyle(
+                      color: widget.store.appColors.textSecondaryColor,
+                      height: 1.4,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    tr(
+                      'Der automatische Wechsel basiert auf dem in CocktailBot gespeicherten Füllstand. Ohne Füllstandssensor kann eine tatsächlich vorzeitig leere Flasche nicht automatisch erkannt werden. In diesem Fall kann die betroffene Pumpe hier sofort als leer markiert werden.',
+                    ),
+                    style: TextStyle(
+                      color: widget.store.appColors.warningColor,
+                      height: 1.4,
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  OutlinedButton.icon(
+                    onPressed: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => CalibrationPage(store: widget.store),
+                        ),
+                      );
+                    },
+                    icon: const Icon(Icons.science_outlined),
+                    label: Text(tr('Mehrfachzuordnung in der Kalibrierung einrichten')),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 14),
+          if (groups.isEmpty)
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(18),
+                child: Column(
+                  children: [
+                    const Icon(Icons.alt_route, size: 38),
+                    const SizedBox(height: 10),
+                    Text(
+                      tr('Noch keine Reservepumpen eingerichtet'),
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w900,
+                        fontSize: 17,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      tr(
+                        'Ordne in der Kalibrierung dieselbe Zutat mindestens zwei aktiven Pumpen zu. Die Reihenfolge ergibt sich automatisch aus der Pumpennummer.',
+                      ),
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: widget.store.appColors.textSecondaryColor,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            )
+          else
+            ...groups.map((group) {
+              final ingredient = group.$1;
+              final pumps = group.$2;
+              final nextPump = pumps
+                  .where(
+                    (pump) =>
+                        pump.mlPerSecond > 0 &&
+                        pump.remainingMl > 0.0001,
+                  )
+                  .firstOrNull;
+
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                widget.store.displayIngredientName(ingredient),
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w900,
+                                  fontSize: 18,
+                                ),
+                              ),
+                            ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 6,
+                              ),
+                              decoration: BoxDecoration(
+                                color: widget.store.appColors.accentColor
+                                    .withValues(alpha: .12),
+                                borderRadius: BorderRadius.circular(999),
+                              ),
+                              child: Text(
+                                pumps
+                                    .map((pump) => '${tr('Pumpe')} ${pump.number}')
+                                    .join(' → '),
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w800,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          nextPump == null
+                              ? tr('Keine einsatzbereite Pumpe')
+                              : '${tr('Nächste Pumpe')}: ${nextPump.number}',
+                          style: TextStyle(
+                            color: nextPump == null
+                                ? widget.store.appColors.errorColor
+                                : widget.store.appColors.successColor,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        ...pumps.indexed.map((entry) {
+                          final index = entry.$1;
+                          final pump = entry.$2;
+                          final empty = pump.remainingMl <= 0.0001;
+                          final calibrated = pump.mlPerSecond > 0;
+                          final status = empty
+                              ? tr('leer')
+                              : calibrated
+                                  ? tr('bereit')
+                                  : tr('nicht kalibriert');
+
+                          return Padding(
+                            padding: const EdgeInsets.only(top: 8),
+                            child: Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                border: Border.all(
+                                  color: widget.store.appColors.borderColor,
+                                ),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Row(
+                                children: [
+                                  CircleAvatar(
+                                    radius: 18,
+                                    child: Text('${index + 1}'),
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          '${tr('Pumpe')} ${pump.number} · $status',
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight.w800,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 3),
+                                        Text(
+                                          '${pump.remainingMl.toStringAsFixed(0)} / '
+                                          '${pump.capacityMl.toStringAsFixed(0)} ml'
+                                          '${calibrated ? ' · ${pump.mlPerSecond.toStringAsFixed(2)} ml/s' : ''}',
+                                          style: TextStyle(
+                                            color: widget.store.appColors
+                                                .textSecondaryColor,
+                                            fontSize: 12,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  OutlinedButton(
+                                    onPressed: empty ? null : () => _markEmpty(pump),
+                                    child: Text(tr('Leer setzen')),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        }),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            }),
+        ],
+      ),
+    );
+  }
+}
+
 class CalibrationPage extends StatelessWidget {
   const CalibrationPage({
     super.key,
@@ -11263,10 +11886,10 @@ class CalibrationPage extends StatelessWidget {
                 gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                   crossAxisCount: count,
                   mainAxisExtent: count == 1
-                      ? 460
+                      ? 500
                       : count == 2
-                          ? 485
-                          : 455,
+                          ? 525
+                          : 495,
                   crossAxisSpacing: 14,
                   mainAxisSpacing: 14,
                 ),
@@ -11323,9 +11946,343 @@ class GridList extends StatelessWidget {
   }
 }
 
+class BackupRestorePage extends StatefulWidget {
+  const BackupRestorePage({super.key, required this.store});
+  final MachineStore store;
+
+  @override
+  State<BackupRestorePage> createState() => _BackupRestorePageState();
+}
+
+class _BackupRestorePageState extends State<BackupRestorePage> {
+  static const String _backupFormat = 'cocktailbot-full-backup';
+  static const int _backupVersion = 1;
+  bool busy = false;
+
+  String _backupFileName() {
+    final now = DateTime.now();
+    String two(int value) => value.toString().padLeft(2, '0');
+    return 'CocktailBot_Backup_${now.year}-${two(now.month)}-${two(now.day)}_'
+        '${two(now.hour)}-${two(now.minute)}-${two(now.second)}.json';
+  }
+
+  Future<Map<String, dynamic>> _serverBackupState() async {
+    final response = await http
+        .get(
+          widget.store._apiUri('/api/backup/server-state'),
+          headers: widget.store._apiHeaders(),
+        )
+        .timeout(const Duration(seconds: 15));
+    final decoded = response.body.trim().isEmpty
+        ? <String, dynamic>{}
+        : jsonDecode(response.body);
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      final message = decoded is Map ? decoded['error']?.toString() : null;
+      throw Exception(message ?? 'Backup HTTP ${response.statusCode}');
+    }
+    if (decoded is! Map || decoded['ok'] != true) {
+      throw Exception('Ungültige Backup-Antwort');
+    }
+    return Map<String, dynamic>.from(decoded);
+  }
+
+  Future<void> _createBackup() async {
+    if (busy) return;
+    setState(() => busy = true);
+    try {
+      await widget.store.save();
+      final serverState = await _serverBackupState();
+      final payload = <String, dynamic>{
+        'format': _backupFormat,
+        'version': _backupVersion,
+        'createdAt': DateTime.now().toUtc().toIso8601String(),
+        'appState': widget.store._persistentStateJson(),
+        'serverState': serverState,
+      };
+      final bytes = Uint8List.fromList(utf8.encode(jsonEncode(payload)));
+      final saved = await FilePicker.saveFile(
+        dialogTitle: tr('Backup erstellen'),
+        fileName: _backupFileName(),
+        bytes: bytes,
+        type: FileType.custom,
+        allowedExtensions: const ['json'],
+      );
+      if (!mounted) return;
+      setState(() => busy = false);
+      if (saved != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(tr('Backup wurde gespeichert.'))),
+        );
+      }
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => busy = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('${tr('Backup erstellen fehlgeschlagen')}: $error'),
+        ),
+      );
+    }
+  }
+
+  bool _validAppState(Map<String, dynamic> state) {
+    return state['ingredients'] is List &&
+        state['pumps'] is List &&
+        state['recipes'] is List;
+  }
+
+  Future<void> _restoreBackup() async {
+    if (busy) return;
+    try {
+      final result = await FilePicker.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: const ['json'],
+        allowMultiple: false,
+        withData: true,
+        dialogTitle: tr('CocktailBot-Backup auswählen'),
+      );
+      if (result == null || result.files.isEmpty) return;
+
+      final file = result.files.single;
+      final bytes = file.bytes ?? await file.xFile.readAsBytes();
+      if (bytes.isEmpty) throw Exception('Backup-Datei ist leer');
+      if (bytes.length > 100 * 1024 * 1024) {
+        throw Exception('Backup-Datei ist größer als 100 MB');
+      }
+
+      final decoded = jsonDecode(utf8.decode(bytes));
+      if (decoded is! Map) throw Exception('Ungültiges Backup-Format');
+      final backup = Map<String, dynamic>.from(decoded);
+      if (backup['format'] != _backupFormat ||
+          (backup['version'] as num?)?.toInt() != _backupVersion) {
+        throw Exception('Diese Datei ist kein unterstütztes CocktailBot-Backup');
+      }
+      final rawAppState = backup['appState'];
+      if (rawAppState is! Map) throw Exception('App-Daten fehlen im Backup');
+      final appState = Map<String, dynamic>.from(rawAppState);
+      if (!_validAppState(appState)) {
+        throw Exception('App-Daten im Backup sind unvollständig');
+      }
+
+      if (!mounted) return;
+      final confirmed = await showDialog<bool>(
+            context: context,
+            builder: (context) => AlertDialog(
+              title: Text(tr('Aktuelle Daten wirklich überschreiben?')),
+              content: const T(
+                'Rezepte, Zutaten, Pumpenzuordnung, Kalibrierungen, Füllstände, '
+                'Design, Statistiken, Party-Daten und weitere Einstellungen '
+                'werden durch den Stand aus dem Backup ersetzt.',
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context, false),
+                  child: Text(tr('Abbrechen')),
+                ),
+                FilledButton.icon(
+                  onPressed: () => Navigator.pop(context, true),
+                  icon: const Icon(Icons.restore),
+                  label: Text(tr('Wiederherstellen')),
+                ),
+              ],
+            ),
+          ) ??
+          false;
+      if (!confirmed || !mounted) return;
+
+      setState(() => busy = true);
+      final response = await http
+          .post(
+            widget.store._apiUri('/api/backup/restore'),
+            headers: widget.store._apiHeaders(json: true),
+            body: bytes,
+          )
+          .timeout(const Duration(seconds: 30));
+      final responseData = response.body.trim().isEmpty
+          ? <String, dynamic>{}
+          : jsonDecode(response.body);
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        final message = responseData is Map
+            ? responseData['error']?.toString()
+            : null;
+        throw Exception(message ?? 'Restore HTTP ${response.statusCode}');
+      }
+
+      final preferences = await SharedPreferences.getInstance();
+      await preferences.setString('machine_state', jsonEncode(appState));
+      await widget.store.load(skipConnect: true);
+      await widget.store.connect();
+
+      if (!mounted) return;
+      setState(() => busy = false);
+      final warnings = responseData is Map && responseData['warnings'] is List
+          ? (responseData['warnings'] as List)
+              .map((entry) => entry.toString())
+              .where((entry) => entry.isNotEmpty)
+              .toList()
+          : <String>[];
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            warnings.isEmpty
+                ? tr('Backup wurde wiederhergestellt.')
+                : '${tr('Backup wurde wiederhergestellt.')} ${warnings.join(' ')}',
+          ),
+          duration: Duration(seconds: warnings.isEmpty ? 3 : 8),
+        ),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => busy = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('${tr('Wiederherstellung fehlgeschlagen')}: $error'),
+        ),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final store = widget.store;
+    return PageFrame(
+      title: tr('Vollbackup'),
+      child: ListView(
+        padding: const EdgeInsets.all(20),
+        children: [
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(18),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(Icons.backup_outlined, color: store.appColors.successColor),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          tr('Vollbackup'),
+                          style: const TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  const T(
+                    'Das Backup enthält Rezepte, Zutaten, Pumpenzuordnung, '
+                    'Kalibrierungen, Füllstände, Größen, Design, Sprache, '
+                    'Statistiken, Party-Daten, Einkaufsliste, Netzwerkzugang, '
+                    'Lizenzdatei, lokale Zahlungsdaten, Preis-Konfiguration '
+                    'und die PayPal-Zugangsdaten.',
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    'Wichtig: Die Backup-Datei enthält vertrauliche Daten '
+                    '(unter anderem PayPal Client-Secret und Netzwerkzugang) '
+                    'und sollte sicher aufbewahrt werden. Nicht enthalten sind '
+                    'das Raspberry-Pi-Betriebssystem und die installierten '
+                    'Programmdateien. Eine Gewerbelizenz bleibt gerätegebunden '
+                    'und wird auf einem anderen Gerät nicht aktiviert.',
+                    style: TextStyle(
+                      color: store.appColors.textSecondaryColor,
+                      height: 1.4,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          SizedBox(
+            height: 54,
+            child: FilledButton.icon(
+              onPressed: busy ? null : _createBackup,
+              icon: busy
+                  ? const SizedBox.square(
+                      dimension: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.download_for_offline_outlined),
+              label: Text(tr('Backup erstellen')),
+            ),
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            height: 54,
+            child: OutlinedButton.icon(
+              onPressed: busy ? null : _restoreBackup,
+              icon: const Icon(Icons.restore),
+              label: Text(tr('Backup wiederherstellen')),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class PumpCalibrationCard extends StatefulWidget { const PumpCalibrationCard({super.key, required this.store, required this.pump}); final MachineStore store; final Pump pump; @override State<PumpCalibrationCard> createState() => _PumpCalibrationCardState(); }
 class _PumpCalibrationCardState extends State<PumpCalibrationCard> {
-  double seconds = 2; final amount = TextEditingController(); bool running = false;
+  double seconds = 2;
+  final amount = TextEditingController();
+  bool running = false;
+
+  Pump? _otherPumpForIngredient(String ingredientId) => widget.store.pumps
+      .where(
+        (pump) =>
+            pump.number != widget.pump.number &&
+            pump.active &&
+            pump.ingredientId == ingredientId,
+      )
+      .firstOrNull;
+
+  List<DropdownMenuItem<String?>> _ingredientItems() => [
+        const DropdownMenuItem(value: null, child: T('Nicht zugeordnet')),
+        ...widget.store.ingredients.map((ingredient) {
+          final other = _otherPumpForIngredient(ingredient.id);
+          final duplicateAllowed = widget.store.commercialLicenseActive ||
+              other == null ||
+              widget.pump.ingredientId == ingredient.id;
+          final suffix =
+              other == null ? '' : ' · ${tr('Pumpe')} ${other.number}';
+
+          return DropdownMenuItem<String?>(
+            value: ingredient.id,
+            enabled: duplicateAllowed,
+            child: Text(
+              '${widget.store.displayIngredientName(ingredient)}$suffix',
+              overflow: TextOverflow.ellipsis,
+            ),
+          );
+        }),
+      ];
+
+  Future<void> _setIngredient(String? ingredientId) async {
+    if (ingredientId != null && !widget.store.commercialLicenseActive) {
+      final other = _otherPumpForIngredient(ingredientId);
+      if (other != null) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              '${tr('Mehrere Pumpen pro Zutat sind eine Gewerbefunktion.')} '
+              '${tr('Die Zutat ist bereits an Pumpe')} ${other.number} ${tr('zugeordnet')}.',
+            ),
+          ),
+        );
+        return;
+      }
+    }
+
+    setState(() => widget.pump.ingredientId = ingredientId);
+    await widget.store.save();
+    await widget.store.syncMachineStateToController();
+  }
+
   @override Widget build(BuildContext context) => Card(child: Padding(padding: const EdgeInsets.all(16), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
     Row(children: [CircleAvatar(child: T('${widget.pump.number}')), const SizedBox(width: 10), const Expanded(child: T('Pumpe', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 17))), Text(widget.pump.mlPerSecond > 0 ? '${widget.pump.mlPerSecond.toStringAsFixed(2)} ml/s' : tr('nicht kalibriert'))]),
     SwitchListTile(
@@ -11352,7 +12309,40 @@ class _PumpCalibrationCardState extends State<PumpCalibrationCard> {
         opacity: widget.pump.active ? 1 : .35,
         child: Column(
           children: [
-    const SizedBox(height: 12), DropdownButtonFormField<String?>(initialValue: widget.pump.ingredientId, decoration: InputDecoration(labelText: tr('Zutat')), items: [const DropdownMenuItem(value: null, child: T('Nicht zugeordnet')), ...widget.store.ingredients.map((e) => DropdownMenuItem(value: e.id, child: Text(widget.store.displayIngredientName(e))))], onChanged: (v) async { widget.pump.ingredientId = v; await widget.store.save(); await widget.store.syncMachineStateToController(); }),
+    const SizedBox(height: 12),
+    DropdownButtonFormField<String?>(
+      initialValue: widget.pump.ingredientId,
+      decoration: InputDecoration(labelText: tr('Zutat')),
+      items: _ingredientItems(),
+      onChanged: _setIngredient,
+    ),
+    if (widget.store.commercialLicenseActive &&
+        widget.pump.ingredientId != null &&
+        widget.store.pumpsForIngredient(widget.pump.ingredientId!).length > 1)
+      Padding(
+        padding: const EdgeInsets.only(top: 6),
+        child: Row(
+          children: [
+            Icon(
+              Icons.alt_route,
+              size: 16,
+              color: widget.store.appColors.successColor,
+            ),
+            const SizedBox(width: 6),
+            Expanded(
+              child: Text(
+                '${tr('Automatisches Pumpen-Failover aktiv')} · '
+                '${tr('Priorität nach Pumpennummer')}',
+                style: TextStyle(
+                  color: widget.store.appColors.successColor,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     Row(children: [Expanded(child: Slider(value: seconds, min: 2, max: 5, divisions: 3, label: '${seconds.round()} s', onChanged: (v) => setState(() => seconds = v))), T('${seconds.round()} s')]),
     Row(
       children: [
@@ -11429,6 +12419,38 @@ class FillLevelsPage extends StatefulWidget {
 }
 
 class _FillLevelsPageState extends State<FillLevelsPage> {
+  int _fillRefreshToken = 0;
+  bool _refillingAll = false;
+
+  Future<void> _refillAllActivePumps() async {
+    if (_refillingAll) return;
+    final pumps = widget.store.pumps.where((pump) => pump.active).toList();
+    if (pumps.isEmpty) return;
+
+    setState(() => _refillingAll = true);
+    for (final pump in pumps) {
+      pump.remainingMl = pump.capacityMl;
+    }
+
+    try {
+      await widget.store.save();
+      await widget.store.syncFillLevelsToController();
+      if (!mounted) return;
+      setState(() {
+        _fillRefreshToken++;
+        _refillingAll = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(tr('Alle Füllstände wurden auf voll gesetzt.'))),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _refillingAll = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('$error')),
+      );
+    }
+  }
   @override
   void initState() {
     super.initState();
@@ -11643,6 +12665,22 @@ class _FillLevelsPageState extends State<FillLevelsPage> {
             ),
           ),
           const SizedBox(height: 12),
+          if (activePumps.isNotEmpty) ...[
+            SizedBox(
+              height: 50,
+              child: FilledButton.icon(
+                onPressed: _refillingAll ? null : _refillAllActivePumps,
+                icon: _refillingAll
+                    ? const SizedBox.square(
+                        dimension: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.local_drink_outlined),
+                label: Text(tr('Alle auffüllen')),
+              ),
+            ),
+            const SizedBox(height: 12),
+          ],
           if (activePumps.isEmpty)
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 40),
@@ -11667,6 +12705,9 @@ class _FillLevelsPageState extends State<FillLevelsPage> {
                     mainAxisExtent: 304,
                   ),
                   itemBuilder: (context, index) => FillCard(
+                    key: ValueKey(
+                      'fill-${activePumps[index].number}-$_fillRefreshToken',
+                    ),
                     store: store,
                     pump: activePumps[index],
                   ),
@@ -11899,6 +12940,16 @@ class _SequencePageState extends State<SequencePage> {
   int? testingPump;
   int currentPump = 0;
   double progress = 0;
+  late final Set<int> selectedCleaningPumps;
+
+  @override
+  void initState() {
+    super.initState();
+    selectedCleaningPumps = widget.store.pumps
+        .where((pump) => pump.active)
+        .map((pump) => pump.number)
+        .toSet();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -12152,6 +13203,87 @@ class _SequencePageState extends State<SequencePage> {
               children: [
                 Row(
                   children: [
+                    Expanded(
+                      child: Text(
+                        tr('Pumpenauswahl'),
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w800,
+                          fontSize: 16,
+                        ),
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: running
+                          ? null
+                          : () {
+                              setState(() {
+                                selectedCleaningPumps
+                                  ..clear()
+                                  ..addAll(widget.store.pumps
+                                      .where((pump) => pump.active)
+                                      .map((pump) => pump.number));
+                              });
+                            },
+                      child: Text(tr('Alle auswählen')),
+                    ),
+                    TextButton(
+                      onPressed: running
+                          ? null
+                          : () => setState(selectedCleaningPumps.clear),
+                      child: Text(tr('Keine auswählen')),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  tr('Nur die ausgewählten aktiven Pumpen laufen nacheinander.'),
+                  style: TextStyle(
+                    color: widget.store.appColors.textSecondaryColor,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: widget.store.pumps
+                      .where((pump) => pump.active)
+                      .map((pump) {
+                    final ingredient =
+                        widget.store.ingredientById(pump.ingredientId);
+                    final label = ingredient == null
+                        ? '${tr('Pumpe')} ${pump.number}'
+                        : '${pump.number} · ${widget.store.displayIngredientName(ingredient)}';
+                    return FilterChip(
+                      selected: selectedCleaningPumps.contains(pump.number),
+                      onSelected: running
+                          ? null
+                          : (selected) {
+                              setState(() {
+                                if (selected) {
+                                  selectedCleaningPumps.add(pump.number);
+                                } else {
+                                  selectedCleaningPumps.remove(pump.number);
+                                }
+                              });
+                            },
+                      avatar: const Icon(Icons.cleaning_services_outlined, size: 17),
+                      label: Text(label),
+                    );
+                  }).toList(),
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 14),
+        Card(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
                     const Expanded(
                       child: T('Laufzeit je Pumpe',
                         style: TextStyle(
@@ -12166,8 +13298,8 @@ class _SequencePageState extends State<SequencePage> {
                   ],
                 ),
                 const SizedBox(height: 6),
-                const T('Alle aktiven Pumpen laufen nacheinander mit derselben Zeit.',
-                  style: TextStyle(color: Color(0xFF9CA7B1)),
+                T('Nur die ausgewählten aktiven Pumpen laufen nacheinander.',
+                  style: const TextStyle(color: Color(0xFF9CA7B1)),
                 ),
                 Slider(
                   value: widget.store.cleaningSeconds,
@@ -12193,7 +13325,10 @@ class _SequencePageState extends State<SequencePage> {
           SizedBox(
             height: 52,
             child: FilledButton.icon(
-              onPressed: widget.store.pumps.any((pump) => pump.active)
+              onPressed: widget.store.pumps.any(
+                        (pump) => pump.active &&
+                            selectedCleaningPumps.contains(pump.number),
+                      )
                   ? _startCleaning
                   : null,
               icon: const Icon(Icons.cleaning_services),
@@ -12303,8 +13438,21 @@ class _SequencePageState extends State<SequencePage> {
 
   Future<void> _startCleaning() async {
     final messenger = ScaffoldMessenger.of(context);
-    final activePumps =
-        widget.store.pumps.where((pump) => pump.active).toList();
+    final activePumps = widget.store.pumps
+        .where(
+          (pump) => pump.active && selectedCleaningPumps.contains(pump.number),
+        )
+        .toList()
+      ..sort((a, b) => a.number.compareTo(b.number));
+
+    if (activePumps.isEmpty) {
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(tr('Wähle mindestens eine Pumpe für die Reinigung aus.')),
+        ),
+      );
+      return;
+    }
 
     await widget.store.save();
     if (!mounted) return;
@@ -14592,6 +15740,7 @@ class _CommercialLicensePageState extends State<CommercialLicensePage> {
                   ),
                   const SizedBox(height: 10),
                   ...[
+                    'Pumpen-Failover',
                     'Statistik',
                     'Einkaufsliste',
                     'Partyplaner',
