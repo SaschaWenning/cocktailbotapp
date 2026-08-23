@@ -12286,10 +12286,10 @@ class _BackupRestorePageState extends State<BackupRestorePage> {
                     width: double.infinity,
                     padding: const EdgeInsets.all(14),
                     decoration: BoxDecoration(
-                      color: store.appColors.primaryColor.withValues(alpha: 0.08),
+                      color: store.appColors.accentColor.withValues(alpha: 0.08),
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(
-                        color: store.appColors.primaryColor.withValues(alpha: 0.25),
+                        color: store.appColors.accentColor.withValues(alpha: 0.25),
                       ),
                     ),
                     child: Row(
@@ -12297,7 +12297,7 @@ class _BackupRestorePageState extends State<BackupRestorePage> {
                       children: [
                         Icon(
                           Icons.info_outline,
-                          color: store.appColors.primaryColor,
+                          color: store.appColors.accentColor,
                         ),
                         const SizedBox(width: 10),
                         Expanded(

@@ -1,3 +1,10 @@
+## V31.4 – Flutter Compile-Fix
+
+- Behebt den fehlgeschlagenen Web-Build aus V31.3.
+- Der Backup-Speicherort-Hinweis verwendete irrtümlich `AppColorThemeConfig.primaryColor`.
+- `AppColorThemeConfig` stellt hierfür `accentColor` bereit; alle drei betroffenen Stellen wurden korrigiert.
+- Keine Funktionsänderung: Reinigungs-Kontrast, Backup-Hinweis, Pumpen-Failover und optionaler Tablet-Admin-PIN bleiben erhalten.
+
 ## V31.3 – Reinigungs-Kontrast und Tablet-Zugriff ohne Pflicht-PIN
 
 - Pumpenauswahl bei der Reinigung: ausgewählte grüne Chips verwenden jetzt automatisch kontrastreiche Schrift, Checkmark und Symbole (bei hellem Grün schwarz statt weiß).
