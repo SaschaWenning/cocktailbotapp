@@ -1,3 +1,26 @@
+## V31.3 – Reinigungs-Kontrast und Tablet-Zugriff ohne Pflicht-PIN
+
+- Pumpenauswahl bei der Reinigung: ausgewählte grüne Chips verwenden jetzt automatisch kontrastreiche Schrift, Checkmark und Symbole (bei hellem Grün schwarz statt weiß).
+- Netzwerk & Tablet: Ein Admin-PIN ist nicht mehr Voraussetzung für LAN/WLAN-Zugriff.
+- Ohne Admin-PIN kann CocktailBot im freigegebenen privaten lokalen Netzwerk direkt auf Tablet/PC geöffnet und bedient werden.
+- Der Admin-PIN bleibt optional verfügbar, um die Einstellungen auf Tablet/PC zusätzlich zu schützen.
+- Ein bereits gesetzter Admin-PIN kann unter „Netzwerk & Tablet“ wieder entfernt werden.
+- Der Server bleibt auf Loopback/private LAN beschränkt; die Änderung öffnet CocktailBot nicht direkt ins Internet.
+- Backup/Wiederherstellung unterstützt jetzt auch Netzwerkfreigaben ohne Admin-PIN.
+
+## V31.2 – Besserer Kontrast bei Pumpenauswahl
+
+- Pumpen-Schaltflächen in der Reinigung verwenden jetzt automatisch kontrastreiche Schrift- und Symbolfarben.
+- Bei hellen/grünen Auswahlfarben wird schwarze Schrift verwendet.
+- Bei dunklen Auswahlfarben bleibt die Schrift weiß.
+- Auswahlrahmen und Schriftgewicht wurden für bessere Lesbarkeit verstärkt.
+
+## V31.1 – Backup-Speicherort Hinweis
+
+- Backup-Seite zeigt jetzt direkt an, dass der Speicherort vom verwendeten Browser/Endgerät abhängt.
+- Direkt am CocktailBot erstellte Backups werden auf dem Raspberry Pi gespeichert (typischerweise Download-Ordner, sofern kein anderer Ort gewählt wird).
+- Bei Zugriff über Tablet oder PC wird die Backup-Datei auf dem jeweiligen Tablet/PC gespeichert, nicht auf dem Raspberry Pi.
+
 ## V31 – Gewerbliche Pumpen-Redundanz & automatisches Failover (22.08.2026)
 
 - Neue **Gewerbefunktion „Pumpen-Failover“**: dieselbe Zutat kann bei aktiver Gewerbelizenz mehreren aktiven Pumpen gleichzeitig zugeordnet werden, z. B. Wodka an Pumpe 1, 2 und 3.

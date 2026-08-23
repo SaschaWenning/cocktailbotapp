@@ -259,9 +259,8 @@ class NetworkAccessManager:
         self.lan_enabled = data.get("lanEnabled") is True
         self.pin_salt = str(data.get("pinSalt", ""))
         self.pin_hash = str(data.get("pinHash", ""))
-        # Never expose LAN access without a configured PIN.
-        if self.lan_enabled and not self.has_pin:
-            self.lan_enabled = False
+        # LAN access may intentionally run without an Admin-PIN. The server
+        # still accepts only loopback/private-LAN clients.
 
     @property
     def has_pin(self) -> bool:
@@ -303,18 +302,29 @@ class NetworkAccessManager:
         temp.replace(NETWORK_ACCESS_FILE)
         os.chmod(NETWORK_ACCESS_FILE, 0o600)
 
-    def configure(self, *, lan_enabled: bool, admin_pin: str = "") -> None:
+    def configure(
+        self,
+        *,
+        lan_enabled: bool,
+        admin_pin: str = "",
+        clear_admin_pin: bool = False,
+    ) -> None:
         with self._lock:
+            if clear_admin_pin:
+                self.pin_salt = ""
+                self.pin_hash = ""
+                self._tokens.clear()
+
             cleaned = admin_pin.strip()
             if cleaned:
                 cleaned = self._validate_pin_format(cleaned)
                 self.pin_salt = secrets.token_hex(16)
                 self.pin_hash = self._derive_pin_hash(cleaned, self.pin_salt)
                 self._tokens.clear()
-            if lan_enabled and not self.has_pin:
-                raise ValidationError(
-                    "Für den Netzwerkzugriff muss zuerst ein Admin-PIN festgelegt werden"
-                )
+
+            # An Admin-PIN is optional. Without one, enabled private-LAN clients
+            # can use CocktailBot directly; with one, protected admin endpoints
+            # require the normal short-lived token.
             self.lan_enabled = bool(lan_enabled)
             self._save()
 
@@ -2016,6 +2026,8 @@ def create_app(controller: PumpController, web_root: Path) -> Flask:
     def remote_admin_authorized() -> bool:
         if _request_is_local():
             return True
+        if not network_access.has_pin:
+            return True
         token = request.headers.get("X-CocktailBot-Admin-Token", "").strip()
         if not token:
             token = request.cookies.get("cocktailbot_admin", "").strip()
@@ -2204,11 +2216,6 @@ def create_app(controller: PumpController, web_root: Path) -> Flask:
             "pinSalt": str(network_state.get("pinSalt", "")),
             "pinHash": str(network_state.get("pinHash", "")),
         }
-        if network_state["lanEnabled"] and not (
-            network_state["pinSalt"] and network_state["pinHash"]
-        ):
-            return jsonify(ok=False, error="Netzwerkzugang im Backup ist unvollständig"), 400
-
         license_raw = server_state.get("license")
         license_state = dict(license_raw) if isinstance(license_raw, dict) else None
 
@@ -2468,6 +2475,7 @@ def create_app(controller: PumpController, web_root: Path) -> Flask:
             network_access.configure(
                 lan_enabled=payload.get("lanEnabled") is True,
                 admin_pin=str(payload.get("adminPin", "")),
+                clear_admin_pin=payload.get("clearAdminPin") is True,
             )
             port = int(request.environ.get("SERVER_PORT", 8080))
             return jsonify(

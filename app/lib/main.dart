@@ -2670,27 +2670,29 @@ String appText(AppLanguage language, String key) {
   };
   final settingsEnglishFallback = <String, String>{
     'Netzwerk & Tablet': 'Network & tablet',
-    'Zugriff im lokalen WLAN/LAN und Admin-PIN': 'Local Wi-Fi/LAN access and admin PIN',
+    'Zugriff im lokalen WLAN/LAN; Admin-PIN optional': 'Local Wi-Fi/LAN access; admin PIN optional',
     'CocktailBot auf Tablet oder PC öffnen': 'Open CocktailBot on a tablet or PC',
     'Der Zugriff funktioniert nur im gleichen lokalen WLAN/LAN. CocktailBot wird nicht für das Internet freigegeben.': 'Access works only on the same local Wi-Fi/LAN. CocktailBot is not exposed to the Internet.',
     'Zugriff im lokalen Netzwerk erlauben': 'Allow access on the local network',
     'Tablet- und PC-Zugriff ist aktiviert.': 'Tablet and PC access is enabled.',
     'Nur der Raspberry selbst kann CocktailBot öffnen.': 'Only the Raspberry itself can open CocktailBot.',
-    'Admin-PIN': 'Admin PIN',
-    'Vom Tablet oder PC sind die Einstellungen nur nach Eingabe dieses PINs erreichbar. Cocktails können ohne Admin-PIN ausgewählt und zubereitet werden.': 'From a tablet or PC, settings are available only after entering this PIN. Cocktails can be selected and prepared without the admin PIN.',
+    'Admin-PIN (optional)': 'Admin PIN (optional)',
+    'Für den Zugriff vom Tablet oder PC ist kein Passwort erforderlich. Optional kannst du einen Admin-PIN setzen, um die Einstellungen im lokalen Netzwerk zu schützen.': 'No password is required to access CocktailBot from a tablet or PC. Optionally, you can set an admin PIN to protect settings on the local network.',
     'Admin-PIN ändern': 'Change admin PIN',
-    'Admin-PIN festlegen': 'Set admin PIN',
+    'Admin-PIN festlegen (optional)': 'Set admin PIN (optional)',
     'Leer lassen, wenn der vorhandene PIN bleiben soll': 'Leave empty to keep the current PIN',
+    'Leer lassen = Zugriff ohne Admin-PIN': 'Leave empty = access without an admin PIN',
     '4 bis 8 Ziffern': '4 to 8 digits',
+    'Admin-PIN entfernen': 'Remove admin PIN',
+    'Admin-PIN wurde entfernt. Tablet- und PC-Zugriff funktioniert jetzt ohne Passwort.': 'Admin PIN removed. Tablet and PC access now works without a password.',
     'Adresse für Tablet oder PC': 'Address for tablet or PC',
     'Keine Netzwerkadresse erkannt.': 'No network address detected.',
     'Adresse kopiert': 'Address copied',
     'Netzwerkfehler': 'Network error',
     'Netzwerkeinstellungen gespeichert': 'Network settings saved',
     'Netzwerkstatus aktualisieren': 'Refresh network status',
-    'Bitte zuerst einen Admin-PIN festlegen': 'Please set an admin PIN first',
-    'Admin-PIN muss aus 4 bis 8 Ziffern bestehen': 'Admin PIN must contain 4 to 8 digits',
-    'Für Einstellungen vom Tablet oder PC bitte den Admin-PIN eingeben.': 'Enter the admin PIN to access settings from a tablet or PC.',
+        'Admin-PIN muss aus 4 bis 8 Ziffern bestehen': 'Admin PIN must contain 4 to 8 digits',
+    'Für Einstellungen vom Tablet oder PC bitte den optional gesetzten Admin-PIN eingeben.': 'Enter the optional admin PIN to access settings from a tablet or PC.',
     'Falscher Admin-PIN': 'Incorrect admin PIN',
     'Speichere …': 'Saving …',
     'Diese Einstellungen gelten für Cocktails, alkoholfreie Cocktails und Shots. Auf den Cocktail-Seiten selbst wird die obere Navigation angezeigt.': 'These settings apply to cocktails, alcohol-free cocktails and shots. The top navigation is shown on the cocktail pages.',
@@ -3667,6 +3669,7 @@ class MachineStore extends ChangeNotifier {
   String settingsPassword = '';
   bool networkAccessEnabled = false;
   bool networkAdminPinConfigured = false;
+  bool networkAccessStatusKnown = false;
   List<String> networkAccessUrls = [];
   String _networkAdminToken = '';
   DateTime? _networkAdminExpiresAt;
@@ -4874,7 +4877,7 @@ class MachineStore extends ChangeNotifier {
     if (!connected || connectionMode == ConnectionMode.bluetooth) {
       return;
     }
-    if (isRemoteBrowser && !remoteAdminUnlocked) {
+    if (isRemoteBrowser && !remoteAdminAccessGranted) {
       return;
     }
     try {
@@ -4922,7 +4925,7 @@ class MachineStore extends ChangeNotifier {
     final state = _persistentStateJson();
     final p = await SharedPreferences.getInstance();
     await p.setString('machine_state', jsonEncode(state));
-    if (connected && (!isRemoteBrowser || remoteAdminUnlocked)) {
+    if (connected && remoteAdminAccessGranted) {
       unawaited(_syncAppStateToController());
     }
   }
@@ -6024,6 +6027,11 @@ class MachineStore extends ChangeNotifier {
       (_networkAdminExpiresAt == null ||
           DateTime.now().isBefore(_networkAdminExpiresAt!));
 
+  /// Remote administration is open inside the enabled private LAN when no
+  /// optional Admin-PIN is configured. If a PIN exists, a valid token is needed.
+  bool get remoteAdminAccessGranted =>
+      !isRemoteBrowser || !networkAdminPinConfigured || remoteAdminUnlocked;
+
   Map<String, String> _apiHeaders({bool json = false}) {
     final headers = <String, String>{};
     if (json) headers['Content-Type'] = 'application/json';
@@ -6050,6 +6058,7 @@ class MachineStore extends ChangeNotifier {
     final data = Map<String, dynamic>.from(decoded);
     networkAccessEnabled = data['lanEnabled'] == true;
     networkAdminPinConfigured = data['adminPinConfigured'] == true;
+    networkAccessStatusKnown = true;
     networkAccessUrls = ((data['urls'] as List?) ?? const [])
         .map((item) => item.toString())
         .where((item) => item.isNotEmpty)
@@ -6085,6 +6094,7 @@ class MachineStore extends ChangeNotifier {
   Future<Map<String, dynamic>> saveNetworkAccessSettings({
     required bool enabled,
     String adminPin = '',
+    bool clearAdminPin = false,
   }) async {
     final response = await http
         .post(
@@ -6093,6 +6103,7 @@ class MachineStore extends ChangeNotifier {
           body: jsonEncode({
             'lanEnabled': enabled,
             'adminPin': adminPin.trim(),
+            'clearAdminPin': clearAdminPin,
           }),
         )
         .timeout(const Duration(seconds: 5));
@@ -6109,6 +6120,7 @@ class MachineStore extends ChangeNotifier {
     final data = Map<String, dynamic>.from(decoded);
     networkAccessEnabled = data['lanEnabled'] == true;
     networkAdminPinConfigured = data['adminPinConfigured'] == true;
+    networkAccessStatusKnown = true;
     networkAccessUrls = ((data['urls'] as List?) ?? const [])
         .map((item) => item.toString())
         .where((item) => item.isNotEmpty)
@@ -6261,7 +6273,7 @@ class MachineStore extends ChangeNotifier {
   }
 
   Future<void> _syncRemoteConsumptionEvent(ConsumptionRecord record) async {
-    if (!connected || !isRemoteBrowser || remoteAdminUnlocked) return;
+    if (!connected || !isRemoteBrowser || remoteAdminAccessGranted) return;
     try {
       await http
           .post(
@@ -6572,6 +6584,13 @@ class MachineStore extends ChangeNotifier {
     notifyListeners();
 
     if (connected) {
+      if (isRemoteBrowser) {
+        try {
+          await refreshNetworkAccessStatus();
+        } catch (_) {
+          networkAccessStatusKnown = false;
+        }
+      }
       final sharedLoaded = await _loadSharedAppStateFromController();
       if (!sharedLoaded && !isRemoteBrowser) {
         await _syncAppStateToController();
@@ -8942,6 +8961,28 @@ class SettingsLockGate extends StatefulWidget {
 class _SettingsLockGateState extends State<SettingsLockGate> {
   final passwordController = TextEditingController();
   bool unlocked = false;
+  bool remoteStatusChecked = false;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.store.isRemoteBrowser) {
+      _checkRemoteStatus();
+    } else {
+      remoteStatusChecked = true;
+    }
+  }
+
+  Future<void> _checkRemoteStatus() async {
+    try {
+      await widget.store.refreshNetworkAccessStatus();
+    } catch (_) {
+      // If the status cannot be read, keep the protected gate instead of
+      // accidentally exposing settings.
+    }
+    if (!mounted) return;
+    setState(() => remoteStatusChecked = true);
+  }
 
   @override
   void dispose() {
@@ -8976,9 +9017,17 @@ class _SettingsLockGateState extends State<SettingsLockGate> {
   @override
   Widget build(BuildContext context) {
     final remote = widget.store.isRemoteBrowser;
+
+    if (remote && !remoteStatusChecked) {
+      return PageFrame(
+        title: tr('Einstellungen'),
+        child: const Center(child: CircularProgressIndicator()),
+      );
+    }
+
     if ((!remote && !widget.store.settingsLockEnabled) ||
         unlocked ||
-        (remote && widget.store.remoteAdminUnlocked)) {
+        (remote && widget.store.remoteAdminAccessGranted)) {
       return widget.child;
     }
 
@@ -9006,7 +9055,7 @@ class _SettingsLockGateState extends State<SettingsLockGate> {
                   const SizedBox(height: 8),
                   Text(
                     tr(remote
-                        ? 'Für Einstellungen vom Tablet oder PC bitte den Admin-PIN eingeben.'
+                        ? 'Für Einstellungen vom Tablet oder PC bitte den optional gesetzten Admin-PIN eingeben.'
                         : 'Bitte Passwort eingeben. Das Notfall-Passwort cocktailbot funktioniert immer.'),
                     style: TextStyle(
                       color: widget.store.appColors.textSecondaryColor,
@@ -9068,7 +9117,7 @@ class SettingsPage extends StatelessWidget {
 
     final items = [
       (store.t('settingsConnection'), store.connected ? tr('Raspberry Pi verbunden') : tr('Lokale GPIO-Steuerung'), Icons.wifi, accent, ConnectionPage(store: store)),
-      (tr('Netzwerk & Tablet'), tr('Zugriff im lokalen WLAN/LAN und Admin-PIN'), Icons.devices, secondary, NetworkAccessSettingsPage(store: store)),
+      (tr('Netzwerk & Tablet'), tr('Zugriff im lokalen WLAN/LAN; Admin-PIN optional'), Icons.devices, secondary, NetworkAccessSettingsPage(store: store)),
       (store.t('settingsLanguage'), '${store.t('settingsLanguageSub')}: ${store.appLanguage.nativeName}', Icons.language, secondary, LanguageSettingsPage(store: store)),
       (store.t('settingsDesign'), store.t('settingsDesignSub'), Icons.palette_outlined, accent, ThemeSettingsPage(store: store)),
       (store.t('Anzeige'), store.t('Sortierung und Cocktails pro Seite einstellen'), Icons.grid_view_outlined, mixed, CocktailDisplaySettingsPage(store: store)),
@@ -9644,12 +9693,6 @@ class _NetworkAccessSettingsPageState
 
   Future<void> _save() async {
     final pin = pinController.text.trim();
-    if (enabled && !pinConfigured && pin.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(tr('Bitte zuerst einen Admin-PIN festlegen'))),
-      );
-      return;
-    }
     if (pin.isNotEmpty && !RegExp(r'^\d{4,8}$').hasMatch(pin)) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(tr('Admin-PIN muss aus 4 bis 8 Ziffern bestehen'))),
@@ -9677,6 +9720,41 @@ class _NetworkAccessSettingsPageState
       });
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(tr('Netzwerkeinstellungen gespeichert'))),
+      );
+    } catch (exc) {
+      if (!mounted) return;
+      setState(() {
+        saving = false;
+        error = exc.toString().replaceFirst('Exception: ', '');
+      });
+    }
+  }
+
+  Future<void> _removeAdminPin() async {
+    setState(() => saving = true);
+    try {
+      final data = await widget.store.saveNetworkAccessSettings(
+        enabled: enabled,
+        clearAdminPin: true,
+      );
+      if (!mounted) return;
+      pinController.clear();
+      setState(() {
+        enabled = data['lanEnabled'] == true;
+        pinConfigured = data['adminPinConfigured'] == true;
+        urls = ((data['urls'] as List?) ?? const [])
+            .map((item) => item.toString())
+            .where((item) => item.isNotEmpty)
+            .toList();
+        saving = false;
+        error = null;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            tr('Admin-PIN wurde entfernt. Tablet- und PC-Zugriff funktioniert jetzt ohne Passwort.'),
+          ),
+        ),
       );
     } catch (exc) {
       if (!mounted) return;
@@ -9753,7 +9831,7 @@ class _NetworkAccessSettingsPageState
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    tr('Admin-PIN'),
+                    tr('Admin-PIN (optional)'),
                     style: const TextStyle(
                       fontWeight: FontWeight.w900,
                       fontSize: 18,
@@ -9761,7 +9839,7 @@ class _NetworkAccessSettingsPageState
                   ),
                   const SizedBox(height: 7),
                   Text(
-                    tr('Vom Tablet oder PC sind die Einstellungen nur nach Eingabe dieses PINs erreichbar. Cocktails können ohne Admin-PIN ausgewählt und zubereitet werden.'),
+                    tr('Für den Zugriff vom Tablet oder PC ist kein Passwort erforderlich. Optional kannst du einen Admin-PIN setzen, um die Einstellungen im lokalen Netzwerk zu schützen.'),
                     style: TextStyle(
                       color: colors.textSecondaryColor,
                       height: 1.35,
@@ -9776,13 +9854,24 @@ class _NetworkAccessSettingsPageState
                     decoration: InputDecoration(
                       labelText: pinConfigured
                           ? tr('Admin-PIN ändern')
-                          : tr('Admin-PIN festlegen'),
+                          : tr('Admin-PIN festlegen (optional)'),
                       helperText: pinConfigured
                           ? tr('Leer lassen, wenn der vorhandene PIN bleiben soll')
-                          : tr('4 bis 8 Ziffern'),
+                          : tr('Leer lassen = Zugriff ohne Admin-PIN'),
                       prefixIcon: const Icon(Icons.dialpad),
                     ),
                   ),
+                  if (pinConfigured) ...[
+                    const SizedBox(height: 4),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: OutlinedButton.icon(
+                        onPressed: saving ? null : _removeAdminPin,
+                        icon: const Icon(Icons.lock_open_outlined),
+                        label: Text(tr('Admin-PIN entfernen')),
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -12192,6 +12281,46 @@ class _BackupRestorePageState extends State<BackupRestorePage> {
                       height: 1.4,
                     ),
                   ),
+                  const SizedBox(height: 14),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: store.appColors.primaryColor.withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: store.appColors.primaryColor.withValues(alpha: 0.25),
+                      ),
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(
+                          Icons.info_outline,
+                          color: store.appColors.primaryColor,
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            'Speicherort des Backups: Der Browser bzw. das '
+                            'Endgerät bestimmt, wo die Backup-Datei gespeichert '
+                            'wird. Wird das Backup direkt am CocktailBot erstellt, '
+                            'wird es auf dem Raspberry Pi gespeichert '
+                            '(normalerweise im Download-Ordner, sofern kein '
+                            'anderer Speicherort gewählt wird). Wird CocktailBot '
+                            'über einen Browser auf einem Tablet oder PC geöffnet, '
+                            'wird das Backup auf diesem Tablet bzw. PC gespeichert '
+                            '– nicht auf dem Raspberry Pi.',
+                            style: TextStyle(
+                              color: store.appColors.textSecondaryColor,
+                              height: 1.4,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -13253,8 +13382,33 @@ class _SequencePageState extends State<SequencePage> {
                     final label = ingredient == null
                         ? '${tr('Pumpe')} ${pump.number}'
                         : '${pump.number} · ${widget.store.displayIngredientName(ingredient)}';
+                    final selected =
+                        selectedCleaningPumps.contains(pump.number);
+                    final selectedBackground =
+                        widget.store.appColors.accentColor;
+                    final selectedForeground =
+                        selectedBackground.computeLuminance() > 0.45
+                            ? Colors.black
+                            : Colors.white;
+
                     return FilterChip(
-                      selected: selectedCleaningPumps.contains(pump.number),
+                      selected: selected,
+                      selectedColor: selectedBackground,
+                      checkmarkColor: selectedForeground,
+                      backgroundColor: widget.store.appColors.cardColor,
+                      side: BorderSide(
+                        color: selected
+                            ? selectedBackground
+                            : widget.store.appColors.borderColor,
+                        width: selected ? 1.6 : 1.0,
+                      ),
+                      labelStyle: TextStyle(
+                        color: selected
+                            ? selectedForeground
+                            : widget.store.appColors.textPrimaryColor,
+                        fontWeight:
+                            selected ? FontWeight.w800 : FontWeight.w600,
+                      ),
                       onSelected: running
                           ? null
                           : (selected) {
@@ -13266,7 +13420,13 @@ class _SequencePageState extends State<SequencePage> {
                                 }
                               });
                             },
-                      avatar: const Icon(Icons.cleaning_services_outlined, size: 17),
+                      avatar: Icon(
+                        Icons.cleaning_services_outlined,
+                        size: 17,
+                        color: selected
+                            ? selectedForeground
+                            : widget.store.appColors.accentColor,
+                      ),
                       label: Text(label),
                     );
                   }).toList(),
