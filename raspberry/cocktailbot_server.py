@@ -10,7 +10,7 @@ The REST API exposes the local contract used by the Flutter app:
   GET  /api/payment/order-status
   POST /api/payment/mark-used
 
-GPIO numbering is BCM. All pumps are forced off at startup, on stop, and on exit.
+Pump GPIO access is isolated in one short-lived helper process per pump operation.
 """
 
 from __future__ import annotations
@@ -31,6 +31,7 @@ import signal
 import socket
 import sqlite3
 import subprocess
+import sys
 import threading
 import time
 import uuid
@@ -60,104 +61,13 @@ except ImportError:  # LED controller is optional; pumps must remain usable
     serial = None  # type: ignore[assignment]
 
 MOCK_GPIO = os.getenv("COCKTAILBOT_GPIO_MOCK", "0") in {"1", "true", "True"}
-
-
-def _detect_rp1_gpio_chip() -> tuple[int | None, str]:
-    """Find the Raspberry Pi 5 RP1 gpiochip by kernel label."""
-    configured = os.getenv("COCKTAILBOT_GPIO_CHIP", "auto").strip().lower()
-    if configured and configured != "auto":
-        if not configured.isdigit():
-            raise RuntimeError(
-                "COCKTAILBOT_GPIO_CHIP muss 'auto' oder eine ganze Zahl sein"
-            )
-        chip = int(configured)
-        if not Path(f"/dev/gpiochip{chip}").exists():
-            raise RuntimeError(f"/dev/gpiochip{chip} existiert nicht")
-        return chip, "konfiguriert"
-
-    try:
-        result = subprocess.run(
-            ["gpiodetect"],
-            check=False,
-            capture_output=True,
-            text=True,
-            timeout=3,
-        )
-    except (FileNotFoundError, OSError, subprocess.TimeoutExpired):
-        return None, "rpi-lgpio-auto"
-
-    if result.returncode != 0:
-        return None, "rpi-lgpio-auto"
-
-    for line in result.stdout.splitlines():
-        if "[pinctrl-rp1]" not in line:
-            continue
-        match = re.match(r"^gpiochip(\d+)\s", line.strip())
-        if match:
-            chip = int(match.group(1))
-            if Path(f"/dev/gpiochip{chip}").exists():
-                return chip, "pinctrl-rp1"
-    return None, "rpi-lgpio-auto"
-
-
-RPIGPIO_CHIP, RPIGPIO_CHIP_SOURCE = _detect_rp1_gpio_chip()
-
-if MOCK_GPIO:
-    class _MockGPIO:
-        BCM = 11
-        OUT = 0
-        HIGH = 1
-        LOW = 0
-
-        def __init__(self) -> None:
-            self._state: dict[int, int] = {}
-
-        def setmode(self, mode: int) -> None:
-            del mode
-
-        def setwarnings(self, enabled: bool) -> None:
-            del enabled
-
-        def setup(
-            self,
-            pin: int,
-            mode: int,
-            initial: int | None = None,
-            **_: Any,
-        ) -> None:
-            del mode
-            self._state[pin] = self.HIGH if initial is None else int(initial)
-
-        def output(self, pin: int, value: int) -> None:
-            self._state[pin] = int(value)
-
-        def input(self, pin: int) -> int:
-            return self._state.get(pin, self.HIGH)
-
-        def cleanup(self, channels: Any = None) -> None:
-            if channels is None:
-                self._state.clear()
-                return
-            if isinstance(channels, int):
-                self._state.pop(channels, None)
-                return
-            try:
-                for channel in channels:
-                    self._state.pop(int(channel), None)
-            except TypeError:
-                self._state.pop(int(channels), None)
-
-    GPIO = _MockGPIO()
-else:
-    if RPIGPIO_CHIP is not None:
-        os.environ["RPI_LGPIO_CHIP"] = str(RPIGPIO_CHIP)
-    try:
-        import RPi.GPIO as GPIO
-    except ImportError as exc:
-        raise SystemExit(
-            "RPi.GPIO-Kompatibilitaet fehlt. Auf Raspberry Pi 5 installieren: "
-            "sudo apt install python3-rpi-lgpio"
-        ) from exc
+PUMP_HELPER = Path(
+    os.getenv(
+        "COCKTAILBOT_PUMP_HELPER",
+        "/opt/cocktailbot/raspberry/pump_control.py",
+    )
+)
+PUMP_HELPER_STOP_TIMEOUT_SECONDS = 2.0
 
 
 PUMP_PINS: tuple[int, ...] = (
@@ -1610,26 +1520,17 @@ class LicenseManager:
 
 
 class PumpController:
-    """Pump control with the same GPIO lifecycle as the proven legacy software.
+    """Manage one short-lived pump helper process per pump operation.
 
-    LOW-active relay logic:
-      HIGH = pump OFF
-      LOW  = pump ON
-
-    Important: pump GPIOs are deliberately NOT configured during server start
-    and are NOT held permanently as outputs while idle. A pin is claimed only
-    for the duration of the corresponding pump operation and is released with
-    GPIO.cleanup(pin) afterwards, matching the old pump_control.py behaviour.
+    The long-running Flask process never imports the GPIO library and never
+    claims pump GPIOs. Each helper owns one pin for one timed operation,
+    releases it, and exits.
     """
 
     def __init__(self) -> None:
         self._lock = threading.RLock()
         self._active_pumps: set[int] = set()
-
-        # Same process-level setup used by the old pump_control.py. This sets
-        # numbering/warning behaviour only; it does not claim any pump pin.
-        GPIO.setmode(GPIO.BCM)
-        GPIO.setwarnings(False)
+        self._pump_processes: dict[int, subprocess.Popen[str]] = {}
         self._job: PumpJob | None = None
         self._job_started_at = 0.0
         self._completed_steps = 0
@@ -1644,7 +1545,8 @@ class PumpController:
             "brightness": 89,
         }
         self.pico = PicoLedController()
-        self.all_off()
+
+        # Absichtlich keine Pumpen-GPIO-Initialisierung im Server.
         self.pico.apply_idle(self.led_settings)
 
     @staticmethod
@@ -1671,79 +1573,125 @@ class PumpController:
         with self._lock:
             self.machine_state = state
 
-    def _release_pump_pin_locked(self, pump: int) -> None:
-        """Switch one active pump OFF and release only that GPIO channel."""
+    def _pump_command(
+        self,
+        command: str,
+        pump: int,
+        duration_ms: int | None = None,
+    ) -> list[str]:
         pin = self.pin_for_pump(pump)
-        error: Exception | None = None
+        args = [sys.executable, str(PUMP_HELPER), command, str(pin)]
+        if duration_ms is not None:
+            args.append(str(duration_ms))
+        return args
 
+    @staticmethod
+    def _read_process_error(process: subprocess.Popen[str]) -> str:
+        if process.stderr is None:
+            return ""
         try:
-            # Legacy behaviour: relay OFF before releasing the GPIO.
-            GPIO.output(pin, GPIO.HIGH)
-        except Exception as exc:
-            error = exc
-        finally:
-            try:
-                # Crucial V34 change: return the channel to the same idle state
-                # as the old standalone pump_control.py after every operation.
-                GPIO.cleanup(pin)
-            except Exception as exc:
-                if error is None:
-                    error = exc
-            self._active_pumps.discard(pump)
+            return process.stderr.read().strip()
+        except Exception:
+            return ""
 
-        if error is not None:
-            raise error
+    def _start_pump_process_locked(
+        self,
+        pump: int,
+        duration_ms: int,
+    ) -> subprocess.Popen[str]:
+        current = self._pump_processes.get(pump)
+        if current is not None and current.poll() is None:
+            raise RuntimeError(f"Pumpe {pump} läuft bereits")
 
-    def _set_pump_locked(self, pump: int, enabled: bool) -> None:
-        pin = self.pin_for_pump(pump)
+        if not PUMP_HELPER.is_file():
+            raise RuntimeError(f"Pumpen-Hilfsprogramm fehlt: {PUMP_HELPER}")
 
-        if enabled:
-            # Exact lifecycle of the old working software:
-            #   GPIO.setup(pin, OUT)
-            #   HIGH = relay OFF
-            #   LOW  = relay ON
-            #
-            # Do not keep unrelated pump pins configured as outputs.
-            try:
-                GPIO.setup(pin, GPIO.OUT)
-                GPIO.output(pin, GPIO.HIGH)
-                GPIO.output(pin, GPIO.LOW)
-                self._active_pumps.add(pump)
-            except Exception:
-                # Best effort: if claiming/starting a pin failed, return that
-                # single channel to HIGH and release it again.
-                try:
-                    GPIO.output(pin, GPIO.HIGH)
-                except Exception:
-                    pass
-                try:
-                    GPIO.cleanup(pin)
-                except Exception:
-                    pass
-                self._active_pumps.discard(pump)
-                raise
+        process = subprocess.Popen(
+            self._pump_command("activate", pump, duration_ms),
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.PIPE,
+            text=True,
+            close_fds=True,
+            start_new_session=True,
+            env=os.environ.copy(),
+        )
+        self._pump_processes[pump] = process
+        self._active_pumps.add(pump)
+        return process
+
+    def _finish_pump_process_locked(
+        self,
+        pump: int,
+        process: subprocess.Popen[str],
+    ) -> None:
+        return_code = process.poll()
+        if return_code is None:
             return
 
-        # Only a channel that this controller currently owns is touched.
-        if pump in self._active_pumps:
-            self._release_pump_pin_locked(pump)
+        if self._pump_processes.get(pump) is process:
+            self._pump_processes.pop(pump, None)
+            self._active_pumps.discard(pump)
+
+        error_text = self._read_process_error(process)
+        if return_code != 0:
+            detail = f": {error_text}" if error_text else ""
+            raise RuntimeError(
+                f"Pumpenprozess {pump} endete mit Code {return_code}{detail}"
+            )
+
+    def _force_off_fallback(self, pump: int) -> None:
+        try:
+            result = subprocess.run(
+                self._pump_command("off", pump),
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.PIPE,
+                text=True,
+                timeout=3,
+                check=False,
+                env=os.environ.copy(),
+            )
+            if result.returncode != 0:
+                message = (result.stderr or "").strip()
+                print(
+                    f"Pumpen-Not-Aus-Fallback Pumpe {pump} fehlgeschlagen "
+                    f"(Code {result.returncode}): {message}",
+                    file=sys.stderr,
+                )
+        except Exception as exc:
+            print(
+                f"Pumpen-Not-Aus-Fallback Pumpe {pump} fehlgeschlagen: {exc}",
+                file=sys.stderr,
+            )
+
+    def _stop_pump_process_locked(
+        self,
+        pump: int,
+        process: subprocess.Popen[str],
+    ) -> None:
+        if process.poll() is None:
+            try:
+                process.terminate()
+                process.wait(timeout=PUMP_HELPER_STOP_TIMEOUT_SECONDS)
+            except subprocess.TimeoutExpired:
+                try:
+                    process.kill()
+                    process.wait(timeout=1)
+                except Exception:
+                    pass
+                self._force_off_fallback(pump)
+            except ProcessLookupError:
+                pass
+
+        self._pump_processes.pop(pump, None)
+        self._active_pumps.discard(pump)
+        self._read_process_error(process)
 
     def all_off(self) -> None:
-        """Stop/release only pumps that are currently active.
-
-        Unlike V33, this intentionally does NOT iterate over and configure all
-        18 pump pins. Idle/unrelated GPIOs remain untouched.
-        """
         with self._lock:
-            first_error: Exception | None = None
-            for pump in tuple(sorted(self._active_pumps)):
-                try:
-                    self._release_pump_pin_locked(pump)
-                except Exception as exc:
-                    if first_error is None:
-                        first_error = exc
-            if first_error is not None:
-                raise first_error
+            for pump, process in tuple(self._pump_processes.items()):
+                self._stop_pump_process_locked(pump, process)
 
     def stop(self, reason: str = "Not-Aus") -> None:
         del reason
@@ -1799,7 +1747,6 @@ class PumpController:
             self._job_started_at = time.monotonic()
             self._completed_steps = 0
 
-        # Die App beschreibt den Zubereitungszustand als rot blinkend.
         self.pico.send("BLINK 255 0 0")
 
         thread = threading.Thread(
@@ -1814,6 +1761,7 @@ class PumpController:
     def _run_job(self, job: PumpJob, generation: int) -> None:
         started: set[int] = set()
         finished: set[int] = set()
+        step_processes: dict[int, subprocess.Popen[str]] = {}
         success = False
         failed = False
 
@@ -1822,24 +1770,31 @@ class PumpController:
                 with self._lock:
                     if self._closed or generation != self._generation:
                         return
-                    elapsed_ms = int((time.monotonic() - self._job_started_at) * 1000)
+
+                    elapsed_ms = int(
+                        (time.monotonic() - self._job_started_at) * 1000
+                    )
 
                     for index, step in enumerate(job.steps):
-                        if index not in started and elapsed_ms >= step.start_offset_ms:
-                            self._set_pump_locked(step.pump, True)
-                            started.add(index)
+                        if index in started or elapsed_ms < step.start_offset_ms:
+                            continue
+                        process = self._start_pump_process_locked(
+                            step.pump,
+                            step.duration_ms,
+                        )
+                        step_processes[index] = process
+                        started.add(index)
 
-                        if (
-                            index in started
-                            and index not in finished
-                            and elapsed_ms >= step.start_offset_ms + step.duration_ms
-                        ):
-                            self._set_pump_locked(step.pump, False)
-                            finished.add(index)
-                            self._completed_steps = len(finished)
+                    for index in tuple(sorted(started - finished)):
+                        process = step_processes[index]
+                        if process.poll() is None:
+                            continue
+                        step = job.steps[index]
+                        self._finish_pump_process_locked(step.pump, process)
+                        finished.add(index)
+                        self._completed_steps = len(finished)
 
                     if len(finished) >= len(job.steps):
-                        self.all_off()
                         self._job = None
                         self._job_started_at = 0.0
                         self._completed_steps = 0
@@ -1847,12 +1802,12 @@ class PumpController:
                         break
 
                 time.sleep(0.01)
-        except Exception:
+
+        except Exception as exc:
             failed = True
-            raise
+            print(f"Pumpenjob fehlgeschlagen: {exc}", file=sys.stderr)
         finally:
             with self._lock:
-                # A superseded thread must never leave an output active.
                 if generation == self._generation:
                     self.all_off()
                     self._job = None
@@ -1871,7 +1826,9 @@ class PumpController:
             if job is None or job.total_duration_ms <= 0:
                 progress = 0.0
             else:
-                elapsed_ms = int((time.monotonic() - self._job_started_at) * 1000)
+                elapsed_ms = int(
+                    (time.monotonic() - self._job_started_at) * 1000
+                )
                 progress = min(1.0, elapsed_ms / job.total_duration_ms)
 
             return {
@@ -1913,8 +1870,6 @@ class PumpController:
                 return
             self._closed = True
             self._generation += 1
-            # V34: active pins are switched HIGH and individually released,
-            # exactly like the legacy standalone pump process.
             self.all_off()
         self.pico.close()
 
@@ -3229,17 +3184,12 @@ def main() -> None:
     signal.signal(signal.SIGINT, shutdown_handler)
 
     print("CocktailBot Raspberry Pi")
-    print(f"GPIO-Modus: BCM | Relais=LOW-aktiv | GPIO-Lifecycle=legacy/lazy | mock={MOCK_GPIO}")
-    if RPIGPIO_CHIP is not None:
-        print(
-            f"GPIO-Chip: gpiochip{RPIGPIO_CHIP} "
-            f"| Quelle={RPIGPIO_CHIP_SOURCE} | Backend=RPi.GPIO/rpi-lgpio"
-        )
-    else:
-        print(
-            f"GPIO-Chip: rpi-lgpio-auto | Quelle={RPIGPIO_CHIP_SOURCE} "
-            "| Backend=RPi.GPIO/rpi-lgpio"
-        )
+    print(
+        "Pumpen-Backend: separater pump_control.py Prozess je Pumpenlauf "
+        "| GPIO nur im Kindprozess "
+        f"| mock={MOCK_GPIO}"
+    )
+    print(f"Pumpen-Helfer: {PUMP_HELPER}")
     print("Pumpen:", ", ".join(f"{i}=GPIO{pin}" for i, pin in enumerate(PUMP_PINS, 1)))
     print(f"Web/API: http://{args.host}:{args.port}")
     print(f"PayPal: mode={PAYPAL_MODE} | configured={bool(PAYPAL_CLIENT_ID and PAYPAL_CLIENT_SECRET)}")

@@ -1,3 +1,16 @@
+## V35 – Pumpensteuerung als separater Prozess wie in der alten Software
+
+- `cocktailbot_server.py` importiert kein RPi.GPIO mehr und beansprucht keinen Pumpen-GPIO.
+- Pro Pumpenschritt startet ein eigener kurzlebiger `raspberry/pump_control.py`-Prozess.
+- Normaler Ablauf: Ausgang setzen → HIGH/AUS → LOW/EIN → warten → HIGH/AUS → `GPIO.cleanup()` → Prozessende.
+- `python3-rpi-lgpio` stellt auf dem Raspberry Pi 5 die RPi.GPIO-kompatible API ausschließlich im Kindprozess bereit.
+- Parallele Pumpen bleiben möglich, da jede laufende Pumpe einen eigenen Prozess besitzt.
+- Not-Aus sendet SIGTERM; der Kindprozess läuft über `finally` in HIGH/AUS + cleanup.
+- Bei einem hängenden Kindprozess gibt es einen zusätzlichen `off`-Fallback.
+- Beim Serverstart und im Leerlauf werden keine Pumpen-GPIOs konfiguriert.
+- V33-Boot-Pumpenschutz und `pump-safety-high.sh` werden weiterhin entfernt.
+- UI, PayPal, Lizenz, Backup, Pumpen-Failover, Reinigung und Vermietmodus bleiben erhalten.
+
 ## V34 – Pumpen-GPIO-Lifecycle wie alte funktionierende Software
 
 - Reproduziert nicht nur die LOW-aktive Relaislogik, sondern auch den GPIO-Lebenszyklus des alten `pump_control.py`.

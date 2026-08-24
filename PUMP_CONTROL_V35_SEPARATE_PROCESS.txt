@@ -1,0 +1,22 @@
+CocktailBot V35 – separates pump_control.py je Pumpenaktion
+
+Das entspricht dem Prozessmodell der alten funktionierenden Software:
+- Web/API-Server hält keine Pumpen-GPIOs.
+- Eine Pumpenaktion startet einen eigenen Python-Prozess.
+- Nur dieser Prozess greift auf genau den benötigten Pumpenpin zu.
+- HIGH = AUS, LOW = EIN.
+- Am Ende: HIGH, GPIO.cleanup(), Prozessende.
+- Mehrere Pumpen können als getrennte Prozesse parallel laufen.
+
+Not-Aus:
+- SIGTERM an laufende Kindprozesse.
+- deren finally-Pfad setzt HIGH/AUS und cleanup.
+- nur wenn ein Prozess hängt, wird ein separater OFF-Fallback gestartet.
+
+Pi 5:
+- RPi.GPIO API über python3-rpi-lgpio im Kindprozess.
+
+V33-Altlasten:
+- COCKTAILBOT PUMP SAFETY in config.txt wird weiterhin entfernt.
+- pump-safety-high.sh wird weiterhin entfernt.
+- keine systemd-pinctrl-Pre/Post-Hooks.

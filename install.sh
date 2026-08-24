@@ -9,7 +9,7 @@ WEB_DIR="$INSTALL_ROOT/web"
 RUNTIME_DIR="$INSTALL_ROOT/raspberry"
 VENV_DIR="$INSTALL_ROOT/venv"
 FLUTTER_DIR="${COCKTAILBOT_FLUTTER_DIR:-/opt/flutter}"
-ACTIVE_HIGH="0"  # V34: LOW=EIN/HIGH=AUS, GPIOs nur waehrend Pumpenlauf belegt
+ACTIVE_HIGH="0"  # V35: LOW=EIN/HIGH=AUS; separater Prozess je Pumpenlauf
 KIOSK_DELAY="${COCKTAILBOT_KIOSK_DELAY_SECONDS:-30}"
 BUILD_MODE="${COCKTAILBOT_BUILD_MODE:-auto}"
 SKIP_APT="${COCKTAILBOT_SKIP_APT:-0}"
@@ -81,7 +81,7 @@ warn() { printf '\n\033[1;33m[CocktailBot WARNUNG]\033[0m %s\n' "$*" >&2; }
 die() { printf '\n\033[1;31m[CocktailBot FEHLER]\033[0m %s\n' "$*" >&2; exit 1; }
 
 [[ $EUID -eq 0 ]] || die "Bitte mit sudo ausführen."
-[[ "$ACTIVE_HIGH" == "0" ]] || die "V34 verwendet fest LOW-aktive Relais. --active-high 1 ist nicht erlaubt."
+[[ "$ACTIVE_HIGH" == "0" ]] || die "V35 verwendet fest LOW-aktive Relais. --active-high 1 ist nicht erlaubt."
 [[ "$KIOSK_DELAY" =~ ^[0-9]+$ ]] || die "--kiosk-delay muss eine ganze Zahl sein."
 (( KIOSK_DELAY <= 3600 )) || die "Die Kiosk-Verzögerung darf höchstens 3600 Sekunden betragen."
 [[ "$BUILD_MODE" =~ ^(auto|release|source)$ ]] || die "--build-mode muss auto, release oder source sein."
@@ -346,6 +346,7 @@ install_runtime() {
   getent group dialout >/dev/null 2>&1 || groupadd --system dialout
   usermod -aG dialout "$TARGET_USER" || true
   install -m 0755 "$SOURCE_DIR/raspberry/cocktailbot_server.py" "$RUNTIME_DIR/cocktailbot_server.py"
+  install -m 0755 "$SOURCE_DIR/raspberry/pump_control.py" "$RUNTIME_DIR/pump_control.py"
   rm -f "$RUNTIME_DIR/pump-safety-high.sh"
   install -m 0755 "$SOURCE_DIR/raspberry/start-kiosk.sh" "$RUNTIME_DIR/start-kiosk.sh"
   install -m 0755 "$SOURCE_DIR/raspberry/start-onboard.sh" "$RUNTIME_DIR/start-onboard.sh"
@@ -364,6 +365,7 @@ install_runtime() {
     /etc/cocktailbot/license_public_key.pem
   cat > /etc/cocktailbot/cocktailbot.env <<ENV
 COCKTAILBOT_ACTIVE_HIGH=0
+COCKTAILBOT_PUMP_HELPER=/opt/cocktailbot/raspberry/pump_control.py
 COCKTAILBOT_STATE_FILE=/var/lib/cocktailbot/machine_state.json
 COCKTAILBOT_APP_STATE_FILE=/var/lib/cocktailbot/app_state.json
 COCKTAILBOT_NETWORK_ACCESS_FILE=/var/lib/cocktailbot/network_access.json
@@ -391,7 +393,8 @@ ENV
     > /etc/systemd/system/cocktailbot.service
   chmod 0644 /etc/systemd/system/cocktailbot.service
 
-  chown root:root /etc/systemd/system/cocktailbot.service "$RUNTIME_DIR/cocktailbot_server.py"
+  chown root:root     /etc/systemd/system/cocktailbot.service     "$RUNTIME_DIR/cocktailbot_server.py"     "$RUNTIME_DIR/pump_control.py"
+  chmod 0755 "$RUNTIME_DIR/cocktailbot_server.py" "$RUNTIME_DIR/pump_control.py"
   chown "$TARGET_USER:$TARGET_GROUP" "$RUNTIME_DIR/start-kiosk.sh"
   chmod 0755 "$RUNTIME_DIR/start-kiosk.sh"
 }
@@ -748,7 +751,7 @@ Kioskbenutzer:    $TARGET_USER
 Kioskstart:       nach $KIOSK_DELAY Sekunden
 Web/API:          http://127.0.0.1:8080
 Relaislogik:      fest LOW-aktiv (HIGH=AUS, LOW=EIN)
-GPIO-Lifecycle:   wie alte Software: Pin nur bei Pumpenlauf belegen + danach cleanup
+GPIO-Lifecycle:   wie alte Software: eigener pump_control.py Prozess je Pumpenlauf
 Pumpen-Bootschutz: kein permanentes OUTPUT-HIGH; V33-Block wird beim Update entfernt
 LCD7C/GoodTFT:    $INSTALL_LCD
 Bootoptimierung:  $BOOT_OPTIMIZE
