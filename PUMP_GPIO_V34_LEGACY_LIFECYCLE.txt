@@ -1,0 +1,32 @@
+CocktailBot V34 – Pump GPIO Lifecycle
+
+Ziel:
+Das Pumpenverhalten der alten funktionierenden Software reproduzieren.
+
+Alte pump_control.py:
+    GPIO.setmode(GPIO.BCM)
+    GPIO.setwarnings(False)
+
+    GPIO.setup(pin, GPIO.OUT)
+    GPIO.output(pin, GPIO.HIGH)  # AUS
+    GPIO.output(pin, GPIO.LOW)   # EIN
+    ...
+    GPIO.output(pin, GPIO.HIGH)  # AUS
+    GPIO.cleanup()
+
+V34:
+- Keine globale Initialisierung aller 18 Pumpenpins beim Serverstart.
+- Keine permanenten OUTPUT/HIGH-Pumpenpins im Leerlauf.
+- Keine systemd-pinctrl-Vor-/Nachschaltung.
+- Kein config.txt-Block, der alle Pumpenpins beim Boot auf op,dh zwingt.
+- Nur der benötigte GPIO wird während einer Pumpenaktion belegt.
+- Ende einer Pumpe: HIGH, danach GPIO.cleanup(pin).
+- Parallele Pumpen werden kanalweise verwaltet und kanalweise freigegeben.
+- Ein Update von V33 entfernt den alten V33-Bootschutz automatisch.
+
+Relaislogik bleibt fest:
+    HIGH = AUS
+    LOW  = EIN
+
+Pi-5-Backend:
+    RPi.GPIO API via rpi-lgpio.

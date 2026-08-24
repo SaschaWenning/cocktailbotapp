@@ -135,7 +135,17 @@ if MOCK_GPIO:
             return self._state.get(pin, self.HIGH)
 
         def cleanup(self, channels: Any = None) -> None:
-            del channels
+            if channels is None:
+                self._state.clear()
+                return
+            if isinstance(channels, int):
+                self._state.pop(channels, None)
+                return
+            try:
+                for channel in channels:
+                    self._state.pop(int(channel), None)
+            except TypeError:
+                self._state.pop(int(channels), None)
 
     GPIO = _MockGPIO()
 else:
@@ -1600,39 +1610,26 @@ class LicenseManager:
 
 
 class PumpController:
-    """Legacy-compatible LOW-active relay controller.
+    """Pump control with the same GPIO lifecycle as the proven legacy software.
 
-    HIGH = pump OFF
-    LOW  = pump ON
+    LOW-active relay logic:
+      HIGH = pump OFF
+      LOW  = pump ON
+
+    Important: pump GPIOs are deliberately NOT configured during server start
+    and are NOT held permanently as outputs while idle. A pin is claimed only
+    for the duration of the corresponding pump operation and is released with
+    GPIO.cleanup(pin) afterwards, matching the old pump_control.py behaviour.
     """
 
     def __init__(self) -> None:
         self._lock = threading.RLock()
         self._active_pumps: set[int] = set()
 
-        GPIO.setwarnings(False)
+        # Same process-level setup used by the old pump_control.py. This sets
+        # numbering/warning behaviour only; it does not claim any pump pin.
         GPIO.setmode(GPIO.BCM)
-
-        initialized: list[int] = []
-        try:
-            for pin in PUMP_PINS:
-                GPIO.setup(pin, GPIO.OUT, initial=GPIO.HIGH)
-                GPIO.output(pin, GPIO.HIGH)
-                initialized.append(pin)
-
-            bad = [pin for pin in PUMP_PINS if GPIO.input(pin) != GPIO.HIGH]
-            if bad:
-                raise RuntimeError(
-                    "Pumpen-GPIOs konnten nicht sicher auf HIGH/AUS gesetzt werden: "
-                    + ",".join(str(pin) for pin in bad)
-                )
-        except Exception:
-            for pin in initialized:
-                try:
-                    GPIO.output(pin, GPIO.HIGH)
-                except Exception:
-                    pass
-            raise
+        GPIO.setwarnings(False)
         self._job: PumpJob | None = None
         self._job_started_at = 0.0
         self._completed_steps = 0
@@ -1674,24 +1671,74 @@ class PumpController:
         with self._lock:
             self.machine_state = state
 
-    def _set_pump_locked(self, pump: int, enabled: bool) -> None:
+    def _release_pump_pin_locked(self, pump: int) -> None:
+        """Switch one active pump OFF and release only that GPIO channel."""
         pin = self.pin_for_pump(pump)
-        if enabled:
-            # Wie in der alten Software: erst sicher HIGH/AUS, dann LOW/EIN.
-            GPIO.setup(pin, GPIO.OUT, initial=GPIO.HIGH)
+        error: Exception | None = None
+
+        try:
+            # Legacy behaviour: relay OFF before releasing the GPIO.
             GPIO.output(pin, GPIO.HIGH)
-            GPIO.output(pin, GPIO.LOW)
-            self._active_pumps.add(pump)
-        else:
-            GPIO.output(pin, GPIO.HIGH)
+        except Exception as exc:
+            error = exc
+        finally:
+            try:
+                # Crucial V34 change: return the channel to the same idle state
+                # as the old standalone pump_control.py after every operation.
+                GPIO.cleanup(pin)
+            except Exception as exc:
+                if error is None:
+                    error = exc
             self._active_pumps.discard(pump)
 
+        if error is not None:
+            raise error
+
+    def _set_pump_locked(self, pump: int, enabled: bool) -> None:
+        pin = self.pin_for_pump(pump)
+
+        if enabled:
+            # Exact lifecycle of the old working software:
+            #   GPIO.setup(pin, OUT)
+            #   HIGH = relay OFF
+            #   LOW  = relay ON
+            #
+            # Do not keep unrelated pump pins configured as outputs.
+            try:
+                GPIO.setup(pin, GPIO.OUT)
+                GPIO.output(pin, GPIO.HIGH)
+                GPIO.output(pin, GPIO.LOW)
+                self._active_pumps.add(pump)
+            except Exception:
+                # Best effort: if claiming/starting a pin failed, return that
+                # single channel to HIGH and release it again.
+                try:
+                    GPIO.output(pin, GPIO.HIGH)
+                except Exception:
+                    pass
+                try:
+                    GPIO.cleanup(pin)
+                except Exception:
+                    pass
+                self._active_pumps.discard(pump)
+                raise
+            return
+
+        # Only a channel that this controller currently owns is touched.
+        if pump in self._active_pumps:
+            self._release_pump_pin_locked(pump)
+
     def all_off(self) -> None:
+        """Stop/release only pumps that are currently active.
+
+        Unlike V33, this intentionally does NOT iterate over and configure all
+        18 pump pins. Idle/unrelated GPIOs remain untouched.
+        """
         with self._lock:
             first_error: Exception | None = None
-            for pump in range(1, PUMP_COUNT + 1):
+            for pump in tuple(sorted(self._active_pumps)):
                 try:
-                    self._set_pump_locked(pump, False)
+                    self._release_pump_pin_locked(pump)
                 except Exception as exc:
                     if first_error is None:
                         first_error = exc
@@ -1866,10 +1913,9 @@ class PumpController:
                 return
             self._closed = True
             self._generation += 1
+            # V34: active pins are switched HIGH and individually released,
+            # exactly like the legacy standalone pump process.
             self.all_off()
-            # Kein GPIO.cleanup(): das würde die LOW-aktiven Relaisleitungen
-            # wieder als Eingänge freigeben. systemd setzt sie nach Prozessende
-            # nochmals explizit auf OUTPUT/HIGH.
         self.pico.close()
 
 
@@ -3183,7 +3229,7 @@ def main() -> None:
     signal.signal(signal.SIGINT, shutdown_handler)
 
     print("CocktailBot Raspberry Pi")
-    print(f"GPIO-Modus: BCM | Relais=LOW-aktiv (HIGH=AUS) | mock={MOCK_GPIO}")
+    print(f"GPIO-Modus: BCM | Relais=LOW-aktiv | GPIO-Lifecycle=legacy/lazy | mock={MOCK_GPIO}")
     if RPIGPIO_CHIP is not None:
         print(
             f"GPIO-Chip: gpiochip{RPIGPIO_CHIP} "

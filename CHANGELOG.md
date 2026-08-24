@@ -1,3 +1,17 @@
+## V34 – Pumpen-GPIO-Lifecycle wie alte funktionierende Software
+
+- Reproduziert nicht nur die LOW-aktive Relaislogik, sondern auch den GPIO-Lebenszyklus des alten `pump_control.py`.
+- Beim Start des CocktailBot-Servers werden **keine** der 18 Pumpenleitungen als Output konfiguriert.
+- Im Leerlauf hält CocktailBot die Pumpenleitungen **nicht dauerhaft auf HIGH**.
+- Erst wenn eine konkrete Pumpe benötigt wird, wird nur deren GPIO mit `GPIO.setup(pin, GPIO.OUT)` belegt, anschließend HIGH (AUS) und dann LOW (EIN) gesetzt.
+- Beim Pumpenende wird genau dieser GPIO zuerst auf HIGH (AUS) gesetzt und danach mit `GPIO.cleanup(pin)` wieder freigegeben.
+- Bei parallelen Cocktails werden nur die tatsächlich laufenden Pumpenpins gleichzeitig belegt; jede Pumpe wird nach ihrem eigenen Ende einzeln freigegeben.
+- Not-Aus und Fehlerbehandlung schalten nur aktuell aktive Pumpen HIGH und geben deren Pins wieder frei.
+- Der V33-systemd-Failsafe (`ExecStartPre`/`ExecStopPost` mit `pinctrl`) wurde entfernt.
+- Der V33-`COCKTAILBOT PUMP SAFETY`-Block in `config.txt` wird vom Installer bei einem Update automatisch entfernt.
+- Ein eventuell installiertes `/opt/cocktailbot/raspberry/pump-safety-high.sh` wird entfernt.
+- Pi 5 behält `rpi-lgpio` als RPi.GPIO-kompatibles Backend; App-, Lizenz-, PayPal-, Backup-, Failover- und Vermietfunktionen bleiben unverändert.
+
 ## V33 – Legacy-kompatible Pumpensteuerung / Pump Safety
 
 - Pumpensteuerung von `gpiozero.OutputDevice` auf die bewährte `RPi.GPIO`-Semantik der alten CocktailBot-Software zurückgeführt.

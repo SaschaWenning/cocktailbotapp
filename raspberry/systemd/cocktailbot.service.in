@@ -11,9 +11,7 @@ Environment=PYTHONUNBUFFERED=1
 WorkingDirectory=/var/lib/cocktailbot
 EnvironmentFile=/etc/cocktailbot/cocktailbot.env
 EnvironmentFile=-/etc/cocktailbot/paypal.env
-ExecStartPre=+/opt/cocktailbot/raspberry/pump-safety-high.sh
 ExecStart=/opt/cocktailbot/venv/bin/python /opt/cocktailbot/raspberry/cocktailbot_server.py --host 0.0.0.0 --port 8080 --web-root /opt/cocktailbot/web
-ExecStopPost=+/opt/cocktailbot/raspberry/pump-safety-high.sh
 Restart=on-failure
 RestartSec=2
 TimeoutStopSec=10

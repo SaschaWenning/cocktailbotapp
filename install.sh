@@ -9,7 +9,7 @@ WEB_DIR="$INSTALL_ROOT/web"
 RUNTIME_DIR="$INSTALL_ROOT/raspberry"
 VENV_DIR="$INSTALL_ROOT/venv"
 FLUTTER_DIR="${COCKTAILBOT_FLUTTER_DIR:-/opt/flutter}"
-ACTIVE_HIGH="0"  # V33 fest: LOW=EIN, HIGH=AUS
+ACTIVE_HIGH="0"  # V34: LOW=EIN/HIGH=AUS, GPIOs nur waehrend Pumpenlauf belegt
 KIOSK_DELAY="${COCKTAILBOT_KIOSK_DELAY_SECONDS:-30}"
 BUILD_MODE="${COCKTAILBOT_BUILD_MODE:-auto}"
 SKIP_APT="${COCKTAILBOT_SKIP_APT:-0}"
@@ -81,7 +81,7 @@ warn() { printf '\n\033[1;33m[CocktailBot WARNUNG]\033[0m %s\n' "$*" >&2; }
 die() { printf '\n\033[1;31m[CocktailBot FEHLER]\033[0m %s\n' "$*" >&2; exit 1; }
 
 [[ $EUID -eq 0 ]] || die "Bitte mit sudo ausführen."
-[[ "$ACTIVE_HIGH" == "0" ]] || die "V33 verwendet fest LOW-aktive Relais. --active-high 1 ist nicht mehr erlaubt."
+[[ "$ACTIVE_HIGH" == "0" ]] || die "V34 verwendet fest LOW-aktive Relais. --active-high 1 ist nicht erlaubt."
 [[ "$KIOSK_DELAY" =~ ^[0-9]+$ ]] || die "--kiosk-delay muss eine ganze Zahl sein."
 (( KIOSK_DELAY <= 3600 )) || die "Die Kiosk-Verzögerung darf höchstens 3600 Sekunden betragen."
 [[ "$BUILD_MODE" =~ ^(auto|release|source)$ ]] || die "--build-mode muss auto, release oder source sein."
@@ -346,7 +346,7 @@ install_runtime() {
   getent group dialout >/dev/null 2>&1 || groupadd --system dialout
   usermod -aG dialout "$TARGET_USER" || true
   install -m 0755 "$SOURCE_DIR/raspberry/cocktailbot_server.py" "$RUNTIME_DIR/cocktailbot_server.py"
-  install -m 0755 "$SOURCE_DIR/raspberry/pump-safety-high.sh" "$RUNTIME_DIR/pump-safety-high.sh"
+  rm -f "$RUNTIME_DIR/pump-safety-high.sh"
   install -m 0755 "$SOURCE_DIR/raspberry/start-kiosk.sh" "$RUNTIME_DIR/start-kiosk.sh"
   install -m 0755 "$SOURCE_DIR/raspberry/start-onboard.sh" "$RUNTIME_DIR/start-onboard.sh"
   install -m 0644 "$SOURCE_DIR/raspberry/requirements.txt" "$RUNTIME_DIR/requirements.txt"
@@ -532,90 +532,63 @@ PY_DISPLAY
 
   log "Boot-Displaykonfiguration gesetzt: KMS + Firmware-EDID-Override aus + HDMI-A-1 1024x600@60"
 }
-configure_pump_boot_safety() {
-  # These BCM GPIOs are exclusively used by the 18 pump relays.
-  local config_file=""
-  local cmdline_file=""
-  local safe_drive="dh"  # feste LOW-aktive Relais: HIGH ist AUS
+remove_v33_pump_boot_safety() {
+  # V34 intentionally restores the idle GPIO lifecycle of the old software.
+  # If this machine was previously installed with V33, remove the block that
+  # forced all 18 relay GPIOs to OUTPUT/HIGH from early boot onward.
+  local config_file
   local pins="17,18,27,22,23,24,25,4,5,6,13,19,26,16,20,21,12,15"
 
-  if [[ -f /boot/firmware/config.txt ]]; then
-    config_file=/boot/firmware/config.txt
-  elif [[ -f /boot/config.txt ]]; then
-    config_file=/boot/config.txt
-  fi
-  if [[ -f /boot/firmware/cmdline.txt ]]; then
-    cmdline_file=/boot/firmware/cmdline.txt
-  elif [[ -f /boot/cmdline.txt ]]; then
-    cmdline_file=/boot/cmdline.txt
-  fi
+  for config_file in /boot/firmware/config.txt /boot/config.txt; do
+    [[ -f "$config_file" ]] || continue
 
-  if [[ -n "$config_file" ]]; then
-    log "Setze alle Pumpen-GPIOs bereits im Bootloader auf AUS"
-    cp -a "$config_file" "${config_file}.cocktailbot-pumps.bak" || true
-    python3 - "$config_file" "$pins" "$safe_drive" <<'PY_PUMPS_CONFIG'
+    if grep -qE '^# BEGIN COCKTAILBOT PUMP SAFETY[[:space:]]*$' "$config_file" || \
+       grep -qF "gpio=${pins}=op," "$config_file"; then
+      log "Entferne V33-Pumpen-Bootschutz aus $config_file (V34 Legacy-GPIO-Lifecycle)"
+      cp -a "$config_file" "${config_file}.cocktailbot-v34.bak" || true
+
+      python3 - "$config_file" "$pins" <<'PY_REMOVE_PUMP_SAFETY'
 from pathlib import Path
 import sys
 
-config = Path(sys.argv[1])
+path = Path(sys.argv[1])
 pins = sys.argv[2]
-safe_drive = sys.argv[3]
-lines = config.read_text(errors="replace").splitlines()
+lines = path.read_text(errors="replace").splitlines()
 out = []
-in_block = False
+inside = False
+
 for raw in lines:
     stripped = raw.strip()
+
     if stripped == "# BEGIN COCKTAILBOT PUMP SAFETY":
-        in_block = True
+        inside = True
         continue
     if stripped == "# END COCKTAILBOT PUMP SAFETY":
-        in_block = False
+        inside = False
         continue
-    if in_block:
+    if inside:
         continue
-    if stripped.startswith("enable_uart="):
-        continue
+
+    # Also remove a stray V33 gpio line if the markers were damaged/removed.
     if stripped.startswith(f"gpio={pins}=op,"):
         continue
+
     out.append(raw)
-while out and not out[-1].strip():
+
+# Avoid accumulating excessive blank lines at EOF.
+while len(out) >= 2 and not out[-1].strip() and not out[-2].strip():
     out.pop()
-out += [
-    "",
-    "# BEGIN COCKTAILBOT PUMP SAFETY",
-    "[all]",
-    "enable_uart=0",
-    f"gpio={pins}=op,{safe_drive}",
-    "# END COCKTAILBOT PUMP SAFETY",
-]
-config.write_text("\n".join(out) + "\n")
-PY_PUMPS_CONFIG
-  else
-    warn "Keine config.txt gefunden; Pumpen-GPIOs konnten nicht früh auf AUS gesetzt werden."
-  fi
 
-  if [[ -n "$cmdline_file" ]]; then
-    cp -a "$cmdline_file" "${cmdline_file}.cocktailbot-pumps.bak" || true
-    python3 - "$cmdline_file" <<'PY_PUMPS_CMDLINE'
-from pathlib import Path
-import sys
+path.write_text("\n".join(out).rstrip() + "\n")
+PY_REMOVE_PUMP_SAFETY
+    fi
+  done
 
-p = Path(sys.argv[1])
-tokens = p.read_text(errors="replace").split()
-tokens = [t for t in tokens if not (
-    t.startswith("console=serial0,") or
-    t.startswith("console=ttyAMA") or
-    t.startswith("console=ttyS")
-)]
-p.write_text(" ".join(tokens) + "\n")
-PY_PUMPS_CMDLINE
-  fi
-
-  # GPIO15 belongs to pump 18. Do not let a serial getty claim it again.
-  systemctl disable --now serial-getty@serial0.service >/dev/null 2>&1 || true
-  systemctl disable --now serial-getty@ttyAMA0.service >/dev/null 2>&1 || true
-  systemctl disable --now serial-getty@ttyS0.service >/dev/null 2>&1 || true
+  # V33 installed this helper in the runtime directory. It must not be called
+  # or left as the active pump policy in V34.
+  rm -f "$RUNTIME_DIR/pump-safety-high.sh"
 }
+
 
 report_gpio_configuration() {
   log "Prüfe Raspberry-Pi-GPIO-Backend"
@@ -759,7 +732,7 @@ fix_web_permissions
 install_runtime
 install_lcd_driver
 configure_display_and_boot
-configure_pump_boot_safety
+remove_v33_pump_boot_safety
 report_gpio_configuration
 configure_kiosk
 start_services
@@ -774,8 +747,9 @@ Installationsort: $INSTALL_ROOT
 Kioskbenutzer:    $TARGET_USER
 Kioskstart:       nach $KIOSK_DELAY Sekunden
 Web/API:          http://127.0.0.1:8080
-Relaislogik:      fest LOW-aktiv (HIGH=AUS, LOW=EIN) – Legacy-kompatibel
-Pumpen-Bootschutz: aktiv (GPIOs frueh auf AUS)
+Relaislogik:      fest LOW-aktiv (HIGH=AUS, LOW=EIN)
+GPIO-Lifecycle:   wie alte Software: Pin nur bei Pumpenlauf belegen + danach cleanup
+Pumpen-Bootschutz: kein permanentes OUTPUT-HIGH; V33-Block wird beim Update entfernt
 LCD7C/GoodTFT:    $INSTALL_LCD
 Bootoptimierung:  $BOOT_OPTIMIZE
 Pico LED-Port:     $PICO_PORT
