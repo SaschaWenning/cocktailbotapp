@@ -1,0 +1,19 @@
+CocktailBot V33: Pumpensteuerung wie in der alten Software
+
+Elektrische Logik:
+  HIGH = Pumpe AUS
+  LOW  = Pumpe EIN
+
+Backend:
+  RPi.GPIO API über rpi-lgpio (Raspberry Pi 5 kompatibel)
+
+Sicherheitskette:
+  1. config.txt setzt alle Pumpenpins schon beim Boot auf op,dh.
+  2. systemd ExecStartPre setzt alle 18 Pins mit pinctrl auf OUTPUT/HIGH.
+  3. Python setzt alle Pins mit GPIO.setup(... initial=GPIO.HIGH) auf AUS.
+  4. Vor Pumpenstart wird der betreffende Pin nochmals HIGH gesetzt, dann LOW.
+  5. Nach Pumpenende/Not-Aus wird HIGH gesetzt.
+  6. systemd ExecStopPost setzt alle 18 Pins erneut OUTPUT/HIGH.
+
+Die umschaltbare ACTIVE_HIGH-Logik wurde für die einheitliche CocktailBot
+Pi-5-Hardware entfernt.

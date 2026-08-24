@@ -1,3 +1,15 @@
+## V33 – Legacy-kompatible Pumpensteuerung / Pump Safety
+
+- Pumpensteuerung von `gpiozero.OutputDevice` auf die bewährte `RPi.GPIO`-Semantik der alten CocktailBot-Software zurückgeführt.
+- Raspberry Pi 5 verwendet `python3-rpi-lgpio`, das die RPi.GPIO-API auf dem modernen RP1/gpiochip-Interface bereitstellt.
+- Relaislogik ist fest: **HIGH = AUS, LOW = EIN**.
+- `--active-high 1` wird aus Sicherheitsgründen nicht mehr akzeptiert.
+- Vor jeder Aktivierung wird der Pumpenpin zuerst OUTPUT/HIGH gesetzt und erst danach auf LOW geschaltet.
+- Beim Serverstart werden alle 18 Pumpenpins OUTPUT/HIGH gesetzt und zurückgelesen.
+- Neuer systemd-Failsafe setzt alle Pins vor dem Serverstart und nach Serverende nochmals mit `pinctrl` auf OUTPUT/HIGH.
+- Bootloader-Pumpenschutz `gpio=...=op,dh` bleibt als zusätzliche frühe Sicherheitsstufe erhalten.
+- Alle UI-, Lizenz-, PayPal-, Backup-, Pumpen-Failover- und Vermietmodus-Funktionen bleiben erhalten.
+
 ## V32 – Gewerblicher Vermietmodus
 
 - Neue Gewerbefunktion „Vermietmodus“.

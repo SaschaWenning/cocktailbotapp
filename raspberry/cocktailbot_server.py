@@ -59,23 +59,11 @@ try:
 except ImportError:  # LED controller is optional; pumps must remain usable
     serial = None  # type: ignore[assignment]
 
-try:
-    from gpiozero import Device, OutputDevice
-    from gpiozero.pins.mock import MockFactory
-except ImportError as exc:  # pragma: no cover - production dependency check
-    raise SystemExit(
-        "gpiozero fehlt. Installiere es mit: sudo apt install python3-gpiozero"
-    ) from exc
+MOCK_GPIO = os.getenv("COCKTAILBOT_GPIO_MOCK", "0") in {"1", "true", "True"}
 
 
 def _detect_rp1_gpio_chip() -> tuple[int | None, str]:
-    """Resolve the RP1 gpiochip used by the Pi 5 40-pin header.
-
-    Raspberry Pi kernel updates may renumber the RP1 gpiochip.  Old gpiozero
-    releases assume gpiochip0/gpiochip4 and can therefore fail with
-    ``lgpio.error: can not open gpiochip``.  We intentionally resolve the
-    kernel label ``pinctrl-rp1`` instead of relying on a fixed number.
-    """
+    """Find the Raspberry Pi 5 RP1 gpiochip by kernel label."""
     configured = os.getenv("COCKTAILBOT_GPIO_CHIP", "auto").strip().lower()
     if configured and configured != "auto":
         if not configured.isdigit():
@@ -96,10 +84,10 @@ def _detect_rp1_gpio_chip() -> tuple[int | None, str]:
             timeout=3,
         )
     except (FileNotFoundError, OSError, subprocess.TimeoutExpired):
-        return None, "gpiozero-standard"
+        return None, "rpi-lgpio-auto"
 
     if result.returncode != 0:
-        return None, "gpiozero-standard"
+        return None, "rpi-lgpio-auto"
 
     for line in result.stdout.splitlines():
         if "[pinctrl-rp1]" not in line:
@@ -109,43 +97,57 @@ def _detect_rp1_gpio_chip() -> tuple[int | None, str]:
             chip = int(match.group(1))
             if Path(f"/dev/gpiochip{chip}").exists():
                 return chip, "pinctrl-rp1"
-    return None, "gpiozero-standard"
+    return None, "rpi-lgpio-auto"
 
 
-def _configure_gpiozero_lgpio_factory() -> tuple[int | None, str]:
-    """Patch gpiozero's LGPIOFactory only when an RP1 chip is resolved.
+RPIGPIO_CHIP, RPIGPIO_CHIP_SOURCE = _detect_rp1_gpio_chip()
 
-    This keeps non-Pi-5 systems on gpiozero's native behaviour while making
-    Pi 5 installations independent of the current gpiochip number.
-    """
-    if os.getenv("COCKTAILBOT_GPIO_MOCK", "0") in {"1", "true", "True"}:
-        return None, "mock"
+if MOCK_GPIO:
+    class _MockGPIO:
+        BCM = 11
+        OUT = 0
+        HIGH = 1
+        LOW = 0
 
-    chip, source = _detect_rp1_gpio_chip()
-    if chip is None:
-        return None, source
+        def __init__(self) -> None:
+            self._state: dict[int, int] = {}
 
+        def setmode(self, mode: int) -> None:
+            del mode
+
+        def setwarnings(self, enabled: bool) -> None:
+            del enabled
+
+        def setup(
+            self,
+            pin: int,
+            mode: int,
+            initial: int | None = None,
+            **_: Any,
+        ) -> None:
+            del mode
+            self._state[pin] = self.HIGH if initial is None else int(initial)
+
+        def output(self, pin: int, value: int) -> None:
+            self._state[pin] = int(value)
+
+        def input(self, pin: int) -> int:
+            return self._state.get(pin, self.HIGH)
+
+        def cleanup(self, channels: Any = None) -> None:
+            del channels
+
+    GPIO = _MockGPIO()
+else:
+    if RPIGPIO_CHIP is not None:
+        os.environ["RPI_LGPIO_CHIP"] = str(RPIGPIO_CHIP)
     try:
-        import lgpio
-        import gpiozero.pins.lgpio as gpiozero_lgpio
+        import RPi.GPIO as GPIO
     except ImportError as exc:
-        raise RuntimeError(
-            "lgpio fehlt; installiere python3-lgpio für die Pumpensteuerung"
+        raise SystemExit(
+            "RPi.GPIO-Kompatibilitaet fehlt. Auf Raspberry Pi 5 installieren: "
+            "sudo apt install python3-rpi-lgpio"
         ) from exc
-
-    base_init = gpiozero_lgpio.LGPIOFactory.__bases__[0].__init__
-
-    def cocktailbot_init(self, _chip=None):  # type: ignore[no-untyped-def]
-        base_init(self)
-        self._handle = lgpio.gpiochip_open(chip)
-        self._chip = chip
-        self.pin_class = gpiozero_lgpio.LGPIOPin
-
-    gpiozero_lgpio.LGPIOFactory.__init__ = cocktailbot_init
-    return chip, source
-
-
-GPIOZERO_LGPIO_CHIP, GPIOZERO_LGPIO_CHIP_SOURCE = _configure_gpiozero_lgpio_factory()
 
 
 PUMP_PINS: tuple[int, ...] = (
@@ -163,8 +165,6 @@ USB_IMAGE_MAX_COUNT = 240
 USB_IMAGE_MAX_BYTES = 25 * 1024 * 1024
 USB_IMAGE_SCAN_DEPTH = 4
 
-ACTIVE_HIGH = os.getenv("COCKTAILBOT_ACTIVE_HIGH", "0") not in {"0", "false", "False"}
-MOCK_GPIO = os.getenv("COCKTAILBOT_GPIO_MOCK", "0") in {"1", "true", "True"}
 STATE_FILE = Path(
     os.getenv("COCKTAILBOT_STATE_FILE", "/var/lib/cocktailbot/machine_state.json")
 )
@@ -547,10 +547,6 @@ def hide_onboard_keyboard() -> bool:
     if not onboard_running():
         return True
     return onboard_dbus("Hide")
-
-if MOCK_GPIO:
-    Device.pin_factory = MockFactory()
-
 
 @dataclass(frozen=True)
 class PumpStep:
@@ -1604,17 +1600,39 @@ class LicenseManager:
 
 
 class PumpController:
+    """Legacy-compatible LOW-active relay controller.
+
+    HIGH = pump OFF
+    LOW  = pump ON
+    """
+
     def __init__(self) -> None:
         self._lock = threading.RLock()
-        self._devices = {
-            number: OutputDevice(
-                pin,
-                active_high=ACTIVE_HIGH,
-                initial_value=False,
-            )
-            for number, pin in enumerate(PUMP_PINS, start=1)
-        }
         self._active_pumps: set[int] = set()
+
+        GPIO.setwarnings(False)
+        GPIO.setmode(GPIO.BCM)
+
+        initialized: list[int] = []
+        try:
+            for pin in PUMP_PINS:
+                GPIO.setup(pin, GPIO.OUT, initial=GPIO.HIGH)
+                GPIO.output(pin, GPIO.HIGH)
+                initialized.append(pin)
+
+            bad = [pin for pin in PUMP_PINS if GPIO.input(pin) != GPIO.HIGH]
+            if bad:
+                raise RuntimeError(
+                    "Pumpen-GPIOs konnten nicht sicher auf HIGH/AUS gesetzt werden: "
+                    + ",".join(str(pin) for pin in bad)
+                )
+        except Exception:
+            for pin in initialized:
+                try:
+                    GPIO.output(pin, GPIO.HIGH)
+                except Exception:
+                    pass
+            raise
         self._job: PumpJob | None = None
         self._job_started_at = 0.0
         self._completed_steps = 0
@@ -1657,18 +1675,28 @@ class PumpController:
             self.machine_state = state
 
     def _set_pump_locked(self, pump: int, enabled: bool) -> None:
-        device = self._devices[pump]
+        pin = self.pin_for_pump(pump)
         if enabled:
-            device.on()
+            # Wie in der alten Software: erst sicher HIGH/AUS, dann LOW/EIN.
+            GPIO.setup(pin, GPIO.OUT, initial=GPIO.HIGH)
+            GPIO.output(pin, GPIO.HIGH)
+            GPIO.output(pin, GPIO.LOW)
             self._active_pumps.add(pump)
         else:
-            device.off()
+            GPIO.output(pin, GPIO.HIGH)
             self._active_pumps.discard(pump)
 
     def all_off(self) -> None:
         with self._lock:
-            for pump in self._devices:
-                self._set_pump_locked(pump, False)
+            first_error: Exception | None = None
+            for pump in range(1, PUMP_COUNT + 1):
+                try:
+                    self._set_pump_locked(pump, False)
+                except Exception as exc:
+                    if first_error is None:
+                        first_error = exc
+            if first_error is not None:
+                raise first_error
 
     def stop(self, reason: str = "Not-Aus") -> None:
         del reason
@@ -1839,8 +1867,9 @@ class PumpController:
             self._closed = True
             self._generation += 1
             self.all_off()
-            for device in self._devices.values():
-                device.close()
+            # Kein GPIO.cleanup(): das würde die LOW-aktiven Relaisleitungen
+            # wieder als Eingänge freigeben. systemd setzt sie nach Prozessende
+            # nochmals explizit auf OUTPUT/HIGH.
         self.pico.close()
 
 
@@ -3154,14 +3183,17 @@ def main() -> None:
     signal.signal(signal.SIGINT, shutdown_handler)
 
     print("CocktailBot Raspberry Pi")
-    print(f"GPIO-Modus: BCM | active_high={ACTIVE_HIGH} | mock={MOCK_GPIO}")
-    if GPIOZERO_LGPIO_CHIP is not None:
+    print(f"GPIO-Modus: BCM | Relais=LOW-aktiv (HIGH=AUS) | mock={MOCK_GPIO}")
+    if RPIGPIO_CHIP is not None:
         print(
-            f"GPIO-Chip: gpiochip{GPIOZERO_LGPIO_CHIP} "
-            f"| Quelle={GPIOZERO_LGPIO_CHIP_SOURCE}"
+            f"GPIO-Chip: gpiochip{RPIGPIO_CHIP} "
+            f"| Quelle={RPIGPIO_CHIP_SOURCE} | Backend=RPi.GPIO/rpi-lgpio"
         )
     else:
-        print(f"GPIO-Chip: gpiozero-standard | Quelle={GPIOZERO_LGPIO_CHIP_SOURCE}")
+        print(
+            f"GPIO-Chip: rpi-lgpio-auto | Quelle={RPIGPIO_CHIP_SOURCE} "
+            "| Backend=RPi.GPIO/rpi-lgpio"
+        )
     print("Pumpen:", ", ".join(f"{i}=GPIO{pin}" for i, pin in enumerate(PUMP_PINS, 1)))
     print(f"Web/API: http://{args.host}:{args.port}")
     print(f"PayPal: mode={PAYPAL_MODE} | configured={bool(PAYPAL_CLIENT_ID and PAYPAL_CLIENT_SECRET)}")

@@ -9,7 +9,7 @@ WEB_DIR="$INSTALL_ROOT/web"
 RUNTIME_DIR="$INSTALL_ROOT/raspberry"
 VENV_DIR="$INSTALL_ROOT/venv"
 FLUTTER_DIR="${COCKTAILBOT_FLUTTER_DIR:-/opt/flutter}"
-ACTIVE_HIGH="${COCKTAILBOT_ACTIVE_HIGH:-0}"
+ACTIVE_HIGH="0"  # V33 fest: LOW=EIN, HIGH=AUS
 KIOSK_DELAY="${COCKTAILBOT_KIOSK_DELAY_SECONDS:-30}"
 BUILD_MODE="${COCKTAILBOT_BUILD_MODE:-auto}"
 SKIP_APT="${COCKTAILBOT_SKIP_APT:-0}"
@@ -36,7 +36,7 @@ Verwendung:
 Optionen:
   --reboot                  Raspberry Pi nach der Installation neu starten
   --local-source            den aktuellen Repository-Ordner statt GitHub verwenden
-  --active-high 0|1         Relaislogik; Standard: 0 (LOW = EIN, HIGH = AUS)
+  --active-high 0           Nur Legacy-Logik erlaubt: LOW = EIN, HIGH = AUS
   --kiosk-delay SEKUNDEN    Wartezeit bis Chromium startet; Standard: 30
   --build-mode auto|release|source
                             Standard: auto (web-release bevorzugt)
@@ -81,7 +81,7 @@ warn() { printf '\n\033[1;33m[CocktailBot WARNUNG]\033[0m %s\n' "$*" >&2; }
 die() { printf '\n\033[1;31m[CocktailBot FEHLER]\033[0m %s\n' "$*" >&2; exit 1; }
 
 [[ $EUID -eq 0 ]] || die "Bitte mit sudo ausführen."
-[[ "$ACTIVE_HIGH" =~ ^[01]$ ]] || die "--active-high muss 0 oder 1 sein."
+[[ "$ACTIVE_HIGH" == "0" ]] || die "V33 verwendet fest LOW-aktive Relais. --active-high 1 ist nicht mehr erlaubt."
 [[ "$KIOSK_DELAY" =~ ^[0-9]+$ ]] || die "--kiosk-delay muss eine ganze Zahl sein."
 (( KIOSK_DELAY <= 3600 )) || die "Die Kiosk-Verzögerung darf höchstens 3600 Sekunden betragen."
 [[ "$BUILD_MODE" =~ ^(auto|release|source)$ ]] || die "--build-mode muss auto, release oder source sein."
@@ -122,11 +122,15 @@ install_packages() {
   apt-get update
   apt-get install -y \
     ca-certificates curl git rsync unzip xz-utils zip libglu1-mesa gpiod \
-    python3 python3-venv python3-pip python3-gpiozero python3-serial python3-cryptography \
+    python3 python3-venv python3-pip python3-serial python3-cryptography \
     x11-xserver-utils unclutter util-linux onboard dbus-x11 dconf-cli
 
-  if apt-cache show python3-lgpio >/dev/null 2>&1; then
-    apt-get install -y python3-lgpio
+  # Pi-5-kompatible RPi.GPIO-Nachbildung mit derselben API wie die alte Software.
+  if apt-cache show python3-rpi-lgpio >/dev/null 2>&1; then
+    apt-get remove -y python3-rpi.gpio >/dev/null 2>&1 || true
+    apt-get install -y python3-rpi-lgpio
+  else
+    die "python3-rpi-lgpio fehlt. Pumpensteuerung wird nicht unsicher mit gpiozero fortgesetzt."
   fi
 
   if apt-cache show chromium >/dev/null 2>&1; then
@@ -342,6 +346,7 @@ install_runtime() {
   getent group dialout >/dev/null 2>&1 || groupadd --system dialout
   usermod -aG dialout "$TARGET_USER" || true
   install -m 0755 "$SOURCE_DIR/raspberry/cocktailbot_server.py" "$RUNTIME_DIR/cocktailbot_server.py"
+  install -m 0755 "$SOURCE_DIR/raspberry/pump-safety-high.sh" "$RUNTIME_DIR/pump-safety-high.sh"
   install -m 0755 "$SOURCE_DIR/raspberry/start-kiosk.sh" "$RUNTIME_DIR/start-kiosk.sh"
   install -m 0755 "$SOURCE_DIR/raspberry/start-onboard.sh" "$RUNTIME_DIR/start-onboard.sh"
   install -m 0644 "$SOURCE_DIR/raspberry/requirements.txt" "$RUNTIME_DIR/requirements.txt"
@@ -358,7 +363,7 @@ install_runtime() {
     "$SOURCE_DIR/raspberry/license_public_key.pem" \
     /etc/cocktailbot/license_public_key.pem
   cat > /etc/cocktailbot/cocktailbot.env <<ENV
-COCKTAILBOT_ACTIVE_HIGH=$ACTIVE_HIGH
+COCKTAILBOT_ACTIVE_HIGH=0
 COCKTAILBOT_STATE_FILE=/var/lib/cocktailbot/machine_state.json
 COCKTAILBOT_APP_STATE_FILE=/var/lib/cocktailbot/app_state.json
 COCKTAILBOT_NETWORK_ACCESS_FILE=/var/lib/cocktailbot/network_access.json
@@ -531,10 +536,8 @@ configure_pump_boot_safety() {
   # These BCM GPIOs are exclusively used by the 18 pump relays.
   local config_file=""
   local cmdline_file=""
-  local safe_drive="dh"
+  local safe_drive="dh"  # feste LOW-aktive Relais: HIGH ist AUS
   local pins="17,18,27,22,23,24,25,4,5,6,13,19,26,16,20,21,12,15"
-
-  [[ "$ACTIVE_HIGH" == "1" ]] && safe_drive="dl"
 
   if [[ -f /boot/firmware/config.txt ]]; then
     config_file=/boot/firmware/config.txt
@@ -618,7 +621,7 @@ report_gpio_configuration() {
   log "Prüfe Raspberry-Pi-GPIO-Backend"
 
   if [[ "$IMAGE_BUILD" == "1" ]]; then
-    log "Image-Build: GPIO-Hardwareprüfung wird übersprungen; pinctrl-rp1 wird beim echten Serverstart automatisch erkannt."
+    log "Image-Build: GPIO-Hardwareprüfung wird übersprungen; rpi-lgpio/RP1 wird beim echten Serverstart erkannt."
     return 0
   fi
 
@@ -640,9 +643,9 @@ report_gpio_configuration() {
   rp1_line="$(gpiodetect 2>/dev/null | awk '/\[pinctrl-rp1\]/ {print; exit}')"
   if [[ -n "$rp1_line" ]]; then
     log "RP1-GPIO automatisch erkannt: $rp1_line"
-    log "CocktailBot ermittelt die gpiochip-Nummer bei jedem Serverstart neu."
+    log "CocktailBot nutzt RPi.GPIO/rpi-lgpio und ermittelt den RP1-gpiochip beim Serverstart."
   else
-    log "Kein pinctrl-rp1 gefunden; gpiozero verwendet sein Standard-Backend (z. B. Raspberry Pi 4)."
+    warn "Kein pinctrl-rp1 gefunden. Dieses Installationspaket ist für Raspberry Pi 5 vorgesehen."
   fi
 }
 
@@ -771,7 +774,7 @@ Installationsort: $INSTALL_ROOT
 Kioskbenutzer:    $TARGET_USER
 Kioskstart:       nach $KIOSK_DELAY Sekunden
 Web/API:          http://127.0.0.1:8080
-Relaislogik:      COCKTAILBOT_ACTIVE_HIGH=$ACTIVE_HIGH
+Relaislogik:      fest LOW-aktiv (HIGH=AUS, LOW=EIN) – Legacy-kompatibel
 Pumpen-Bootschutz: aktiv (GPIOs frueh auf AUS)
 LCD7C/GoodTFT:    $INSTALL_LCD
 Bootoptimierung:  $BOOT_OPTIMIZE
