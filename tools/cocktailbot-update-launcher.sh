@@ -22,6 +22,7 @@ fi
 # Worker in eine eigene systemd-Unit auslagern. Dadurch überlebt das Update
 # einen Neustart von cocktailbot.service innerhalb tools/update.sh.
 exec systemd-run \
+  --no-block \
   --unit=cocktailbot-self-update \
   --collect \
   --property=Type=oneshot \

@@ -1,3 +1,12 @@
+## Version 2.5 / V38.1 – Update-Launcher Timeout-Fix
+
+- Behebt die irreführende Meldung **„Update-Launcher antwortet nicht“**.
+- Ursache: `systemd-run` startete den transienten `Type=oneshot`-Updatejob ohne `--no-block`; dadurch wartete der HTTP-Aufruf länger als das 8-Sekunden-Backend-Timeout.
+- Der Launcher verwendet jetzt `systemd-run --no-block`.
+- Die App erhält dadurch sofort die Rückmeldung, dass der Updatejob gestartet wurde.
+- Der eigentliche Updatejob läuft weiterhin unabhängig als `cocktailbot-self-update.service`.
+- Softwareversion bleibt **2.5**; der Versions-/Commit-Check erkennt diesen Fix als neuen Build derselben Version.
+
 ## Software-Version 2.5 / V38 – Update-Prüfung vor Installation
 
 - Sichtbare CocktailBot-Softwareversion ist jetzt **2.5**.
