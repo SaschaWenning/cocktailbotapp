@@ -1,9 +1,0 @@
-CocktailBot V31.2 – Reinigung: Pumpenauswahl besser lesbar
-
-Die ausgewählten Pumpen-Schaltflächen passen die Vordergrundfarbe automatisch
-an die Akzentfarbe an:
-
-- heller/grüner Hintergrund -> schwarze Schrift und schwarzes Symbol
-- dunkler Hintergrund -> weiße Schrift und weißes Symbol
-
-Zusätzlich ist die ausgewählte Schaltfläche stärker umrandet und fett beschriftet.
