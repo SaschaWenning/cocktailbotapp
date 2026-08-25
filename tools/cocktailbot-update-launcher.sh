@@ -14,18 +14,33 @@ WORKER="/usr/local/sbin/cocktailbot-update-worker"
   exit 1
 }
 
-if systemctl is-active --quiet "$UNIT"; then
-  echo "Ein CocktailBot-Software-Update läuft bereits."
-  exit 75
-fi
+state="$(systemctl is-active "$UNIT" 2>/dev/null || true)"
+case "$state" in
+  active|activating|reloading|deactivating)
+    echo "Ein CocktailBot-Software-Update läuft bereits."
+    exit 75
+    ;;
+esac
 
-# Worker in eine eigene systemd-Unit auslagern. Dadurch überlebt das Update
-# einen Neustart von cocktailbot.service innerhalb tools/update.sh.
-exec systemd-run \
+# Alte fehlgeschlagene/stale transient units dürfen keinen neuen Start blockieren.
+systemctl reset-failed "$UNIT" >/dev/null 2>&1 || true
+for _ in 1 2 3 4 5; do
+  if ! systemctl status "$UNIT" >/dev/null 2>&1; then
+    break
+  fi
+  sleep 0.2
+done
+
+# Nur die Annahme des Jobs abwarten, nicht das komplette Update.
+systemd-run \
   --no-block \
+  --quiet \
   --unit=cocktailbot-self-update \
   --collect \
   --property=Type=oneshot \
   --property=TimeoutStartSec=infinity \
   --description="CocktailBot Software Update" \
   "$WORKER"
+
+echo "CocktailBot-Software-Update wurde an systemd übergeben."
+exit 0

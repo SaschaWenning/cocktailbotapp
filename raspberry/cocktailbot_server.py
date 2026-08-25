@@ -2989,9 +2989,39 @@ def create_app(controller: PumpController, web_root: Path) -> Flask:
                 check=False,
             )
         except subprocess.TimeoutExpired:
+            # Ein Timeout ist nur dann ein Fehler, wenn systemd den Updatejob
+            # tatsächlich nicht angenommen hat.
+            try:
+                state = subprocess.run(
+                    [
+                        "systemctl",
+                        "is-active",
+                        "cocktailbot-self-update.service",
+                    ],
+                    stdin=subprocess.DEVNULL,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.DEVNULL,
+                    text=True,
+                    timeout=3,
+                    check=False,
+                ).stdout.strip()
+            except (OSError, subprocess.TimeoutExpired):
+                state = ""
+
+            if state in {"active", "activating", "reloading", "deactivating"}:
+                return jsonify(
+                    ok=True,
+                    updating=True,
+                    reboot=True,
+                    message=(
+                        "Software-Update läuft bereits. CocktailBot startet "
+                        "nach erfolgreicher Installation neu."
+                    ),
+                ), 202
+
             return jsonify(
                 ok=False,
-                error="Update-Launcher antwortet nicht",
+                error="Update-Launcher antwortet nicht und kein Updatejob läuft",
             ), 504
         except OSError as exc:
             return jsonify(
@@ -3011,6 +3041,34 @@ def create_app(controller: PumpController, web_root: Path) -> Flask:
             ), 409
 
         if result.returncode != 0:
+            try:
+                state = subprocess.run(
+                    [
+                        "systemctl",
+                        "is-active",
+                        "cocktailbot-self-update.service",
+                    ],
+                    stdin=subprocess.DEVNULL,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.DEVNULL,
+                    text=True,
+                    timeout=3,
+                    check=False,
+                ).stdout.strip()
+            except (OSError, subprocess.TimeoutExpired):
+                state = ""
+
+            if state in {"active", "activating", "reloading", "deactivating"}:
+                return jsonify(
+                    ok=True,
+                    updating=True,
+                    reboot=True,
+                    message=(
+                        "Software-Update läuft. CocktailBot startet nach "
+                        "erfolgreicher Installation neu."
+                    ),
+                ), 202
+
             return jsonify(
                 ok=False,
                 error=stderr or stdout or f"Update-Launcher Exit {result.returncode}",
@@ -3020,7 +3078,11 @@ def create_app(controller: PumpController, web_root: Path) -> Flask:
             ok=True,
             updating=True,
             reboot=True,
-            message="Software-Update wurde gestartet. CocktailBot startet nach erfolgreicher Installation neu.",
+            message=(
+                "Software-Update wurde gestartet. Die Installation beginnt "
+                "nach einer kurzen Sicherheitsreserve und CocktailBot startet "
+                "danach automatisch neu."
+            ),
         ), 202
 
     @app.route("/api/kiosk/exit", methods=["POST", "OPTIONS"])

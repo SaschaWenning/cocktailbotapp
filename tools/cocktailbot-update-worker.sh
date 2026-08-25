@@ -11,20 +11,28 @@ LOG="/var/log/cocktailbot-update.log"
 
 exec >>"$LOG" 2>&1
 
+on_error() {
+  rc=$?
+  echo
+  echo "FEHLER: Software-Update abgebrochen (Exit-Code $rc)"
+  echo "Zeit: $(date --iso-8601=seconds)"
+  echo "Es erfolgt KEIN automatischer Neustart."
+  exit "$rc"
+}
+trap on_error ERR
+
 echo
 echo "============================================================"
 echo "CocktailBot Software-Update: $(date --iso-8601=seconds)"
 echo "============================================================"
 
-if [[ ! -d "$SOURCE/.git" ]]; then
-  echo "FEHLER: Git-Repository fehlt: $SOURCE"
-  exit 1
-fi
+[[ -d "$SOURCE/.git" ]] || { echo "FEHLER: Git-Repository fehlt: $SOURCE"; exit 1; }
+[[ -f "$SOURCE/tools/update.sh" ]] || { echo "FEHLER: Update-Skript fehlt: $SOURCE/tools/update.sh"; exit 1; }
 
-if [[ ! -f "$SOURCE/tools/update.sh" ]]; then
-  echo "FEHLER: Update-Skript fehlt: $SOURCE/tools/update.sh"
-  exit 1
-fi
+# Zeitreserve, damit Backend/Flutter die Startbestätigung sicher erhalten,
+# bevor Quellen ersetzt oder cocktailbot.service neu gestartet werden.
+echo "[0/4] Update angenommen. 5 Sekunden Startreserve für die Oberfläche."
+sleep 5
 
 echo "[1/4] Hole origin/main"
 git -c safe.directory=/opt/cocktailbot/source \
@@ -37,7 +45,8 @@ git -c safe.directory=/opt/cocktailbot/source \
 echo "[3/4] Führe CocktailBot-Update aus"
 bash /opt/cocktailbot/source/tools/update.sh
 
-echo "[4/4] Update erfolgreich. Neustart."
+echo "[4/4] Update erfolgreich. Neustart wird vorbereitet."
 sync
-sleep 2
+sleep 3
+echo "Neustart: $(date --iso-8601=seconds)"
 systemctl reboot

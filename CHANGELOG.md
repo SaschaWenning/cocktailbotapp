@@ -1,3 +1,13 @@
+## Version 2.5 / V38.2 – Robuster Self-Update-Ablauf
+
+- Update-Worker wartet **5 Sekunden**, bevor Git-Reset, `update.sh` oder Service-Neustarts beginnen.
+- Launcher nutzt `systemd-run --no-block --quiet` und räumt alte fehlgeschlagene/stale Update-Units auf.
+- Ein bereits laufender Updatejob wird eindeutig erkannt.
+- Backend behandelt einen Launcher-Timeout nicht automatisch als Fehler, sondern prüft zuerst `cocktailbot-self-update.service`.
+- Auch bei ungewöhnlichem Launcher-Exitcode wird ein tatsächlich laufender Updatejob als Erfolg gemeldet.
+- Worker protokolliert Fehler und startet nur nach vollständig erfolgreichem `update.sh` neu.
+- Sichtbare Softwareversion bleibt **2.5**; dieser Fix wird per Commit-ID als neuer Build erkannt.
+
 ## Version 2.5 / V38.1 – Update-Launcher Timeout-Fix
 
 - Behebt die irreführende Meldung **„Update-Launcher antwortet nicht“**.
