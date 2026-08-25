@@ -1,0 +1,14 @@
+CocktailBot V36 – Partykarte
+
+Fehler in V35:
+Die Partykarte wurde gespeichert/als aktiv markiert, aber RecipeOverview bezog
+seine Daten aus sortedRecipesForCategory(), das ausschließlich nach Kategorie
+und Sortierung filterte. activePartyCardId wurde dort nie ausgewertet.
+
+V36:
+- Aktive Partykarte filtert die normalen Cocktail-, Mocktail- und Shot-Seiten.
+- Nur recipeIds der aktiven Partykarte werden angezeigt.
+- Einstellungen/Rezeptverwaltung zeigen weiterhin alle Rezepte.
+- Partyplaner-Auswahl ist von der aktiven Gäste-Partykarte getrennt.
+- Aktivieren/Deaktivieren ist explizit.
+- Party starten aktiviert die verwendete Partykarte.

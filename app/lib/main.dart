@@ -3764,6 +3764,7 @@ class MachineStore extends ChangeNotifier {
   final partyCards = <PartyCardProfile>[];
   final partySessions = <PartySession>[];
   String? activePartyCardId;
+  String? partyPlannerCardId;
   String? activePartySessionId;
   int partyPlannerGuestCount = 30;
   int partyPlannerReservePercent = 10;
@@ -3887,6 +3888,11 @@ class MachineStore extends ChangeNotifier {
                 ),
           );
         activePartyCardId = j['activePartyCardId']?.toString();
+        // V36: Planungsauswahl ist getrennt von der tatsächlich aktiven
+        // Gäste-Partykarte. Alte Backups übernehmen zunächst die bisher aktive
+        // Karte als Planerauswahl.
+        partyPlannerCardId = j['partyPlannerCardId']?.toString() ??
+            activePartyCardId;
         partySessions
           ..clear()
           ..addAll(
@@ -4924,6 +4930,7 @@ class MachineStore extends ChangeNotifier {
       'activeCocktailListId': activeCocktailListId,
       'partyCards': partyCards.map((e) => e.toJson()).toList(),
       'activePartyCardId': activePartyCardId,
+      'partyPlannerCardId': partyPlannerCardId,
       'partySessions': partySessions.map((e) => e.toJson()).toList(),
       'activePartySessionId': activePartySessionId,
       'partyPlannerGuestCount': partyPlannerGuestCount,
@@ -5620,6 +5627,26 @@ class MachineStore extends ChangeNotifier {
   PartyCardProfile? partyCardById(String? id) =>
       id == null ? null : partyCards.where((card) => card.id == id).firstOrNull;
 
+  PartyCardProfile? activePartyCardForDisplay() {
+    if (!commercialLicenseActive) return null;
+    return partyCardById(activePartyCardId);
+  }
+
+  bool recipeVisibleForCustomer(Recipe recipe) {
+    final card = activePartyCardForDisplay();
+    return card == null || card.recipeIds.contains(recipe.id);
+  }
+
+  Future<void> setActivePartyCard(String? id) async {
+    if (id != null && partyCardById(id) == null) return;
+    activePartyCardId = id;
+    if (id != null) {
+      partyPlannerCardId = id;
+    }
+    await save();
+    notifyListeners();
+  }
+
   PartySession? activePartySession() =>
       activePartySessionId == null
           ? null
@@ -5662,13 +5689,12 @@ class MachineStore extends ChangeNotifier {
           updatedAt: now,
         ),
       );
-      activePartyCardId = id;
+      partyPlannerCardId ??= id;
     } else {
       existing.name = trimmed;
       existing.recipeIds = recipeIds;
       existing.popularity = popularity;
       existing.updatedAt = now;
-      activePartyCardId = existing.id;
     }
 
     await save();
@@ -5678,7 +5704,10 @@ class MachineStore extends ChangeNotifier {
   Future<void> deletePartyCard(String id) async {
     partyCards.removeWhere((card) => card.id == id);
     if (activePartyCardId == id) {
-      activePartyCardId = partyCards.firstOrNull?.id;
+      activePartyCardId = null;
+    }
+    if (partyPlannerCardId == id) {
+      partyPlannerCardId = partyCards.firstOrNull?.id;
     }
     await save();
     notifyListeners();
@@ -5713,6 +5742,7 @@ class MachineStore extends ChangeNotifier {
     );
     activePartySessionId = id;
     activePartyCardId = card.id;
+    partyPlannerCardId = card.id;
     partyPlannerGuestCount = guestCount;
     await save();
     notifyListeners();
@@ -5747,8 +5777,8 @@ class MachineStore extends ChangeNotifier {
     if (reservePercent != null) {
       partyPlannerReservePercent = reservePercent.clamp(0, 100).toInt();
     }
-    if (partyCardId != null) {
-      activePartyCardId = partyCardId;
+    if (partyCardId != null && partyCardById(partyCardId) != null) {
+      partyPlannerCardId = partyCardId;
     }
     await save();
     notifyListeners();
@@ -5869,7 +5899,16 @@ class MachineStore extends ChangeNotifier {
       .compareTo(displayRecipeName(b).toLowerCase());
 
   List<Recipe> sortedRecipesForCategory(DrinkCategory category) {
-    final data = recipes.where((r) => r.category == category).toList();
+    // V36: Eine aktivierte Partykarte ist die Gäste-Cocktailkarte. Nur die dort
+    // ausgewählten Rezepte erscheinen auf den normalen Cocktail-Seiten.
+    // Admin-/Einstellungsseiten greifen weiterhin direkt auf `recipes` zu und
+    // bleiben deshalb vollständig editierbar.
+    final data = recipes
+        .where(
+          (recipe) =>
+              recipe.category == category && recipeVisibleForCustomer(recipe),
+        )
+        .toList();
 
     switch (recipeSortMode) {
       case RecipeSortMode.original:
@@ -18275,9 +18314,10 @@ class _PartyCardsPageState extends State<PartyCardsPage> {
                       if (action == 'edit') {
                         _edit(card);
                       } else if (action == 'activate') {
-                        await widget.store.setPartyPlannerSettings(
-                          partyCardId: card.id,
-                        );
+                        await widget.store.setActivePartyCard(card.id);
+                        if (mounted) setState(() {});
+                      } else if (action == 'deactivate') {
+                        await widget.store.setActivePartyCard(null);
                         if (mounted) setState(() {});
                       } else if (action == 'delete') {
                         await widget.store.deletePartyCard(card.id);
@@ -18285,14 +18325,24 @@ class _PartyCardsPageState extends State<PartyCardsPage> {
                       }
                     },
                     itemBuilder: (_) => [
-                      PopupMenuItem(
-                        value: 'activate',
-                        child: ListTile(
-                          contentPadding: EdgeInsets.zero,
-                          leading: const Icon(Icons.check_circle_outline),
-                          title: Text(tr('Aktivieren')),
+                      if (widget.store.activePartyCardId == card.id)
+                        PopupMenuItem(
+                          value: 'deactivate',
+                          child: ListTile(
+                            contentPadding: EdgeInsets.zero,
+                            leading: const Icon(Icons.cancel_outlined),
+                            title: Text(tr('Deaktivieren')),
+                          ),
+                        )
+                      else
+                        PopupMenuItem(
+                          value: 'activate',
+                          child: ListTile(
+                            contentPadding: EdgeInsets.zero,
+                            leading: const Icon(Icons.check_circle_outline),
+                            title: Text(tr('Aktivieren')),
+                          ),
                         ),
-                      ),
                       PopupMenuItem(
                         value: 'edit',
                         child: ListTile(
@@ -18422,7 +18472,7 @@ class _PartyPlannerPageState extends State<PartyPlannerPage> {
   Widget build(BuildContext context) {
     final cards = widget.store.partyCards;
     final selectedCard = widget.store.partyCardById(
-          widget.store.activePartyCardId,
+          widget.store.partyPlannerCardId,
         ) ??
         cards.firstOrNull;
     final activeSession = widget.store.activePartySession();
@@ -18854,7 +18904,7 @@ class _ShoppingListPageState extends State<ShoppingListPage> {
   Widget build(BuildContext context) {
     final cards = widget.store.partyCards;
     final selectedCard = widget.store.partyCardById(
-          widget.store.activePartyCardId,
+          widget.store.partyPlannerCardId,
         ) ??
         cards.firstOrNull;
     final completed = selectedCard == null

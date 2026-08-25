@@ -1,3 +1,15 @@
+## V36 – Partykarte filtert die Cocktailanzeige korrekt
+
+- Behebt den Fehler, dass trotz aktivierter Partykarte weiterhin alle Cocktails auf den normalen Cocktail-Seiten sichtbar waren.
+- `sortedRecipesForCategory()` berücksichtigt jetzt die aktivierte Partykarte und zeigt nur deren ausgewählte Rezepte.
+- Der Filter greift nur bei aktiver Gewerbelizenz; Admin-/Einstellungsseiten behalten weiterhin Zugriff auf alle Rezepte.
+- Neue Partykarte wird beim Speichern nicht mehr stillschweigend als Gäste-Partykarte aktiviert; dafür bleibt der explizite Menüpunkt „Aktivieren“ maßgeblich.
+- Aktive Partykarte kann über „Deaktivieren“ ausgeschaltet werden; danach sind wieder alle Cocktails sichtbar.
+- Löschen der aktiven Partykarte deaktiviert den Filter, statt automatisch eine andere Partykarte zu aktivieren.
+- Partyplaner/Einkaufsliste verwenden jetzt eine separate `partyPlannerCardId`, damit die Auswahl zur Planung nicht unbeabsichtigt die sichtbare Gäste-Cocktailkarte ändert.
+- Beim tatsächlichen Start einer Party wird deren Partykarte weiterhin automatisch als Gäste-Partykarte aktiviert.
+- Alte Backups werden migriert: fehlt `partyPlannerCardId`, wird zunächst die bisherige `activePartyCardId` als Planerauswahl übernommen.
+
 ## V35 – Pumpensteuerung als separater Prozess wie in der alten Software
 
 - `cocktailbot_server.py` importiert kein RPi.GPIO mehr und beansprucht keinen Pumpen-GPIO.
