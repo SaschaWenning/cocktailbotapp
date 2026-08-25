@@ -68,6 +68,12 @@ PUMP_HELPER = Path(
     )
 )
 PUMP_HELPER_STOP_TIMEOUT_SECONDS = 2.0
+SOFTWARE_UPDATE_LAUNCHER = Path(
+    os.getenv(
+        "COCKTAILBOT_UPDATE_LAUNCHER",
+        "/usr/local/sbin/cocktailbot-update-launcher",
+    )
+)
 
 
 PUMP_PINS: tuple[int, ...] = (
@@ -2870,6 +2876,73 @@ def create_app(controller: PumpController, web_root: Path) -> Flask:
             return ("", 204)
         hidden = hide_onboard_keyboard()
         return jsonify(ok=hidden, keyboard="onboard", visible=False), (200 if hidden else 503)
+
+    @app.route("/api/system/update", methods=["POST", "OPTIONS"])
+    def api_system_update():
+        if request.method == "OPTIONS":
+            return ("", 204)
+
+        # Software-Updates dürfen ausschließlich direkt am Raspberry ausgelöst
+        # werden. Ein Tablet/LAN-Client darf diesen Root-Vorgang nie starten.
+        if not _request_is_local():
+            return jsonify(
+                ok=False,
+                error="Software-Update kann nur direkt am CocktailBot gestartet werden",
+            ), 403
+
+        if not SOFTWARE_UPDATE_LAUNCHER.is_file():
+            return jsonify(
+                ok=False,
+                error=f"Update-Launcher fehlt: {SOFTWARE_UPDATE_LAUNCHER}",
+            ), 503
+
+        # Vor einem Update laufende Pumpen sicher stoppen.
+        controller.stop("Software-Update")
+
+        try:
+            result = subprocess.run(
+                ["sudo", "-n", str(SOFTWARE_UPDATE_LAUNCHER)],
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                timeout=8,
+                check=False,
+            )
+        except subprocess.TimeoutExpired:
+            return jsonify(
+                ok=False,
+                error="Update-Launcher antwortet nicht",
+            ), 504
+        except OSError as exc:
+            return jsonify(
+                ok=False,
+                error=f"Update konnte nicht gestartet werden: {exc}",
+            ), 500
+
+        stdout = (result.stdout or "").strip()
+        stderr = (result.stderr or "").strip()
+
+        # 75 = bereits laufendes Update.
+        if result.returncode == 75:
+            return jsonify(
+                ok=False,
+                updating=True,
+                error=stdout or stderr or "Ein Software-Update läuft bereits",
+            ), 409
+
+        if result.returncode != 0:
+            return jsonify(
+                ok=False,
+                error=stderr or stdout or f"Update-Launcher Exit {result.returncode}",
+            ), 500
+
+        return jsonify(
+            ok=True,
+            updating=True,
+            reboot=True,
+            message="Software-Update wurde gestartet. CocktailBot startet nach erfolgreicher Installation neu.",
+        ), 202
 
     @app.route("/api/kiosk/exit", methods=["POST", "OPTIONS"])
     def api_kiosk_exit():

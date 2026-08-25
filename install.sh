@@ -121,7 +121,7 @@ install_packages() {
   export DEBIAN_FRONTEND=noninteractive
   apt-get update
   apt-get install -y \
-    ca-certificates curl git rsync unzip xz-utils zip libglu1-mesa gpiod \
+    ca-certificates curl git rsync unzip xz-utils zip libglu1-mesa gpiod sudo \
     python3 python3-venv python3-pip python3-serial python3-cryptography \
     x11-xserver-utils unclutter util-linux onboard dbus-x11 dconf-cli
 
@@ -351,6 +351,18 @@ install_runtime() {
   install -m 0755 "$SOURCE_DIR/raspberry/start-kiosk.sh" "$RUNTIME_DIR/start-kiosk.sh"
   install -m 0755 "$SOURCE_DIR/raspberry/start-onboard.sh" "$RUNTIME_DIR/start-onboard.sh"
   install -m 0644 "$SOURCE_DIR/raspberry/requirements.txt" "$RUNTIME_DIR/requirements.txt"
+
+  # V37: fest definierter Self-Update-Pfad. Der CocktailBot-Benutzer erhält
+  # KEIN allgemeines passwortloses sudo, sondern nur diesen einen Launcher.
+  install -o root -g root -m 0755     "$SOURCE_DIR/tools/cocktailbot-update-launcher.sh"     /usr/local/sbin/cocktailbot-update-launcher
+  install -o root -g root -m 0755     "$SOURCE_DIR/tools/cocktailbot-update-worker.sh"     /usr/local/sbin/cocktailbot-update-worker
+
+  cat > /etc/sudoers.d/cocktailbot-update <<SUDOERS
+$TARGET_USER ALL=(root) NOPASSWD: /usr/local/sbin/cocktailbot-update-launcher
+SUDOERS
+  chmod 0440 /etc/sudoers.d/cocktailbot-update
+  visudo -cf /etc/sudoers.d/cocktailbot-update >/dev/null     || die "Ungültige sudoers-Konfiguration für CocktailBot-Update."
+
   [[ -f "$SOURCE_DIR/raspberry/license_public_key.pem" ]] || die "Lizenz-Public-Key fehlt im Repository."
 
   if [[ ! -x "$VENV_DIR/bin/python" ]]; then
@@ -366,6 +378,7 @@ install_runtime() {
   cat > /etc/cocktailbot/cocktailbot.env <<ENV
 COCKTAILBOT_ACTIVE_HIGH=0
 COCKTAILBOT_PUMP_HELPER=/opt/cocktailbot/raspberry/pump_control.py
+COCKTAILBOT_UPDATE_LAUNCHER=/usr/local/sbin/cocktailbot-update-launcher
 COCKTAILBOT_STATE_FILE=/var/lib/cocktailbot/machine_state.json
 COCKTAILBOT_APP_STATE_FILE=/var/lib/cocktailbot/app_state.json
 COCKTAILBOT_NETWORK_ACCESS_FILE=/var/lib/cocktailbot/network_access.json

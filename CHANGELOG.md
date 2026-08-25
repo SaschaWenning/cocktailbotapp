@@ -1,3 +1,19 @@
+## V37 – Software-Update direkt in den Einstellungen
+
+- Neuer Einstellungsbereich **Software-Update**.
+- Update kann nur direkt am Raspberry/Kiosk gestartet werden; Tablet-/LAN-Aufrufe werden serverseitig abgewiesen.
+- Der Benutzer bestätigt das Update ausdrücklich in einem Dialog.
+- Ablauf entspricht dem bisherigen manuellen Update:
+  1. `git -c safe.directory=/opt/cocktailbot/source -C /opt/cocktailbot/source fetch origin main`
+  2. `git -c safe.directory=/opt/cocktailbot/source -C /opt/cocktailbot/source reset --hard origin/main`
+  3. `bash /opt/cocktailbot/source/tools/update.sh`
+  4. Neustart nach erfolgreichem Abschluss.
+- Das Update läuft in einer eigenen transienten systemd-Unit, damit ein Neustart von `cocktailbot.service` während `update.sh` den Updateprozess nicht beendet.
+- Kein allgemeines passwortloses sudo: der CocktailBot-Benutzer darf ausschließlich `/usr/local/sbin/cocktailbot-update-launcher` ohne Passwort starten.
+- Vor dem Start eines Updates werden laufende Pumpenjobs gestoppt.
+- Im Vermietmodus ist der Update-Bereich für Mieter standardmäßig ausgeblendet.
+- Update-Log: `/var/log/cocktailbot-update.log`.
+
 ## V36 – Partykarte filtert die Cocktailanzeige korrekt
 
 - Behebt den Fehler, dass trotz aktivierter Partykarte weiterhin alle Cocktails auf den normalen Cocktail-Seiten sichtbar waren.

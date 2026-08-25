@@ -1282,6 +1282,7 @@ const Map<String, RentalSettingAccess> _defaultRentalSettingAccess = {
   'ingredients': RentalSettingAccess.hidden,
   'recipes': RentalSettingAccess.hidden,
   'info': RentalSettingAccess.visible,
+  'softwareUpdate': RentalSettingAccess.hidden,
   'license': RentalSettingAccess.hidden,
   'pumpFailover': RentalSettingAccess.hidden,
   'statistics': RentalSettingAccess.pinProtected,
@@ -1921,6 +1922,50 @@ String appText(AppLanguage language, String key) {
     'Aktiv': {AppLanguage.de: 'Aktiv', AppLanguage.en: 'Active', AppLanguage.es: 'Activa', AppLanguage.it: 'Attiva', AppLanguage.nl: 'Actief', AppLanguage.fr: 'Active', AppLanguage.pt: 'Ativa', AppLanguage.pl: 'Aktywna', AppLanguage.tr: 'Aktif', AppLanguage.ru: 'Активно'},
   };
   final settingsSupplementalTexts = <String, Map<AppLanguage, String>>{
+    'Software-Update': {
+      AppLanguage.de: 'Software-Update',
+      AppLanguage.en: 'Software update',
+    },
+    'Neue Version von GitHub installieren': {
+      AppLanguage.de: 'Neue Version von GitHub installieren',
+      AppLanguage.en: 'Install a new version from GitHub',
+    },
+    'Update installieren': {
+      AppLanguage.de: 'Update installieren',
+      AppLanguage.en: 'Install update',
+    },
+    'Software-Update wirklich starten?': {
+      AppLanguage.de: 'Software-Update wirklich starten?',
+      AppLanguage.en: 'Really start the software update?',
+    },
+    'CocktailBot lädt origin/main von GitHub, verwirft lokale Änderungen im Quellordner, führt das Update-Skript aus und startet danach automatisch neu.': {
+      AppLanguage.de: 'CocktailBot lädt origin/main von GitHub, verwirft lokale Änderungen im Quellordner, führt das Update-Skript aus und startet danach automatisch neu.',
+      AppLanguage.en: 'CocktailBot downloads origin/main from GitHub, discards local changes in the source directory, runs the update script and then reboots automatically.',
+    },
+    'Internetverbindung erforderlich': {
+      AppLanguage.de: 'Internetverbindung erforderlich',
+      AppLanguage.en: 'Internet connection required',
+    },
+    'Das Update kann mehrere Minuten dauern. Währenddessen CocktailBot nicht ausschalten.': {
+      AppLanguage.de: 'Das Update kann mehrere Minuten dauern. Währenddessen CocktailBot nicht ausschalten.',
+      AppLanguage.en: 'The update can take several minutes. Do not switch off CocktailBot while it is running.',
+    },
+    'Software-Update gestartet': {
+      AppLanguage.de: 'Software-Update gestartet',
+      AppLanguage.en: 'Software update started',
+    },
+    'CocktailBot wird aktualisiert und nach erfolgreicher Installation automatisch neu gestartet.': {
+      AppLanguage.de: 'CocktailBot wird aktualisiert und nach erfolgreicher Installation automatisch neu gestartet.',
+      AppLanguage.en: 'CocktailBot is being updated and will reboot automatically after a successful installation.',
+    },
+    'Update konnte nicht gestartet werden': {
+      AppLanguage.de: 'Update konnte nicht gestartet werden',
+      AppLanguage.en: 'The update could not be started',
+    },
+    'Software-Updates können aus Sicherheitsgründen nur direkt am CocktailBot gestartet werden.': {
+      AppLanguage.de: 'Software-Updates können aus Sicherheitsgründen nur direkt am CocktailBot gestartet werden.',
+      AppLanguage.en: 'For security reasons, software updates can only be started directly on CocktailBot.',
+    },
     'Weniger': {
       AppLanguage.de: 'Weniger',
       AppLanguage.en: 'Less',
@@ -6858,6 +6903,44 @@ class MachineStore extends ChangeNotifier {
     }
   }
 
+  Future<Map<String, dynamic>> startSoftwareUpdate() async {
+    if (isRemoteBrowser) {
+      throw Exception(
+        tr('Software-Updates können aus Sicherheitsgründen nur direkt am CocktailBot gestartet werden.'),
+      );
+    }
+
+    try {
+      final response = await http
+          .post(
+            _apiUri('/api/system/update'),
+            headers: _apiHeaders(json: true),
+          )
+          .timeout(const Duration(seconds: 10));
+
+      final body = response.body.trim();
+      final decoded = body.isEmpty
+          ? <String, dynamic>{}
+          : jsonDecode(body);
+
+      final data = decoded is Map
+          ? Map<String, dynamic>.from(decoded)
+          : <String, dynamic>{};
+
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        throw Exception(
+          data['error']?.toString() ??
+              '${tr('Update konnte nicht gestartet werden')} (HTTP ${response.statusCode})',
+        );
+      }
+
+      return data;
+    } catch (error) {
+      if (error is Exception) rethrow;
+      throw Exception(error.toString());
+    }
+  }
+
   Future<Map<String, dynamic>> sendCommand(
     Map<String, dynamic> command,
   ) async {
@@ -9740,6 +9823,14 @@ class SettingsPage extends StatelessWidget {
         accent,
         InfoAndLicensePage(store: store),
       ),
+      (
+        'softwareUpdate',
+        tr('Software-Update'),
+        tr('Neue Version von GitHub installieren'),
+        Icons.system_update_alt,
+        secondary,
+        SoftwareUpdatePage(store: store),
+      ),
 
       // Gewerbliche/lizenzpflichtige Funktionen.
       (
@@ -10163,6 +10254,243 @@ class SettingsPage extends StatelessWidget {
 
 
 class PageFrame extends StatelessWidget { const PageFrame({super.key, required this.title, required this.child, this.actions}); final String title; final Widget child; final List<Widget>? actions; @override Widget build(BuildContext context) => Scaffold(appBar: AppBar(title: Text(title, style: const TextStyle(fontWeight: FontWeight.w800)), actions: actions), body: SafeArea(child: child)); }
+
+class SoftwareUpdatePage extends StatefulWidget {
+  const SoftwareUpdatePage({super.key, required this.store});
+  final MachineStore store;
+
+  @override
+  State<SoftwareUpdatePage> createState() => _SoftwareUpdatePageState();
+}
+
+class _SoftwareUpdatePageState extends State<SoftwareUpdatePage> {
+  bool _starting = false;
+  String _statusMessage = '';
+
+  Future<void> _startUpdate() async {
+    if (widget.store.isRemoteBrowser) {
+      setState(() {
+        _statusMessage = tr(
+          'Software-Updates können aus Sicherheitsgründen nur direkt am CocktailBot gestartet werden.',
+        );
+      });
+      return;
+    }
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(tr('Software-Update wirklich starten?')),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              tr(
+                'CocktailBot lädt origin/main von GitHub, verwirft lokale Änderungen im Quellordner, führt das Update-Skript aus und startet danach automatisch neu.',
+              ),
+            ),
+            const SizedBox(height: 14),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(
+                  Icons.warning_amber_rounded,
+                  color: widget.store.appColors.warningColor,
+                ),
+                const SizedBox(width: 9),
+                Expanded(
+                  child: Text(
+                    tr(
+                      'Das Update kann mehrere Minuten dauern. Währenddessen CocktailBot nicht ausschalten.',
+                    ),
+                    style: const TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: Text(tr('Abbrechen')),
+          ),
+          FilledButton.icon(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            icon: const Icon(Icons.system_update_alt),
+            label: Text(tr('Update installieren')),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    setState(() {
+      _starting = true;
+      _statusMessage = '';
+    });
+
+    try {
+      await widget.store.startSoftwareUpdate();
+      if (!mounted) return;
+      setState(() {
+        _statusMessage = tr(
+          'CocktailBot wird aktualisiert und nach erfolgreicher Installation automatisch neu gestartet.',
+        );
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(tr('Software-Update gestartet'))),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _starting = false;
+        _statusMessage =
+            '${tr('Update konnte nicht gestartet werden')}: $error';
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final remote = widget.store.isRemoteBrowser;
+    final warning = widget.store.appColors.warningColor;
+    final accent = widget.store.appColors.accentColor;
+
+    return PageFrame(
+      title: tr('Software-Update'),
+      child: ListView(
+        padding: const EdgeInsets.all(18),
+        children: [
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(18),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(Icons.system_update_alt, color: accent, size: 32),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          tr('Software-Update'),
+                          style: const TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+                  Text(
+                    tr(
+                      'CocktailBot lädt origin/main von GitHub, verwirft lokale Änderungen im Quellordner, führt das Update-Skript aus und startet danach automatisch neu.',
+                    ),
+                    style: const TextStyle(height: 1.4),
+                  ),
+                  const SizedBox(height: 14),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(Icons.wifi, color: warning),
+                      const SizedBox(width: 9),
+                      Expanded(
+                        child: Text(
+                          tr('Internetverbindung erforderlich'),
+                          style: const TextStyle(fontWeight: FontWeight.w800),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(Icons.power_settings_new, color: warning),
+                      const SizedBox(width: 9),
+                      Expanded(
+                        child: Text(
+                          tr(
+                            'Das Update kann mehrere Minuten dauern. Währenddessen CocktailBot nicht ausschalten.',
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (remote) ...[
+                    const SizedBox(height: 18),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(10),
+                        color: warning.withValues(alpha: .12),
+                        border: Border.all(
+                          color: warning.withValues(alpha: .45),
+                        ),
+                      ),
+                      child: Text(
+                        tr(
+                          'Software-Updates können aus Sicherheitsgründen nur direkt am CocktailBot gestartet werden.',
+                        ),
+                        style: const TextStyle(fontWeight: FontWeight.w700),
+                      ),
+                    ),
+                  ],
+                  if (_statusMessage.isNotEmpty) ...[
+                    const SizedBox(height: 18),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(10),
+                        color: accent.withValues(alpha: .10),
+                        border: Border.all(
+                          color: accent.withValues(alpha: .35),
+                        ),
+                      ),
+                      child: Text(
+                        _statusMessage,
+                        style: const TextStyle(fontWeight: FontWeight.w700),
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 20),
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton.icon(
+                      onPressed: remote || _starting ? null : _startUpdate,
+                      icon: _starting
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2.5,
+                              ),
+                            )
+                          : const Icon(Icons.system_update_alt),
+                      label: Text(
+                        _starting
+                            ? tr('Software-Update gestartet')
+                            : tr('Update installieren'),
+                        style: const TextStyle(fontWeight: FontWeight.w900),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 
 class ConnectionPage extends StatefulWidget {
   const ConnectionPage({super.key, required this.store});
