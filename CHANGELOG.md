@@ -1,3 +1,16 @@
+## Software-Version 2.5 / V38 – Update-Prüfung vor Installation
+
+- Sichtbare CocktailBot-Softwareversion ist jetzt **2.5**.
+- Neue Repository-Datei `VERSION`; `app/pubspec.yaml` steht auf `2.5.0+25`.
+- Die Update-Seite prüft beim Öffnen automatisch `origin/main`.
+- Zusätzlich gibt es **Auf Updates prüfen** für eine manuelle erneute Prüfung.
+- Angezeigt werden installierte Version, GitHub-Version und verkürzte Build-/Commit-ID.
+- `Update installieren` wird nur freigeschaltet, wenn sich `origin/main` vom installierten Commit unterscheidet.
+- Ist dieselbe Version mit einem neueren Commit vorhanden, wird **Neuer Build verfügbar** angezeigt.
+- Sind Version und Commit aktuell, erscheint **Du verwendest bereits die aktuelle Version**.
+- Die reine Prüfung führt nur `git fetch`/`git show` aus; kein Reset, keine Installation und kein Neustart.
+- Checker ist wie der Update-Launcher nur direkt am Raspberry aufrufbar und besitzt eine eigene eng begrenzte sudo-Regel.
+
 ## V37 – Software-Update direkt in den Einstellungen
 
 - Neuer Einstellungsbereich **Software-Update**.

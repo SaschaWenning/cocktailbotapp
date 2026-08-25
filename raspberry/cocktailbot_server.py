@@ -74,6 +74,12 @@ SOFTWARE_UPDATE_LAUNCHER = Path(
         "/usr/local/sbin/cocktailbot-update-launcher",
     )
 )
+SOFTWARE_UPDATE_CHECKER = Path(
+    os.getenv(
+        "COCKTAILBOT_UPDATE_CHECKER",
+        "/usr/local/sbin/cocktailbot-update-check",
+    )
+)
 
 
 PUMP_PINS: tuple[int, ...] = (
@@ -2876,6 +2882,79 @@ def create_app(controller: PumpController, web_root: Path) -> Flask:
             return ("", 204)
         hidden = hide_onboard_keyboard()
         return jsonify(ok=hidden, keyboard="onboard", visible=False), (200 if hidden else 503)
+
+    @app.route("/api/system/update/check", methods=["GET", "OPTIONS"])
+    def api_system_update_check():
+        if request.method == "OPTIONS":
+            return ("", 204)
+
+        # Auch die reine Git-Prüfung wird nur direkt am Raspberry angeboten.
+        # So kann ein LAN-Client nicht beliebig Remote-Fetches triggern.
+        if not _request_is_local():
+            return jsonify(
+                ok=False,
+                error="Update-Prüfung kann nur direkt am CocktailBot gestartet werden",
+            ), 403
+
+        if not SOFTWARE_UPDATE_CHECKER.is_file():
+            return jsonify(
+                ok=False,
+                error=f"Update-Checker fehlt: {SOFTWARE_UPDATE_CHECKER}",
+            ), 503
+
+        try:
+            result = subprocess.run(
+                ["sudo", "-n", str(SOFTWARE_UPDATE_CHECKER)],
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                timeout=45,
+                check=False,
+            )
+        except subprocess.TimeoutExpired:
+            return jsonify(
+                ok=False,
+                error="Zeitüberschreitung beim Prüfen auf Updates",
+            ), 504
+        except OSError as exc:
+            return jsonify(
+                ok=False,
+                error=f"Update-Prüfung konnte nicht gestartet werden: {exc}",
+            ), 500
+
+        stdout = (result.stdout or "").strip()
+        stderr = (result.stderr or "").strip()
+
+        if result.returncode != 0:
+            return jsonify(
+                ok=False,
+                error=stderr or stdout or f"Update-Check Exit {result.returncode}",
+            ), 500
+
+        values: dict[str, str] = {}
+        for line in stdout.splitlines():
+            if "=" not in line:
+                continue
+            key, value = line.split("=", 1)
+            values[key.strip()] = value.strip()
+
+        current_version = values.get("current_version", "unbekannt")
+        remote_version = values.get("remote_version", "unbekannt")
+        current_sha = values.get("current_sha", "unbekannt")
+        remote_sha = values.get("remote_sha", "unbekannt")
+        update_available = values.get("update_available") == "1"
+        same_version_new_build = values.get("same_version_new_build") == "1"
+
+        return jsonify(
+            ok=True,
+            currentVersion=current_version,
+            remoteVersion=remote_version,
+            currentSha=current_sha,
+            remoteSha=remote_sha,
+            updateAvailable=update_available,
+            sameVersionNewBuild=same_version_new_build,
+        )
 
     @app.route("/api/system/update", methods=["POST", "OPTIONS"])
     def api_system_update():

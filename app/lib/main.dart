@@ -1926,6 +1926,46 @@ String appText(AppLanguage language, String key) {
       AppLanguage.de: 'Software-Update',
       AppLanguage.en: 'Software update',
     },
+    'Installierte Version': {
+      AppLanguage.de: 'Installierte Version',
+      AppLanguage.en: 'Installed version',
+    },
+    'Version auf GitHub': {
+      AppLanguage.de: 'Version auf GitHub',
+      AppLanguage.en: 'Version on GitHub',
+    },
+    'Auf Updates prüfen': {
+      AppLanguage.de: 'Auf Updates prüfen',
+      AppLanguage.en: 'Check for updates',
+    },
+    'Prüfe auf Updates …': {
+      AppLanguage.de: 'Prüfe auf Updates …',
+      AppLanguage.en: 'Checking for updates …',
+    },
+    'Neue Version verfügbar': {
+      AppLanguage.de: 'Neue Version verfügbar',
+      AppLanguage.en: 'New version available',
+    },
+    'Neuer Build verfügbar': {
+      AppLanguage.de: 'Neuer Build verfügbar',
+      AppLanguage.en: 'New build available',
+    },
+    'Du verwendest bereits die aktuelle Version.': {
+      AppLanguage.de: 'Du verwendest bereits die aktuelle Version.',
+      AppLanguage.en: 'You are already using the current version.',
+    },
+    'Update-Prüfung fehlgeschlagen': {
+      AppLanguage.de: 'Update-Prüfung fehlgeschlagen',
+      AppLanguage.en: 'Update check failed',
+    },
+    'Noch nicht geprüft': {
+      AppLanguage.de: 'Noch nicht geprüft',
+      AppLanguage.en: 'Not checked yet',
+    },
+    'Unbekannt': {
+      AppLanguage.de: 'Unbekannt',
+      AppLanguage.en: 'Unknown',
+    },
     'Neue Version von GitHub installieren': {
       AppLanguage.de: 'Neue Version von GitHub installieren',
       AppLanguage.en: 'Install a new version from GitHub',
@@ -6903,6 +6943,44 @@ class MachineStore extends ChangeNotifier {
     }
   }
 
+  Future<Map<String, dynamic>> checkSoftwareUpdate() async {
+    if (isRemoteBrowser) {
+      throw Exception(
+        tr('Software-Updates können aus Sicherheitsgründen nur direkt am CocktailBot gestartet werden.'),
+      );
+    }
+
+    try {
+      final response = await http
+          .get(
+            _apiUri('/api/system/update/check'),
+            headers: _apiHeaders(),
+          )
+          .timeout(const Duration(seconds: 50));
+
+      final body = response.body.trim();
+      final decoded = body.isEmpty
+          ? <String, dynamic>{}
+          : jsonDecode(body);
+
+      final data = decoded is Map
+          ? Map<String, dynamic>.from(decoded)
+          : <String, dynamic>{};
+
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        throw Exception(
+          data['error']?.toString() ??
+              '${tr('Update-Prüfung fehlgeschlagen')} (HTTP ${response.statusCode})',
+        );
+      }
+
+      return data;
+    } catch (error) {
+      if (error is Exception) rethrow;
+      throw Exception(error.toString());
+    }
+  }
+
   Future<Map<String, dynamic>> startSoftwareUpdate() async {
     if (isRemoteBrowser) {
       throw Exception(
@@ -10264,8 +10342,89 @@ class SoftwareUpdatePage extends StatefulWidget {
 }
 
 class _SoftwareUpdatePageState extends State<SoftwareUpdatePage> {
+  bool _checking = false;
   bool _starting = false;
+  bool _checked = false;
+  bool _updateAvailable = false;
+  bool _sameVersionNewBuild = false;
+  String _currentVersion = '2.5';
+  String _remoteVersion = '';
+  String _currentSha = '';
+  String _remoteSha = '';
   String _statusMessage = '';
+
+  @override
+  void initState() {
+    super.initState();
+    if (!widget.store.isRemoteBrowser) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _checkForUpdate();
+      });
+    }
+  }
+
+  String _shortSha(String value) {
+    if (value.length >= 8) return value.substring(0, 8);
+    return value;
+  }
+
+  Future<void> _checkForUpdate() async {
+    if (widget.store.isRemoteBrowser || _checking || _starting) return;
+
+    setState(() {
+      _checking = true;
+      _statusMessage = '';
+    });
+
+    try {
+      final result = await widget.store.checkSoftwareUpdate();
+      if (!mounted) return;
+
+      final currentVersion =
+          result['currentVersion']?.toString().trim() ?? '';
+      final remoteVersion =
+          result['remoteVersion']?.toString().trim() ?? '';
+
+      setState(() {
+        _checking = false;
+        _checked = true;
+        _currentVersion =
+            currentVersion.isEmpty || currentVersion == 'unbekannt'
+                ? '2.5'
+                : currentVersion;
+        _remoteVersion =
+            remoteVersion.isEmpty || remoteVersion == 'unbekannt'
+                ? tr('Unbekannt')
+                : remoteVersion;
+        _currentSha = result['currentSha']?.toString() ?? '';
+        _remoteSha = result['remoteSha']?.toString() ?? '';
+        _updateAvailable = result['updateAvailable'] == true;
+        _sameVersionNewBuild = result['sameVersionNewBuild'] == true;
+
+        if (_updateAvailable) {
+          if (_sameVersionNewBuild) {
+            _statusMessage =
+                '${tr('Neuer Build verfügbar')}: $_remoteVersion';
+          } else {
+            _statusMessage =
+                '${tr('Neue Version verfügbar')}: $_remoteVersion';
+          }
+        } else {
+          _statusMessage =
+              tr('Du verwendest bereits die aktuelle Version.');
+        }
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _checking = false;
+        _checked = true;
+        _updateAvailable = false;
+        _statusMessage =
+            '${tr('Update-Prüfung fehlgeschlagen')}: $error';
+      });
+    }
+  }
 
   Future<void> _startUpdate() async {
     if (widget.store.isRemoteBrowser) {
@@ -10277,6 +10436,17 @@ class _SoftwareUpdatePageState extends State<SoftwareUpdatePage> {
       return;
     }
 
+    if (!_checked) {
+      await _checkForUpdate();
+      if (!mounted || !_updateAvailable) return;
+    }
+
+    if (!_updateAvailable) return;
+
+    final versionText = _remoteVersion.isEmpty
+        ? ''
+        : '\n\n${tr('Version auf GitHub')}: $_remoteVersion';
+
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
@@ -10286,9 +10456,9 @@ class _SoftwareUpdatePageState extends State<SoftwareUpdatePage> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              tr(
+              '${tr(
                 'CocktailBot lädt origin/main von GitHub, verwirft lokale Änderungen im Quellordner, führt das Update-Skript aus und startet danach automatisch neu.',
-              ),
+              )}$versionText',
             ),
             const SizedBox(height: 14),
             Row(
@@ -10353,11 +10523,56 @@ class _SoftwareUpdatePageState extends State<SoftwareUpdatePage> {
     }
   }
 
+  Widget _versionRow({
+    required IconData icon,
+    required String label,
+    required String value,
+    String sha = '',
+  }) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, size: 22),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: const TextStyle(fontWeight: FontWeight.w700),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                value,
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              if (sha.isNotEmpty && sha != 'unbekannt')
+                Text(
+                  'Build ${_shortSha(sha)}',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Theme.of(context)
+                        .colorScheme
+                        .onSurfaceVariant,
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final remote = widget.store.isRemoteBrowser;
     final warning = widget.store.appColors.warningColor;
     final accent = widget.store.appColors.accentColor;
+    final success = widget.store.appColors.successColor;
 
     return PageFrame(
       title: tr('Software-Update'),
@@ -10385,7 +10600,79 @@ class _SoftwareUpdatePageState extends State<SoftwareUpdatePage> {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 14),
+                  const SizedBox(height: 20),
+                  _versionRow(
+                    icon: Icons.memory,
+                    label: tr('Installierte Version'),
+                    value: _currentVersion,
+                    sha: _currentSha,
+                  ),
+                  const SizedBox(height: 16),
+                  _versionRow(
+                    icon: Icons.cloud_outlined,
+                    label: tr('Version auf GitHub'),
+                    value: _remoteVersion.isEmpty
+                        ? tr('Noch nicht geprüft')
+                        : _remoteVersion,
+                    sha: _remoteSha,
+                  ),
+                  const SizedBox(height: 20),
+                  OutlinedButton.icon(
+                    onPressed:
+                        remote || _checking || _starting
+                            ? null
+                            : _checkForUpdate,
+                    icon: _checking
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2.2),
+                          )
+                        : const Icon(Icons.refresh),
+                    label: Text(
+                      _checking
+                          ? tr('Prüfe auf Updates …')
+                          : tr('Auf Updates prüfen'),
+                      style: const TextStyle(fontWeight: FontWeight.w800),
+                    ),
+                  ),
+                  if (_statusMessage.isNotEmpty) ...[
+                    const SizedBox(height: 16),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(10),
+                        color: (_updateAvailable ? warning : success)
+                            .withValues(alpha: .11),
+                        border: Border.all(
+                          color: (_updateAvailable ? warning : success)
+                              .withValues(alpha: .40),
+                        ),
+                      ),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Icon(
+                            _updateAvailable
+                                ? Icons.new_releases_outlined
+                                : Icons.verified_outlined,
+                            color: _updateAvailable ? warning : success,
+                          ),
+                          const SizedBox(width: 9),
+                          Expanded(
+                            child: Text(
+                              _statusMessage,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 20),
                   Text(
                     tr(
                       'CocktailBot lädt origin/main von GitHub, verwirft lokale Änderungen im Quellordner, führt das Update-Skript aus und startet danach automatisch neu.',
@@ -10441,29 +10728,17 @@ class _SoftwareUpdatePageState extends State<SoftwareUpdatePage> {
                       ),
                     ),
                   ],
-                  if (_statusMessage.isNotEmpty) ...[
-                    const SizedBox(height: 18),
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(10),
-                        color: accent.withValues(alpha: .10),
-                        border: Border.all(
-                          color: accent.withValues(alpha: .35),
-                        ),
-                      ),
-                      child: Text(
-                        _statusMessage,
-                        style: const TextStyle(fontWeight: FontWeight.w700),
-                      ),
-                    ),
-                  ],
                   const SizedBox(height: 20),
                   SizedBox(
                     width: double.infinity,
                     child: FilledButton.icon(
-                      onPressed: remote || _starting ? null : _startUpdate,
+                      onPressed: remote ||
+                              _starting ||
+                              _checking ||
+                              !_checked ||
+                              !_updateAvailable
+                          ? null
+                          : _startUpdate,
                       icon: _starting
                           ? const SizedBox(
                               width: 20,

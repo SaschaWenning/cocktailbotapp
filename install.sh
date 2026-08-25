@@ -356,9 +356,11 @@ install_runtime() {
   # KEIN allgemeines passwortloses sudo, sondern nur diesen einen Launcher.
   install -o root -g root -m 0755     "$SOURCE_DIR/tools/cocktailbot-update-launcher.sh"     /usr/local/sbin/cocktailbot-update-launcher
   install -o root -g root -m 0755     "$SOURCE_DIR/tools/cocktailbot-update-worker.sh"     /usr/local/sbin/cocktailbot-update-worker
+  install -o root -g root -m 0755     "$SOURCE_DIR/tools/cocktailbot-update-check.sh"     /usr/local/sbin/cocktailbot-update-check
 
   cat > /etc/sudoers.d/cocktailbot-update <<SUDOERS
 $TARGET_USER ALL=(root) NOPASSWD: /usr/local/sbin/cocktailbot-update-launcher
+$TARGET_USER ALL=(root) NOPASSWD: /usr/local/sbin/cocktailbot-update-check
 SUDOERS
   chmod 0440 /etc/sudoers.d/cocktailbot-update
   visudo -cf /etc/sudoers.d/cocktailbot-update >/dev/null     || die "Ungültige sudoers-Konfiguration für CocktailBot-Update."
@@ -379,6 +381,7 @@ SUDOERS
 COCKTAILBOT_ACTIVE_HIGH=0
 COCKTAILBOT_PUMP_HELPER=/opt/cocktailbot/raspberry/pump_control.py
 COCKTAILBOT_UPDATE_LAUNCHER=/usr/local/sbin/cocktailbot-update-launcher
+COCKTAILBOT_UPDATE_CHECKER=/usr/local/sbin/cocktailbot-update-check
 COCKTAILBOT_STATE_FILE=/var/lib/cocktailbot/machine_state.json
 COCKTAILBOT_APP_STATE_FILE=/var/lib/cocktailbot/app_state.json
 COCKTAILBOT_NETWORK_ACCESS_FILE=/var/lib/cocktailbot/network_access.json
