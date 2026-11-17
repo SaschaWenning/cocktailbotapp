@@ -9,7 +9,7 @@ WEB_DIR="$INSTALL_ROOT/web"
 RUNTIME_DIR="$INSTALL_ROOT/raspberry"
 VENV_DIR="$INSTALL_ROOT/venv"
 FLUTTER_DIR="${COCKTAILBOT_FLUTTER_DIR:-/opt/flutter}"
-ACTIVE_HIGH="0"  # V35: LOW=EIN/HIGH=AUS; separater Prozess je Pumpenlauf
+ACTIVE_HIGH="0"  # Existing installations default to active-low relays.
 KIOSK_DELAY="${COCKTAILBOT_KIOSK_DELAY_SECONDS:-30}"
 BUILD_MODE="${COCKTAILBOT_BUILD_MODE:-auto}"
 SKIP_APT="${COCKTAILBOT_SKIP_APT:-0}"
@@ -36,7 +36,8 @@ Verwendung:
 Optionen:
   --reboot                  Raspberry Pi nach der Installation neu starten
   --local-source            den aktuellen Repository-Ordner statt GitHub verwenden
-  --active-high 0           Nur Legacy-Logik erlaubt: LOW = EIN, HIGH = AUS
+  --active-high 0|1         Erstauswahl: 0=Relais (Standard), 1=MOSFET-Platine
+                            Gespeicherte Hardwareauswahl bleibt bei Updates erhalten.
   --kiosk-delay SEKUNDEN    Wartezeit bis Chromium startet; Standard: 30
   --build-mode auto|release|source
                             Standard: auto (web-release bevorzugt)
@@ -81,7 +82,7 @@ warn() { printf '\n\033[1;33m[CocktailBot WARNUNG]\033[0m %s\n' "$*" >&2; }
 die() { printf '\n\033[1;31m[CocktailBot FEHLER]\033[0m %s\n' "$*" >&2; exit 1; }
 
 [[ $EUID -eq 0 ]] || die "Bitte mit sudo ausführen."
-[[ "$ACTIVE_HIGH" == "0" ]] || die "V35 verwendet fest LOW-aktive Relais. --active-high 1 ist nicht erlaubt."
+[[ "$ACTIVE_HIGH" =~ ^[01]$ ]] || die "--active-high muss 0 oder 1 sein."
 [[ "$KIOSK_DELAY" =~ ^[0-9]+$ ]] || die "--kiosk-delay muss eine ganze Zahl sein."
 (( KIOSK_DELAY <= 3600 )) || die "Die Kiosk-Verzögerung darf höchstens 3600 Sekunden betragen."
 [[ "$BUILD_MODE" =~ ^(auto|release|source)$ ]] || die "--build-mode muss auto, release oder source sein."
@@ -122,7 +123,7 @@ install_packages() {
   apt-get update
   apt-get install -y \
     ca-certificates curl git rsync unzip xz-utils zip libglu1-mesa gpiod sudo \
-    python3 python3-venv python3-pip python3-serial python3-cryptography \
+    python3 python3-venv python3-pip python3-serial python3-cryptography python3-dev build-essential \
     x11-xserver-utils unclutter util-linux onboard dbus-x11 dconf-cli
 
   # Pi-5-kompatible RPi.GPIO-Nachbildung mit derselben API wie die alte Software.
@@ -347,6 +348,8 @@ install_runtime() {
   usermod -aG dialout "$TARGET_USER" || true
   install -m 0755 "$SOURCE_DIR/raspberry/cocktailbot_server.py" "$RUNTIME_DIR/cocktailbot_server.py"
   install -m 0755 "$SOURCE_DIR/raspberry/pump_control.py" "$RUNTIME_DIR/pump_control.py"
+  install -m 0644 "$SOURCE_DIR/raspberry/hardware_settings.py" "$RUNTIME_DIR/hardware_settings.py"
+  install -m 0644 "$SOURCE_DIR/raspberry/led_ring.py" "$RUNTIME_DIR/led_ring.py"
   rm -f "$RUNTIME_DIR/pump-safety-high.sh"
   install -m 0755 "$SOURCE_DIR/raspberry/start-kiosk.sh" "$RUNTIME_DIR/start-kiosk.sh"
   install -m 0755 "$SOURCE_DIR/raspberry/start-onboard.sh" "$RUNTIME_DIR/start-onboard.sh"
@@ -373,6 +376,27 @@ SUDOERS
   fi
   "$VENV_DIR/bin/pip" install --disable-pip-version-check -r "$RUNTIME_DIR/requirements.txt"
 
+  # RP1 PIO permits the V2 PCB's actual LED pin, BCM9. SPI MOSI would be BCM10.
+  if [[ "$(uname -m)" == "aarch64" ]]; then
+    "$VENV_DIR/bin/pip" install --disable-pip-version-check \
+      'Adafruit-Blinka>=8.50,<9' 'Adafruit-Blinka-Raspberry-Pi5-Neopixel==1.0.0rc2'
+  fi
+  cat > /etc/udev/rules.d/70-cocktailbot-pio.rules <<'PIO_RULE'
+SUBSYSTEM=="*-pio", GROUP="gpio", MODE="0660"
+PIO_RULE
+  udevadm control --reload-rules || true
+  if [[ -e /dev/pio0 ]]; then
+    chgrp gpio /dev/pio0
+    chmod 0660 /dev/pio0
+  fi
+  # Never overwrite a previously selected machine setup during an update.
+  if [[ ! -e /var/lib/cocktailbot/hardware.json && "$ACTIVE_HIGH" == "1" ]]; then
+    install -d -o "$TARGET_USER" -g "$TARGET_GROUP" -m 0750 /var/lib/cocktailbot
+    printf '%s\n' '{"pumpDriver":"mosfet","ledDriver":"pico"}' > /var/lib/cocktailbot/hardware.json
+    chown "$TARGET_USER:$TARGET_GROUP" /var/lib/cocktailbot/hardware.json
+    chmod 0640 /var/lib/cocktailbot/hardware.json
+  fi
+
   install -d -m 0755 /etc/cocktailbot
   install -o root -g root -m 0644 \
     "$SOURCE_DIR/raspberry/license_public_key.pem" \
@@ -383,6 +407,7 @@ COCKTAILBOT_PUMP_HELPER=/opt/cocktailbot/raspberry/pump_control.py
 COCKTAILBOT_UPDATE_LAUNCHER=/usr/local/sbin/cocktailbot-update-launcher
 COCKTAILBOT_UPDATE_CHECKER=/usr/local/sbin/cocktailbot-update-check
 COCKTAILBOT_STATE_FILE=/var/lib/cocktailbot/machine_state.json
+COCKTAILBOT_HARDWARE_FILE=/var/lib/cocktailbot/hardware.json
 COCKTAILBOT_APP_STATE_FILE=/var/lib/cocktailbot/app_state.json
 COCKTAILBOT_NETWORK_ACCESS_FILE=/var/lib/cocktailbot/network_access.json
 COCKTAILBOT_PICO_PORT=$PICO_PORT
@@ -608,6 +633,27 @@ PY_REMOVE_PUMP_SAFETY
   rm -f "$RUNTIME_DIR/pump-safety-high.sh"
 }
 
+configure_pump_uart() {
+  # BCM15 is pump 18. A serial console must never drive this pump gate.
+  local config_file="/boot/firmware/config.txt"
+  local cmdline_file="/boot/firmware/cmdline.txt"
+  [[ -f "$config_file" ]] || config_file="/boot/config.txt"
+  [[ -f "$cmdline_file" ]] || cmdline_file="/boot/cmdline.txt"
+  [[ -f "$config_file" && -f "$cmdline_file" ]] || die "Bootdateien für Pumpen-GPIO15 fehlen."
+  python3 - "$config_file" "$cmdline_file" <<'PY_PUMP_UART'
+from pathlib import Path
+import sys
+config, cmdline = map(Path, sys.argv[1:])
+lines = [line for line in config.read_text().splitlines()
+         if not line.strip().startswith("enable_uart=")]
+lines += ["[all]", "enable_uart=0"]
+config.write_text("\n".join(lines) + "\n")
+tokens = [t for t in cmdline.read_text().split()
+          if not t.startswith(("console=serial", "console=ttyAMA", "console=ttyS"))]
+cmdline.write_text(" ".join(tokens) + "\n")
+PY_PUMP_UART
+}
+
 
 report_gpio_configuration() {
   log "Prüfe Raspberry-Pi-GPIO-Backend"
@@ -752,6 +798,7 @@ install_runtime
 install_lcd_driver
 configure_display_and_boot
 remove_v33_pump_boot_safety
+configure_pump_uart
 report_gpio_configuration
 configure_kiosk
 start_services
@@ -766,7 +813,8 @@ Installationsort: $INSTALL_ROOT
 Kioskbenutzer:    $TARGET_USER
 Kioskstart:       nach $KIOSK_DELAY Sekunden
 Web/API:          http://127.0.0.1:8080
-Relaislogik:      fest LOW-aktiv (HIGH=AUS, LOW=EIN)
+Pumpen/LEDs:      auswählbar unter Einstellungen → LED-Beleuchtung → Hardware-Aufbau
+Standard:        LOW-aktive Relais und bisherige Pico-Beleuchtung
 GPIO-Lifecycle:   wie alte Software: eigener pump_control.py Prozess je Pumpenlauf
 Pumpen-Bootschutz: kein permanentes OUTPUT-HIGH; V33-Block wird beim Update entfernt
 LCD7C/GoodTFT:    $INSTALL_LCD

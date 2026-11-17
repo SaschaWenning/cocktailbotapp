@@ -17,6 +17,7 @@ PUMP_PINS = {
 }
 MAX_DURATION_MS = 120_000
 MOCK_GPIO = os.getenv("COCKTAILBOT_GPIO_MOCK", "0") in {"1", "true", "True"}
+ACTIVE_HIGH = os.getenv("COCKTAILBOT_ACTIVE_HIGH", "0") in {"1", "true", "True"}
 
 
 class PumpStopRequested(Exception):
@@ -113,10 +114,13 @@ else:
     GPIO.setmode(GPIO.BCM)
     GPIO.setwarnings(False)
 
-    def _safe_high_and_cleanup(pin: int, configured: bool) -> None:
+    ON_LEVEL = GPIO.HIGH if ACTIVE_HIGH else GPIO.LOW
+    OFF_LEVEL = GPIO.LOW if ACTIVE_HIGH else GPIO.HIGH
+
+    def _safe_off_and_cleanup(pin: int, configured: bool) -> None:
         if configured:
             try:
-                GPIO.output(pin, GPIO.HIGH)
+                GPIO.output(pin, OFF_LEVEL)
             except Exception:
                 pass
         try:
@@ -129,13 +133,12 @@ else:
     def activate_pump(pin: int, duration_ms: int) -> int:
         configured = False
         try:
-            # Bewusst dieselbe Reihenfolge wie in der alten Software.
-            GPIO.setup(pin, GPIO.OUT)
+            # Set the inactive level atomically, before enabling the output.
+            GPIO.setup(pin, GPIO.OUT, initial=OFF_LEVEL)
             configured = True
-            GPIO.output(pin, GPIO.HIGH)
-            GPIO.output(pin, GPIO.LOW)
+            GPIO.output(pin, ON_LEVEL)
             time.sleep(duration_ms / 1000.0)
-            GPIO.output(pin, GPIO.HIGH)
+            GPIO.output(pin, OFF_LEVEL)
             return 0
         except PumpStopRequested:
             return 130
@@ -143,20 +146,20 @@ else:
             print(f"Pumpenfehler GPIO{pin}: {exc}", file=sys.stderr)
             return 1
         finally:
-            _safe_high_and_cleanup(pin, configured)
+            _safe_off_and_cleanup(pin, configured)
 
     def force_off(pin: int) -> int:
         configured = False
         try:
-            GPIO.setup(pin, GPIO.OUT)
+            GPIO.setup(pin, GPIO.OUT, initial=OFF_LEVEL)
             configured = True
-            GPIO.output(pin, GPIO.HIGH)
+            GPIO.output(pin, OFF_LEVEL)
             return 0
         except Exception as exc:
             print(f"Pumpen-AUS-Fehler GPIO{pin}: {exc}", file=sys.stderr)
             return 1
         finally:
-            _safe_high_and_cleanup(pin, configured)
+            _safe_off_and_cleanup(pin, configured)
 
 
 def main() -> int:

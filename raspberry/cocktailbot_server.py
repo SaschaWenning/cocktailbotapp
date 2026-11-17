@@ -41,6 +41,9 @@ from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from pathlib import Path
 from typing import Any
 
+from hardware_settings import load_hardware, save_hardware, validate_hardware
+from led_ring import RingLedController
+
 import requests
 
 from cryptography.exceptions import InvalidSignature
@@ -1549,6 +1552,7 @@ class PumpController:
         self._generation = 0
         self._closed = False
         self.machine_state: dict[str, Any] = self._load_machine_state()
+        self.hardware = load_hardware()
         self.led_settings: dict[str, Any] = {
             "mode": "solid",
             "r": 22,
@@ -1556,10 +1560,52 @@ class PumpController:
             "b": 204,
             "brightness": 89,
         }
-        self.pico = PicoLedController()
+        self.pico = self._make_led_controller(self.hardware["ledDriver"])
 
         # Absichtlich keine Pumpen-GPIO-Initialisierung im Server.
         self.pico.apply_idle(self.led_settings)
+
+    @staticmethod
+    def _make_led_controller(driver: str):
+        return RingLedController() if driver == "ring24" else PicoLedController()
+
+    def _pump_environment(self) -> dict[str, str]:
+        environment = os.environ.copy()
+        environment["COCKTAILBOT_ACTIVE_HIGH"] = "1" if self.hardware["pumpDriver"] == "mosfet" else "0"
+        return environment
+
+    def configure_hardware(self, value: dict) -> dict[str, str]:
+        try:
+            hardware = validate_hardware(value)
+        except ValueError as exc:
+            raise ValidationError(str(exc)) from exc
+        with self._lock:
+            if self._closed or self._job is not None or self._active_pumps:
+                raise ValidationError("Hardware kann nur bei gestoppten Pumpen geändert werden")
+            if hardware == self.hardware:
+                return dict(self.hardware)
+            replacement = None
+            if hardware["ledDriver"] != self.hardware["ledDriver"]:
+                replacement = self._make_led_controller(hardware["ledDriver"])
+                # Validate the local ring driver before persisting the selection.
+                # An unplugged legacy Pico remains optional, as before.
+                if hardware["ledDriver"] == "ring24" and not replacement.send("OFF"):
+                    error = replacement.last_error
+                    replacement.close()
+                    raise ValidationError(f"24-LED-Ring nicht verfügbar: {error}")
+            try:
+                save_hardware(hardware)
+            except Exception:
+                if replacement is not None:
+                    replacement.close()
+                raise
+            if replacement is not None:
+                self.pico.close()
+                self.pico = replacement
+                self.pico.apply_idle(self.led_settings)
+            self.hardware = hardware
+            self._generation += 1  # Cancel delayed effects from the previous setup.
+            return dict(hardware)
 
     @staticmethod
     def pin_for_pump(pump: int) -> int:
@@ -1626,7 +1672,7 @@ class PumpController:
             text=True,
             close_fds=True,
             start_new_session=True,
-            env=os.environ.copy(),
+            env=self._pump_environment(),
         )
         self._pump_processes[pump] = process
         self._active_pumps.add(pump)
@@ -1662,7 +1708,7 @@ class PumpController:
                 text=True,
                 timeout=3,
                 check=False,
-                env=os.environ.copy(),
+                env=self._pump_environment(),
             )
             if result.returncode != 0:
                 message = (result.stderr or "").strip()
@@ -1868,8 +1914,11 @@ class PumpController:
                     "g": self.led_settings["g"],
                     "b": self.led_settings["b"],
                 },
-                "ledController": "Pico2-USB-Serial",
-                "picoConnected": self.pico.connected,
+                "hardware": dict(self.hardware),
+                "ledController": "Ring24-GPIO9" if self.hardware["ledDriver"] == "ring24" else "Pico2-USB-Serial",
+                "ledConnected": self.pico.connected,
+                "ledLastError": self.pico.last_error,
+                "picoConnected": self.hardware["ledDriver"] == "pico" and self.pico.connected,
                 "picoPort": self.pico.port,
                 "picoLastCommand": self.pico.last_command,
                 "picoLastResponse": self.pico.last_response,
@@ -2258,6 +2307,7 @@ def create_app(controller: PumpController, web_root: Path) -> Flask:
             payload = request.get_json(silent=True)
             action = str(payload.get("action", "")) if isinstance(payload, dict) else ""
             if action in {
+                "set_hardware",
                 "set_led",
                 "save_machine_state",
                 "run_pump",
@@ -3131,6 +3181,12 @@ def create_app(controller: PumpController, web_root: Path) -> Flask:
             return jsonify(ok=False, error="Feld action fehlt"), 400
 
         try:
+            if action == "set_hardware":
+                if payload.get("powerDisconnected") is not True:
+                    raise ValidationError("Vor dem Umstellen die 12-V-Versorgung trennen und bestätigen")
+                hardware = controller.configure_hardware(payload)
+                return jsonify(ok=True, hardware=hardware)
+
             if action == "set_led":
                 mode = str(payload.get("mode", "solid"))
                 if mode not in {"solid", "rainbow", "breathe", "blink", "chase", "off"}:

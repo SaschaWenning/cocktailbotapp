@@ -13195,6 +13195,11 @@ class LedSettingsPage extends StatefulWidget {
 }
 
 class _LedSettingsPageState extends State<LedSettingsPage> {
+  String pumpDriver = 'relay';
+  String ledDriver = 'pico';
+  bool hardwareLoaded = false;
+  bool savingHardware = false;
+  String? hardwareError;
   late LedIdleMode mode;
   late double brightness;
   late double red;
@@ -13226,6 +13231,115 @@ class _LedSettingsPageState extends State<LedSettingsPage> {
     red = ((color >> 16) & 0xFF).toDouble();
     green = ((color >> 8) & 0xFF).toDouble();
     blue = (color & 0xFF).toDouble();
+    _loadHardware();
+  }
+
+  Future<void> _loadHardware() async {
+    try {
+      final status = await widget.store.fetchMachineStatus();
+      final hardware = status['hardware'];
+      if (hardware is! Map) {
+        throw Exception('Die Raspberry-Software muss für die Hardwareauswahl aktualisiert werden.');
+      }
+      if (!mounted) return;
+      setState(() {
+        pumpDriver = hardware['pumpDriver'] == 'mosfet' ? 'mosfet' : 'relay';
+        ledDriver = hardware['ledDriver'] == 'ring24' ? 'ring24' : 'pico';
+        hardwareLoaded = true;
+        hardwareError = null;
+      });
+    } catch (error) {
+      if (mounted) setState(() => hardwareError = '$error');
+    }
+  }
+
+  Future<void> _applyHardware() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const T('Hardware umstellen'),
+        content: const T('Alle Pumpen stoppen und die 12-V-Versorgung der Platine bzw. Relais trennen. '
+            'Eine falsche Auswahl kann Pumpen unbeabsichtigt einschalten. '
+            'Ist die 12-V-Versorgung getrennt?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const T('Abbrechen')),
+          FilledButton(onPressed: () => Navigator.pop(context, true), child: const T('Ja, übernehmen')),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    setState(() => savingHardware = true);
+    try {
+      await widget.store.sendCommand({
+        'action': 'set_hardware',
+        'pumpDriver': pumpDriver,
+        'ledDriver': ledDriver,
+        'powerDisconnected': true,
+      });
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: T('Hardware gespeichert. Versorgung wieder anschließen und einen Ausgang testen.')),
+      );
+      await _loadHardware();
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$error')));
+    } finally {
+      if (mounted) setState(() => savingHardware = false);
+    }
+  }
+
+  Widget _hardwareCard() {
+    final enabled = hardwareLoaded && !savingHardware;
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const T('Hardware-Aufbau', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 17)),
+            const SizedBox(height: 12),
+            const T('Standard: bisherige Relaissteuerung und Pico-Beleuchtung. '
+                'Die Auswahl wird direkt auf diesem Raspberry Pi gespeichert.'),
+            const SizedBox(height: 16),
+            DropdownButtonFormField<String>(
+              key: ValueKey('pump-$pumpDriver'),
+              initialValue: pumpDriver,
+              isExpanded: true,
+              decoration: const InputDecoration(labelText: 'Pumpensteuerung'),
+              items: const [
+                DropdownMenuItem(value: 'relay', child: Text('Relais – bisheriger Aufbau')),
+                DropdownMenuItem(value: 'mosfet', child: Text('Cocktailbot V2 – MOSFET-Platine')),
+              ],
+              onChanged: enabled ? (value) => setState(() => pumpDriver = value!) : null,
+            ),
+            const SizedBox(height: 16),
+            DropdownButtonFormField<String>(
+              key: ValueKey('led-$ledDriver'),
+              initialValue: ledDriver,
+              isExpanded: true,
+              decoration: const InputDecoration(labelText: 'LED-Aufbau'),
+              items: const [
+                DropdownMenuItem(value: 'pico', child: Text('Pico per USB – bisherige 240 LEDs')),
+                DropdownMenuItem(value: 'ring24', child: Text('24-LED-Ring – Anschluss auf V2-Platine')),
+              ],
+              onChanged: enabled ? (value) => setState(() => ledDriver = value!) : null,
+            ),
+            if (hardwareError != null) ...[
+              const SizedBox(height: 12),
+              Text(hardwareError!, style: const TextStyle(color: Colors.orange)),
+              TextButton(onPressed: _loadHardware, child: const T('Erneut verbinden')),
+            ],
+            const SizedBox(height: 16),
+            FilledButton.icon(
+              onPressed: enabled ? _applyHardware : null,
+              icon: const Icon(Icons.settings_input_component),
+              label: T(savingHardware ? 'Wird gespeichert …' : 'Hardware übernehmen'),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   Color get selectedColor => Color.fromARGB(
@@ -13332,6 +13446,8 @@ class _LedSettingsPageState extends State<LedSettingsPage> {
       child: ListView(
         padding: const EdgeInsets.all(20),
         children: [
+          _hardwareCard(),
+          const SizedBox(height: 14),
           Card(
             child: Padding(
               padding: const EdgeInsets.all(16),
