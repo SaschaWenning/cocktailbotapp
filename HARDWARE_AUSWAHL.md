@@ -1,5 +1,36 @@
 # CocktailBot 2.6 – Pumpensteuerung und Beleuchtung
 
+## Reparatur nach fehlgeschlagenem Update / vollem Datenträger
+
+Wenn der Quellcode schon aktualisiert wurde, kann die alte Update-Prüfung trotzdem
+fälschlich „aktuell“ melden, obwohl der Flutter-Build abgebrochen ist. Die
+korrigierte Version bestätigt eine Installation erst nach erfolgreichem
+Web-/Backend-Update und speichert Prüfsummen der tatsächlich installierten Dateien.
+Die Update-Seite zeigt außerdem den Arbeitsschritt und das Fehlerprotokoll.
+
+Zuerst alle Dateien dieses Updatepakets in ihrer bestehenden Ordnerstruktur auf
+GitHub hochladen. Unter GitHub → Actions auf den erfolgreichen Abschluss von
+**Build Flutter Web** für diesen Commit warten. Danach am Raspberry Pi einmal:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/SaschaWenning/cocktailbotapp/main/tools/repair-update.sh -o /tmp/cocktailbot-repair-update.sh
+sudo bash /tmp/cocktailbot-repair-update.sh
+```
+
+Die Reparatur stoppt die Pumpen, entfernt ausschließlich generierte Flutter-Build-
+und Paketcachedateien und lädt die korrigierten Installationsskripte. Sie ersetzt
+lokale Änderungen im Quellordner durch GitHub `main`; Rezepte und Einstellungen
+in `/var/lib/cocktailbot` bleiben erhalten. Danach installiert sie den geprüften,
+fertig gebauten Web-Release und startet nur bei Erfolg neu. Die Ausgabe im
+Terminal zeigt dabei den Fortschritt. Bei weniger als 512 MiB freiem Speicher
+wird mit einer konkreten Fehlermeldung abgebrochen.
+
+Künftige Updates verwenden den passenden fertigen Web-Release statt eines lokalen
+Flutter-Builds auf dem Pi. Ein nicht passender oder fehlender Web-Release wird
+abgewiesen; die GitHub-Aktion muss zuerst erfolgreich sein.
+
+## Hardwareauswahl
+
 Es gibt zwei unabhängige Auswahlen an den passenden Stellen:
 
 - Oben unter **Einstellungen → Kalibrierung**: **Relais – bisheriger Aufbau** oder **MOSFET-Platine – Cocktailbot V2**.

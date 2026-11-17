@@ -6994,7 +6994,7 @@ class MachineStore extends ChangeNotifier {
             _apiUri('/api/system/update'),
             headers: _apiHeaders(json: true),
           )
-          .timeout(const Duration(seconds: 10));
+          .timeout(const Duration(seconds: 20));
 
       final body = response.body.trim();
       final decoded = body.isEmpty
@@ -7017,6 +7017,17 @@ class MachineStore extends ChangeNotifier {
       if (error is Exception) rethrow;
       throw Exception(error.toString());
     }
+  }
+
+  Future<Map<String, dynamic>> fetchSoftwareUpdateProgress() async {
+    final response = await http.get(
+      _apiUri('/api/system/update/status'), headers: _apiHeaders(),
+    ).timeout(const Duration(seconds: 8));
+    final data = jsonDecode(response.body);
+    if (response.statusCode != 200 || data is! Map<String, dynamic>) {
+      throw Exception(data is Map ? data['error'] : 'Update-Status nicht verfügbar');
+    }
+    return data;
   }
 
   Future<Map<String, dynamic>> sendCommand(
@@ -10342,12 +10353,17 @@ class SoftwareUpdatePage extends StatefulWidget {
 }
 
 class _SoftwareUpdatePageState extends State<SoftwareUpdatePage> {
+  Timer? _progressTimer;
+  bool _pollingProgress = false;
+  bool _launching = false;
+  bool _statusIsError = false;
+  String _updateLog = '';
   bool _checking = false;
   bool _starting = false;
   bool _checked = false;
   bool _updateAvailable = false;
   bool _sameVersionNewBuild = false;
-  String _currentVersion = '2.6';
+  String _currentVersion = 'Unbekannt';
   String _remoteVersion = '';
   String _currentSha = '';
   String _remoteSha = '';
@@ -10358,8 +10374,52 @@ class _SoftwareUpdatePageState extends State<SoftwareUpdatePage> {
     super.initState();
     if (!widget.store.isRemoteBrowser) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) _checkForUpdate();
+        if (mounted) {
+          _checkForUpdate();
+          _watchProgress();
+        }
       });
+    }
+  }
+
+  @override
+  void dispose() {
+    _progressTimer?.cancel();
+    super.dispose();
+  }
+
+  void _watchProgress() {
+    _progressTimer?.cancel();
+    _progressTimer = Timer.periodic(const Duration(seconds: 3), (_) => _pollProgress());
+    _pollProgress();
+  }
+
+  Future<void> _pollProgress() async {
+    if (_pollingProgress || _launching || !mounted) return;
+    _pollingProgress = true;
+    try {
+      final result = await widget.store.fetchSoftwareUpdateProgress();
+      if (!mounted) return;
+      final state = result['state']?.toString() ?? 'idle';
+      setState(() {
+        _updateLog = result['logTail']?.toString() ?? '';
+        if (state != 'idle') {
+          _starting = state == 'running' || state == 'rebooting';
+          _statusIsError = state == 'failed';
+          _statusMessage = result['message']?.toString() ?? '';
+          if (_statusIsError) _updateAvailable = true;
+        }
+      });
+      if (state == 'complete' || state == 'failed' || state == 'idle') {
+        _progressTimer?.cancel();
+      }
+    } catch (error) {
+      if (mounted && _starting) {
+        setState(() => _statusMessage = 'Verbindung während des Updates unterbrochen. '
+            'Warte auf den Programmdienst bzw. Neustart …');
+      }
+    } finally {
+      _pollingProgress = false;
     }
   }
 
@@ -10373,6 +10433,7 @@ class _SoftwareUpdatePageState extends State<SoftwareUpdatePage> {
 
     setState(() {
       _checking = true;
+      _statusIsError = false;
       _statusMessage = '';
     });
 
@@ -10390,7 +10451,7 @@ class _SoftwareUpdatePageState extends State<SoftwareUpdatePage> {
         _checked = true;
         _currentVersion =
             currentVersion.isEmpty || currentVersion == 'unbekannt'
-                ? '2.6'
+                ? tr('Unbekannt')
                 : currentVersion;
         _remoteVersion =
             remoteVersion.isEmpty || remoteVersion == 'unbekannt'
@@ -10401,7 +10462,10 @@ class _SoftwareUpdatePageState extends State<SoftwareUpdatePage> {
         _updateAvailable = result['updateAvailable'] == true;
         _sameVersionNewBuild = result['sameVersionNewBuild'] == true;
 
-        if (_updateAvailable) {
+        if (result['installedVerified'] != true) {
+          _statusMessage = 'Installation noch nicht bestätigt. Bitte das Update erneut installieren.';
+          _statusIsError = true;
+        } else if (_updateAvailable) {
           if (_sameVersionNewBuild) {
             _statusMessage =
                 '${tr('Neuer Build verfügbar')}: $_remoteVersion';
@@ -10418,6 +10482,7 @@ class _SoftwareUpdatePageState extends State<SoftwareUpdatePage> {
       if (!mounted) return;
       setState(() {
         _checking = false;
+        _statusIsError = true;
         _checked = true;
         _updateAvailable = false;
         _statusMessage =
@@ -10499,6 +10564,8 @@ class _SoftwareUpdatePageState extends State<SoftwareUpdatePage> {
 
     setState(() {
       _starting = true;
+      _launching = true;
+      _statusIsError = false;
       _statusMessage = '';
     });
 
@@ -10513,13 +10580,18 @@ class _SoftwareUpdatePageState extends State<SoftwareUpdatePage> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(tr('Software-Update gestartet'))),
       );
+      _launching = false;
+      _watchProgress();
     } catch (error) {
       if (!mounted) return;
       setState(() {
         _starting = false;
+        _launching = false;
+        _statusIsError = true;
         _statusMessage =
             '${tr('Update konnte nicht gestartet werden')}: $error';
       });
+      _watchProgress();
     }
   }
 
@@ -10573,6 +10645,8 @@ class _SoftwareUpdatePageState extends State<SoftwareUpdatePage> {
     final warning = widget.store.appColors.warningColor;
     final accent = widget.store.appColors.accentColor;
     final success = widget.store.appColors.successColor;
+    final statusColor = _statusIsError ? Theme.of(context).colorScheme.error
+        : (_updateAvailable ? warning : success);
 
     return PageFrame(
       title: tr('Software-Update'),
@@ -10643,10 +10717,10 @@ class _SoftwareUpdatePageState extends State<SoftwareUpdatePage> {
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(10),
-                        color: (_updateAvailable ? warning : success)
+                        color: statusColor
                             .withValues(alpha: .11),
                         border: Border.all(
-                          color: (_updateAvailable ? warning : success)
+                          color: statusColor
                               .withValues(alpha: .40),
                         ),
                       ),
@@ -10654,10 +10728,10 @@ class _SoftwareUpdatePageState extends State<SoftwareUpdatePage> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Icon(
-                            _updateAvailable
+                            _statusIsError ? Icons.error_outline : _updateAvailable
                                 ? Icons.new_releases_outlined
                                 : Icons.verified_outlined,
-                            color: _updateAvailable ? warning : success,
+                            color: statusColor,
                           ),
                           const SizedBox(width: 9),
                           Expanded(
@@ -10670,6 +10744,24 @@ class _SoftwareUpdatePageState extends State<SoftwareUpdatePage> {
                           ),
                         ],
                       ),
+                    ),
+                  ],
+                  if (_starting) ...[
+                    const SizedBox(height: 14),
+                    const LinearProgressIndicator(),
+                  ],
+                  if (_updateLog.isNotEmpty) ...[
+                    const SizedBox(height: 14),
+                    ExpansionTile(
+                      title: const T('Update-Protokoll'),
+                      initiallyExpanded: _statusIsError,
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.all(12),
+                          child: SelectableText(_updateLog,
+                              style: const TextStyle(fontFamily: 'monospace', fontSize: 12)),
+                        ),
+                      ],
                     ),
                   ],
                   const SizedBox(height: 20),
@@ -10750,7 +10842,7 @@ class _SoftwareUpdatePageState extends State<SoftwareUpdatePage> {
                           : const Icon(Icons.system_update_alt),
                       label: Text(
                         _starting
-                            ? tr('Software-Update gestartet')
+                            ? (_launching ? tr('Update wird gestartet …') : tr('Update läuft …'))
                             : tr('Update installieren'),
                         style: const TextStyle(fontWeight: FontWeight.w900),
                       ),

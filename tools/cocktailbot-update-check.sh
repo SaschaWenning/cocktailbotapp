@@ -25,14 +25,14 @@ sanitize_version() {
 }
 
 current_version="unbekannt"
-if [[ -f "$SOURCE/VERSION" ]]; then
-  current_version="$(sanitize_version "$(head -n1 "$SOURCE/VERSION")")"
+current_sha="unbekannt"
+installed_verified="0"
+if [[ -f /usr/local/libexec/cocktailbot-update-state ]]; then
+  receipt="$(python3 /usr/local/libexec/cocktailbot-update-state installed-info)"
+  current_version="$(sanitize_version "$(python3 -c 'import json,sys; x=json.load(sys.stdin); print(x.get("version", "unbekannt") if x.get("verified") else "unbekannt")' <<<"$receipt")")"
+  current_sha="$(python3 -c 'import json,sys; x=json.load(sys.stdin); print(x.get("sourceSha", "unbekannt") if x.get("verified") else "unbekannt")' <<<"$receipt")"
+  installed_verified="$(python3 -c 'import json,sys; print(int(bool(json.load(sys.stdin).get("verified"))))' <<<"$receipt")"
 fi
-
-current_sha="$(
-  git -c safe.directory=/opt/cocktailbot/source \
-    -C /opt/cocktailbot/source rev-parse HEAD 2>/dev/null || true
-)"
 [[ "$current_sha" =~ ^[0-9a-fA-F]{40}$ ]] || current_sha="unbekannt"
 
 # Nur Remote-Information aktualisieren. Keine lokale Datei wird überschrieben.
@@ -71,3 +71,4 @@ printf 'current_sha=%s\n' "$current_sha"
 printf 'remote_sha=%s\n' "$remote_sha"
 printf 'update_available=%s\n' "$update_available"
 printf 'same_version_new_build=%s\n' "$same_version_new_build"
+printf 'installed_verified=%s\n' "$installed_verified"

@@ -77,7 +77,12 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-log() { printf '\n\033[1;36m[CocktailBot]\033[0m %s\n' "$*"; }
+log() {
+  printf '\n\033[1;36m[CocktailBot]\033[0m %s\n' "$*"
+  if [[ "${COCKTAILBOT_SELF_UPDATE:-0}" == "1" && -x /usr/local/libexec/cocktailbot-update-state ]]; then
+    python3 /usr/local/libexec/cocktailbot-update-state running "$*"
+  fi
+}
 warn() { printf '\n\033[1;33m[CocktailBot WARNUNG]\033[0m %s\n' "$*" >&2; }
 die() { printf '\n\033[1;31m[CocktailBot FEHLER]\033[0m %s\n' "$*" >&2; exit 1; }
 
@@ -350,6 +355,9 @@ install_runtime() {
   install -m 0755 "$SOURCE_DIR/raspberry/pump_control.py" "$RUNTIME_DIR/pump_control.py"
   install -m 0644 "$SOURCE_DIR/raspberry/hardware_settings.py" "$RUNTIME_DIR/hardware_settings.py"
   install -m 0644 "$SOURCE_DIR/raspberry/led_ring.py" "$RUNTIME_DIR/led_ring.py"
+  install -m 0644 "$SOURCE_DIR/raspberry/update_state.py" "$RUNTIME_DIR/update_state.py"
+  install -d -o root -g root -m 0755 /usr/local/libexec /var/lib/cocktailbot-update
+  install -o root -g root -m 0755 "$SOURCE_DIR/raspberry/update_state.py" /usr/local/libexec/cocktailbot-update-state
   rm -f "$RUNTIME_DIR/pump-safety-high.sh"
   install -m 0755 "$SOURCE_DIR/raspberry/start-kiosk.sh" "$RUNTIME_DIR/start-kiosk.sh"
   install -m 0755 "$SOURCE_DIR/raspberry/start-onboard.sh" "$RUNTIME_DIR/start-onboard.sh"
@@ -364,6 +372,7 @@ install_runtime() {
   cat > /etc/sudoers.d/cocktailbot-update <<SUDOERS
 $TARGET_USER ALL=(root) NOPASSWD: /usr/local/sbin/cocktailbot-update-launcher
 $TARGET_USER ALL=(root) NOPASSWD: /usr/local/sbin/cocktailbot-update-check
+$TARGET_USER ALL=(root) NOPASSWD: /usr/local/libexec/cocktailbot-update-state status
 SUDOERS
   chmod 0440 /etc/sudoers.d/cocktailbot-update
   visudo -cf /etc/sudoers.d/cocktailbot-update >/dev/null     || die "Ungültige sudoers-Konfiguration für CocktailBot-Update."
@@ -374,11 +383,11 @@ SUDOERS
     rm -rf "$VENV_DIR"
     python3 -m venv --system-site-packages "$VENV_DIR"
   fi
-  "$VENV_DIR/bin/pip" install --disable-pip-version-check -r "$RUNTIME_DIR/requirements.txt"
+  "$VENV_DIR/bin/pip" install --no-cache-dir --disable-pip-version-check -r "$RUNTIME_DIR/requirements.txt"
 
   # RP1 PIO permits the V2 PCB's actual LED pin, BCM9. SPI MOSI would be BCM10.
   if [[ "$(uname -m)" == "aarch64" ]]; then
-    "$VENV_DIR/bin/pip" install --disable-pip-version-check \
+    "$VENV_DIR/bin/pip" install --no-cache-dir --disable-pip-version-check \
       'Adafruit-Blinka>=8.50,<9' 'Adafruit-Blinka-Raspberry-Pi5-Neopixel==1.0.0rc2'
   fi
   cat > /etc/udev/rules.d/70-cocktailbot-pio.rules <<'PIO_RULE'
@@ -408,6 +417,7 @@ COCKTAILBOT_UPDATE_LAUNCHER=/usr/local/sbin/cocktailbot-update-launcher
 COCKTAILBOT_UPDATE_CHECKER=/usr/local/sbin/cocktailbot-update-check
 COCKTAILBOT_STATE_FILE=/var/lib/cocktailbot/machine_state.json
 COCKTAILBOT_HARDWARE_FILE=/var/lib/cocktailbot/hardware.json
+COCKTAILBOT_UPDATE_STATE=/usr/local/libexec/cocktailbot-update-state
 COCKTAILBOT_APP_STATE_FILE=/var/lib/cocktailbot/app_state.json
 COCKTAILBOT_NETWORK_ACCESS_FILE=/var/lib/cocktailbot/network_access.json
 COCKTAILBOT_PICO_PORT=$PICO_PORT
@@ -802,6 +812,10 @@ configure_pump_uart
 report_gpio_configuration
 configure_kiosk
 start_services
+
+# Source HEAD is not evidence of a successful installation. Commit the receipt
+# only after both the web build and runtime have been installed and started.
+python3 /usr/local/libexec/cocktailbot-update-state record "$INSTALL_ROOT"
 
 cat <<SUMMARY
 

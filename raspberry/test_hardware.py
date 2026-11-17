@@ -51,6 +51,17 @@ class HardwareTests(unittest.TestCase):
         self.assertFalse(self.path.exists())
         self.assertEqual(self.controller._pump_environment()["COCKTAILBOT_ACTIVE_HIGH"], "0")
 
+    def test_update_progress_is_local_only_and_returns_worker_failure(self):
+        state = {"ok": True, "state": "failed", "message": "Disk full", "logTail": "No space left on device"}
+        with patch.object(server.SOFTWARE_UPDATE_STATE.__class__, "is_file", return_value=True), patch.object(server.subprocess, "run", return_value=types.SimpleNamespace(returncode=0, stdout=json.dumps(state))) as command:
+            response = self.app.get("/api/system/update/status")
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(response.json["state"], "failed")
+            self.assertIn("No space left", response.json["logTail"])
+            self.assertEqual(command.call_args.args[0][-1], "status")
+        response = self.app.get("/api/system/update/status", environ_overrides={"REMOTE_ADDR": "8.8.8.8"})
+        self.assertEqual(response.status_code, 403)
+
     def test_switch_persist_restart_and_switch_back(self):
         response = self.command(pumpDriver="mosfet", ledDriver="ring24", powerDisconnected=True)
         self.assertEqual(response.status_code, 200, response.json)

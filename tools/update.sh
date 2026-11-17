@@ -21,13 +21,23 @@ fi
 
 export COCKTAILBOT_FORCE_X11_1024X600="${FORCE_X11_1024X600:-0}"
 
-# Updates werden bewusst aus dem aktuellen Quellcode gebaut. Dadurch landet nicht
-# versehentlich ein veralteter GitHub-web-release-Build auf dem Raspberry.
+# The Pi installs the already-built release only after its app/workflow hashes
+# match main. Do not fill the SD card by compiling Flutter during an update.
+# These two folders contain generated build files, never recipes or settings.
+rm -rf -- /opt/cocktailbot/source/app/build /opt/cocktailbot/source/app/.dart_tool
+apt-get clean
+free_kb="$(df -Pk /opt/cocktailbot | awk 'NR==2 {print $4}')"
+if [[ ! "$free_kb" =~ ^[0-9]+$ ]] || (( free_kb < 524288 )); then
+  echo "Update abgebrochen: mindestens 512 MiB freier Speicher auf /opt/cocktailbot erforderlich." >&2
+  df -h /opt/cocktailbot >&2
+  exit 1
+fi
+
 exec bash /opt/cocktailbot/source/install.sh \
   --active-high "${ACTIVE_HIGH:-0}" \
   --pico-port "${PICO_PORT:-auto}" \
   --gpio-chip "${GPIO_CHIP:-auto}" \
   --kiosk-delay "${DELAY:-30}" \
   --skip-lcd --skip-boot-opt \
-  --build-mode source \
+  --build-mode release \
   "$@"

@@ -31,8 +31,10 @@ for _ in 1 2 3 4 5; do
   sleep 0.2
 done
 
+# Publish an accepted/running state before the UI's first status poll.
+python3 /usr/local/libexec/cocktailbot-update-state start "Update wird gestartet"
 # Nur die Annahme des Jobs abwarten, nicht das komplette Update.
-systemd-run \
+if ! systemd-run \
   --no-block \
   --quiet \
   --unit=cocktailbot-self-update \
@@ -40,7 +42,10 @@ systemd-run \
   --property=Type=oneshot \
   --property=TimeoutStartSec=infinity \
   --description="CocktailBot Software Update" \
-  "$WORKER"
+  "$WORKER"; then
+  python3 /usr/local/libexec/cocktailbot-update-state failed "Updatejob konnte nicht gestartet werden"
+  exit 1
+fi
 
 echo "CocktailBot-Software-Update wurde an systemd übergeben."
 exit 0

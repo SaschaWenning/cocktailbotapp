@@ -10,16 +10,21 @@ LOG="/var/log/cocktailbot-update.log"
 }
 
 exec >>"$LOG" 2>&1
+chmod 0644 "$LOG"
+export COCKTAILBOT_SELF_UPDATE=1
+progress() { python3 /usr/local/libexec/cocktailbot-update-state "$1" "$2"; }
 
-on_error() {
+on_exit() {
   rc=$?
+  [[ "$rc" == "0" ]] && return
   echo
   echo "FEHLER: Software-Update abgebrochen (Exit-Code $rc)"
   echo "Zeit: $(date --iso-8601=seconds)"
   echo "Es erfolgt KEIN automatischer Neustart."
-  exit "$rc"
+  progress failed "Update fehlgeschlagen (Exit-Code $rc). Details stehen im Protokoll." || true
 }
-trap on_error ERR
+trap on_exit EXIT
+progress start "Update angenommen"
 
 echo
 echo "============================================================"
@@ -35,6 +40,7 @@ echo "[0/4] Update angenommen. 5 Sekunden Startreserve für die Oberfläche."
 sleep 5
 
 echo "[1/4] Hole origin/main"
+progress running "Lade neue Software von GitHub"
 git -c safe.directory=/opt/cocktailbot/source \
   -C /opt/cocktailbot/source fetch origin main
 
@@ -43,9 +49,11 @@ git -c safe.directory=/opt/cocktailbot/source \
   -C /opt/cocktailbot/source reset --hard origin/main
 
 echo "[3/4] Führe CocktailBot-Update aus"
+progress running "Installiere geprüften Web-Release und Programmdienst"
 bash /opt/cocktailbot/source/tools/update.sh
 
 echo "[4/4] Update erfolgreich. Neustart wird vorbereitet."
+progress rebooting "Installation erfolgreich. CocktailBot startet neu."
 sync
 sleep 3
 echo "Neustart: $(date --iso-8601=seconds)"

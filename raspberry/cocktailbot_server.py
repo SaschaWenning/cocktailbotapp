@@ -83,6 +83,7 @@ SOFTWARE_UPDATE_CHECKER = Path(
         "/usr/local/sbin/cocktailbot-update-check",
     )
 )
+SOFTWARE_UPDATE_STATE = Path(os.getenv("COCKTAILBOT_UPDATE_STATE", "/usr/local/libexec/cocktailbot-update-state"))
 
 
 PUMP_PINS: tuple[int, ...] = (
@@ -3007,7 +3008,26 @@ def create_app(controller: PumpController, web_root: Path) -> Flask:
             remoteSha=remote_sha,
             updateAvailable=update_available,
             sameVersionNewBuild=same_version_new_build,
+            installedVerified=values.get("installed_verified") == "1",
         )
+
+    @app.get("/api/system/update/status")
+    def api_system_update_status():
+        if not _request_is_local():
+            return jsonify(ok=False, error="Update-Protokoll ist nur direkt am CocktailBot verfügbar"), 403
+        if not SOFTWARE_UPDATE_STATE.is_file():
+            return jsonify(ok=False, error="Update-Fortschrittsanzeige muss zunächst installiert werden"), 503
+        try:
+            result = subprocess.run(
+                ["sudo", "-n", str(SOFTWARE_UPDATE_STATE), "status"],
+                stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=5,
+                check=False,
+            )
+            if result.returncode:
+                return jsonify(ok=False, error=result.stderr.strip() or "Update-Status konnte nicht gelesen werden"), 500
+            return jsonify(json.loads(result.stdout))
+        except (OSError, ValueError, subprocess.TimeoutExpired) as exc:
+            return jsonify(ok=False, error=f"Update-Status nicht verfügbar: {exc}"), 503
 
     @app.route("/api/system/update", methods=["POST", "OPTIONS"])
     def api_system_update():
