@@ -26,12 +26,7 @@ export COCKTAILBOT_FORCE_X11_1024X600="${FORCE_X11_1024X600:-0}"
 # These two folders contain generated build files, never recipes or settings.
 rm -rf -- /opt/cocktailbot/source/app/build /opt/cocktailbot/source/app/.dart_tool
 apt-get clean
-free_kb="$(df -Pk /opt/cocktailbot | awk 'NR==2 {print $4}')"
-if [[ ! "$free_kb" =~ ^[0-9]+$ ]] || (( free_kb < 524288 )); then
-  echo "Update abgebrochen: mindestens 512 MiB freier Speicher auf /opt/cocktailbot erforderlich." >&2
-  df -h /opt/cocktailbot >&2
-  exit 1
-fi
+python3 /opt/cocktailbot/source/tools/ensure-update-space.py
 
 exec bash /opt/cocktailbot/source/install.sh \
   --active-high "${ACTIVE_HIGH:-0}" \

@@ -23,7 +23,16 @@ lokale Änderungen im Quellordner durch GitHub `main`; Rezepte und Einstellungen
 in `/var/lib/cocktailbot` bleiben erhalten. Danach installiert sie den geprüften,
 fertig gebauten Web-Release und startet nur bei Erfolg neu. Die Ausgabe im
 Terminal zeigt dabei den Fortschritt. Bei weniger als 512 MiB freiem Speicher
-wird mit einer konkreten Fehlermeldung abgebrochen.
+prüft das Update automatisch, ob das ext4-Systemdateisystem kleiner als seine
+vorhandene Partition ist. In diesem Fall wird es mit `resize2fs` online vergrößert
+und das Update anschließend fortgesetzt. Sobald die neuen Dateien auf GitHub
+liegen, funktioniert das über den Updateknopf ohne eigenen Terminalbefehl.
+
+Die Automatik verändert keine Partitionstabelle. Bei tatsächlich vollem
+Datenträger, anderen Dateisystemen oder fehlgeschlagener Erweiterung bricht das
+Update weiterhin mit einer konkreten Fehlermeldung ab. Bei bereits genügend
+freiem Platz wird nichts vergrößert. Der Schritt wird im Update-Protokoll und in
+der Fortschrittsanzeige gemeldet.
 
 Künftige Updates verwenden den passenden fertigen Web-Release statt eines lokalen
 Flutter-Builds auf dem Pi. Ein nicht passender oder fehlender Web-Release wird
