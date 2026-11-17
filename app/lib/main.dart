@@ -1,6 +1,7 @@
 //noinspection SpellCheckingInspection
 // spellchecker:disable
 import 'dart:async';
+import 'home_tabs.dart';
 import 'dart:convert';
 import 'dart:math' as math;
 import 'dart:typed_data';
@@ -3801,6 +3802,7 @@ class MachineStore extends ChangeNotifier {
   List<double> primeTimesSeconds = List<double>.filled(18, 5);
   double cleaningSeconds = 15;
   int cocktailsPerPage = 10;
+  List<String> homeTabs = List.of(defaultHomeTabs);
   int lowStockWarningPortions = 2;
   int lowFillWarningPercent = 20;
   RecipeSortMode recipeSortMode = RecipeSortMode.original;
@@ -4217,6 +4219,7 @@ class MachineStore extends ChangeNotifier {
               ? AppColorThemeConfig.defaults()
               : loadedColors;
         }
+        homeTabs = normalizeHomeTabs(j['homeTabs']);
         final savedLedMode = j['ledIdleMode']?.toString();
         final migratedLedMode = savedLedMode == 'chase' ? 'blink' : savedLedMode;
         ledIdleMode = LedIdleMode.values.where(
@@ -5038,6 +5041,7 @@ class MachineStore extends ChangeNotifier {
       'primeTimesSeconds': primeTimesSeconds,
       'cleaningSeconds': cleaningSeconds,
       'cocktailsPerPage': cocktailsPerPage,
+      'homeTabs': normalizeHomeTabs(homeTabs),
       'lowStockWarningPortions': lowStockWarningPortions,
       'lowFillWarningPercent': lowFillWarningPercent,
       'recipeSortMode': recipeSortMode.name,
@@ -6394,6 +6398,15 @@ class MachineStore extends ChangeNotifier {
     }
     await save();
     notifyListeners();
+  }
+
+  List<String> get visibleHomeTabs => normalizeHomeTabs(homeTabs).where((id) =>
+      id != 'fill' || !rentalModeActive || rentalOwnerUnlocked ||
+      rentalAccessFor('fill') != RentalSettingAccess.hidden).toList();
+
+  Future<void> setHomeTabs(List<String> tabs) async {
+    homeTabs = normalizeHomeTabs(tabs);
+    await save();
   }
 
   bool get rentalModeActive =>
@@ -7767,7 +7780,15 @@ class HomeShell extends StatefulWidget {
 }
 
 class _HomeShellState extends State<HomeShell> {
-  int index = 0;
+  String selectedTab = 'cocktails';
+  int get index => math.max(0, widget.store.visibleHomeTabs.indexOf(selectedTab));
+
+  void _selectIndex(int value) {
+    final tabs = widget.store.visibleHomeTabs;
+    if (value >= 0 && value < tabs.length) {
+      setState(() => selectedTab = tabs[value]);
+    }
+  }
 
   void _openRecipe(Recipe recipe, String fallbackAsset) {
     Navigator.push(
@@ -7781,7 +7802,7 @@ class _HomeShellState extends State<HomeShell> {
           onNavigate: (targetIndex) {
             Navigator.of(context).pop();
             if (!mounted) return;
-            setState(() => index = targetIndex.clamp(0, 3).toInt());
+            _selectIndex(targetIndex);
           },
         ),
       ),
@@ -7790,30 +7811,26 @@ class _HomeShellState extends State<HomeShell> {
 
   @override
   Widget build(BuildContext context) {
-    final pages = [
-      RecipeOverview(
-        store: widget.store,
-        category: DrinkCategory.cocktail,
-        title: widget.store.t('titleAlcoholicCocktails'),
-        onOpenRecipe: _openRecipe,
+    final tabs = widget.store.visibleHomeTabs;
+    if (!tabs.contains(selectedTab)) selectedTab = tabs.first;
+    final page = switch (selectedTab) {
+      'cocktails' => RecipeOverview(
+        store: widget.store, category: DrinkCategory.cocktail,
+        title: widget.store.t('titleAlcoholicCocktails'), onOpenRecipe: _openRecipe,
       ),
-      RecipeOverview(
-        store: widget.store,
-        category: DrinkCategory.mocktail,
-        title: widget.store.t('titleMocktails'),
-        onOpenRecipe: _openRecipe,
+      'mocktails' => RecipeOverview(
+        store: widget.store, category: DrinkCategory.mocktail,
+        title: widget.store.t('titleMocktails'), onOpenRecipe: _openRecipe,
       ),
-      RecipeOverview(
-        store: widget.store,
-        category: DrinkCategory.shot,
-        title: widget.store.t('navShots'),
-        onOpenRecipe: _openRecipe,
+      'shots' => RecipeOverview(
+        store: widget.store, category: DrinkCategory.shot,
+        title: widget.store.t('navShots'), onOpenRecipe: _openRecipe,
       ),
-      SettingsLockGate(
-        store: widget.store,
-        child: SettingsPage(store: widget.store),
-      ),
-    ];
+      'fill' => SettingsLockGate(store: widget.store,
+        child: HomeFillLevelsGate(store: widget.store)),
+      _ => SettingsLockGate(store: widget.store,
+        child: SettingsPage(store: widget.store)),
+    };
 
     return LayoutBuilder(
       builder: (context, c) {
@@ -7826,9 +7843,9 @@ class _HomeShellState extends State<HomeShell> {
                 CocktailBotTopNavigation(
                   store: widget.store,
                   selectedIndex: index,
-                  onSelected: (value) => setState(() => index = value),
+                  onSelected: _selectIndex,
                 ),
-                Expanded(child: pages[index]),
+                Expanded(child: page),
               ],
             ),
           );
@@ -7836,7 +7853,7 @@ class _HomeShellState extends State<HomeShell> {
 
         final nav = cocktailBotNavigationItems(widget.store);
         return Scaffold(
-          body: pages[index],
+          body: page,
           bottomNavigationBar: Container(
             decoration: BoxDecoration(
               color: widget.store.appColors.navigationColor.withValues(alpha: .96),
@@ -7861,7 +7878,7 @@ class _HomeShellState extends State<HomeShell> {
                     nav.length,
                     (i) => Expanded(
                       child: InkWell(
-                        onTap: () => setState(() => index = i),
+                        onTap: () => _selectIndex(i),
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
@@ -7897,31 +7914,139 @@ class _HomeShellState extends State<HomeShell> {
   }
 }
 
-List<(IconData, IconData, String)> cocktailBotNavigationItems(
-  MachineStore store,
-) =>
-    [
-      (
-        Icons.local_bar_outlined,
-        Icons.local_bar,
-        store.t('navCocktails'),
-      ),
-      (
-        Icons.local_drink_outlined,
-        Icons.local_drink,
-        store.t('navMocktails'),
-      ),
-      (
-        Icons.liquor_outlined,
-        Icons.liquor,
-        store.t('navShots'),
-      ),
-      (
-        Icons.settings_outlined,
-        Icons.settings,
-        store.t('navSettings'),
-      ),
-    ];
+(IconData, IconData, String) homeTabNavigationItem(MachineStore store, String id) => switch (id) {
+  'cocktails' => (Icons.local_bar_outlined, Icons.local_bar, store.t('navCocktails')),
+  'mocktails' => (Icons.local_drink_outlined, Icons.local_drink, store.t('navMocktails')),
+  'shots' => (Icons.liquor_outlined, Icons.liquor, store.t('navShots')),
+  'fill' => (Icons.inventory_2_outlined, Icons.inventory_2, store.t('settingsFill')),
+  _ => (Icons.settings_outlined, Icons.settings, store.t('navSettings')),
+};
+
+List<(IconData, IconData, String)> cocktailBotNavigationItems(MachineStore store) =>
+    store.visibleHomeTabs.map((id) => homeTabNavigationItem(store, id)).toList();
+
+class HomeFillLevelsGate extends StatelessWidget {
+  const HomeFillLevelsGate({super.key, required this.store});
+  final MachineStore store;
+
+  @override
+  Widget build(BuildContext context) {
+    final tenant = store.rentalModeActive && !store.rentalOwnerUnlocked;
+    final access = store.rentalAccessFor('fill');
+    if (tenant && access == RentalSettingAccess.hidden) {
+      return PageFrame(title: store.t('settingsFill'),
+        child: const Center(child: T('Dieser Bereich ist nicht freigegeben.')));
+    }
+    if (tenant && access == RentalSettingAccess.pinProtected && !store.rentalServiceUnlocked) {
+      return PageFrame(title: store.t('settingsFill'),
+        child: Center(child: FilledButton.icon(
+          icon: const Icon(Icons.lock_outline),
+          label: const T('Mit Service-PIN öffnen'),
+          onPressed: () => SettingsPage(store: store)._requestServiceUnlock(context),
+        )));
+    }
+    return FillLevelsPage(store: store);
+  }
+}
+
+class HomeTabsSettingsCard extends StatefulWidget {
+  const HomeTabsSettingsCard({super.key, required this.store});
+  final MachineStore store;
+
+  @override
+  State<HomeTabsSettingsCard> createState() => _HomeTabsSettingsCardState();
+}
+
+class _HomeTabsSettingsCardState extends State<HomeTabsSettingsCard> {
+  bool saving = false;
+
+  Future<void> _save(List<String> tabs) async {
+    setState(() => saving = true);
+    try {
+      await widget.store.setHomeTabs(tabs);
+    } catch (error) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$error')));
+    } finally {
+      if (mounted) setState(() => saving = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => AnimatedBuilder(
+    animation: widget.store,
+    builder: (context, _) {
+      final selected = normalizeHomeTabs(widget.store.homeTabs)..remove('settings');
+      final choices = [...selected, ...optionalHomeTabs.where((id) => !selected.contains(id))];
+      return Card(
+        child: Padding(
+          padding: const EdgeInsets.all(18),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const T('Tabs auf der Hauptseite', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18)),
+              const SizedBox(height: 8),
+              const T('Wähle die sichtbaren Tabs und ihre Reihenfolge. Änderungen werden automatisch gespeichert. '
+                  'Einstellungen bleibt immer erreichbar. Vorhandene Passwörter und Freigaben gelten weiterhin.'),
+              const SizedBox(height: 12),
+              for (final id in choices)
+                Row(
+                  key: ValueKey('home-tab-$id'),
+                  children: [
+                    Expanded(child: CheckboxListTile(
+                      contentPadding: EdgeInsets.zero,
+                      controlAffinity: ListTileControlAffinity.leading,
+                      title: Text(homeTabNavigationItem(widget.store, id).$3),
+                      value: selected.contains(id),
+                      onChanged: saving ? null : (enabled) {
+                        final next = List<String>.of(selected);
+                        if (enabled == true) { next.add(id); } else { next.remove(id); }
+                        _save(next);
+                      },
+                    )),
+                    if (selected.contains(id)) ...[
+                      IconButton(
+                        tooltip: 'Nach oben',
+                        onPressed: saving || selected.indexOf(id) == 0 ? null : () {
+                          final next = List<String>.of(selected);
+                          final index = next.indexOf(id);
+                          next.removeAt(index);
+                          next.insert(index - 1, id);
+                          _save(next);
+                        },
+                        icon: const Icon(Icons.arrow_upward),
+                      ),
+                      IconButton(
+                        tooltip: 'Nach unten',
+                        onPressed: saving || selected.indexOf(id) == selected.length - 1 ? null : () {
+                          final next = List<String>.of(selected);
+                          final index = next.indexOf(id);
+                          next.removeAt(index);
+                          next.insert(index + 1, id);
+                          _save(next);
+                        },
+                        icon: const Icon(Icons.arrow_downward),
+                      ),
+                    ],
+                  ],
+                ),
+              const ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: Icon(Icons.settings_outlined),
+                title: T('Einstellungen'),
+                subtitle: T('Immer sichtbar'),
+              ),
+              TextButton.icon(
+                onPressed: saving ? null : () => _save(List.of(defaultHomeTabs)),
+                icon: const Icon(Icons.restore),
+                label: const T('Standard-Tabs wiederherstellen'),
+              ),
+            ],
+          ),
+        ),
+      );
+    },
+  );
+}
 
 class CocktailBotTopNavigation extends StatelessWidget {
   const CocktailBotTopNavigation({
@@ -9819,7 +9944,7 @@ class SettingsPage extends StatelessWidget {
       (
         'display',
         store.t('Anzeige'),
-        store.t('Sortierung und Cocktails pro Seite einstellen'),
+        store.t('Hauptseiten-Tabs, Sortierung und Cocktails pro Seite'),
         Icons.grid_view_outlined,
         mixed,
         CocktailDisplaySettingsPage(store: store),
@@ -12202,6 +12327,8 @@ class _CocktailDisplaySettingsPageState
       child: ListView(
         padding: const EdgeInsets.all(20),
         children: [
+          HomeTabsSettingsCard(store: widget.store),
+          const SizedBox(height: 14),
           Card(
             child: Padding(
               padding: const EdgeInsets.all(18),
@@ -14795,7 +14922,7 @@ class _FillLevelsPageState extends State<FillLevelsPage> {
                 ),
               ),
               const SizedBox(width: 8),
-              Container(
+              Flexible(child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                 decoration: BoxDecoration(
                   color: color.withValues(alpha: .18),
@@ -14809,7 +14936,7 @@ class _FillLevelsPageState extends State<FillLevelsPage> {
                     fontSize: 15,
                   ),
                 ),
-              ),
+              )),
             ],
           ),
           const SizedBox(height: 8),
