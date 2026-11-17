@@ -128,13 +128,13 @@ install_packages() {
   apt-get update
   apt-get install -y \
     ca-certificates curl git rsync unzip xz-utils zip libglu1-mesa gpiod sudo \
-    python3 python3-venv python3-pip python3-serial python3-cryptography python3-dev build-essential \
+    python3 python3-venv python3-pip python3-serial python3-cryptography python3-dev build-essential swig \
     x11-xserver-utils unclutter util-linux onboard dbus-x11 dconf-cli
 
   # Pi-5-kompatible RPi.GPIO-Nachbildung mit derselben API wie die alte Software.
   if apt-cache show python3-rpi-lgpio >/dev/null 2>&1; then
     apt-get remove -y python3-rpi.gpio >/dev/null 2>&1 || true
-    apt-get install -y python3-rpi-lgpio
+    apt-get install -y python3-rpi-lgpio python3-lgpio
   else
     die "python3-rpi-lgpio fehlt. Pumpensteuerung wird nicht unsicher mit gpiozero fortgesetzt."
   fi
@@ -381,8 +381,10 @@ SUDOERS
 
   if [[ ! -x "$VENV_DIR/bin/python" ]]; then
     rm -rf "$VENV_DIR"
-    python3 -m venv --system-site-packages "$VENV_DIR"
   fi
+  # Also update an existing venv's configuration; preserve its packages.
+  # The OS supplies the native lgpio binding for its Python version.
+  python3 -m venv --system-site-packages "$VENV_DIR"
   "$VENV_DIR/bin/pip" install --no-cache-dir --disable-pip-version-check -r "$RUNTIME_DIR/requirements.txt"
 
   # RP1 PIO permits the V2 PCB's actual LED pin, BCM9. SPI MOSI would be BCM10.
@@ -390,6 +392,26 @@ SUDOERS
     "$VENV_DIR/bin/pip" install --no-cache-dir --disable-pip-version-check \
       'Adafruit-Blinka>=8.50,<9' 'Adafruit-Blinka-Raspberry-Pi5-Neopixel==1.0.0rc2'
   fi
+
+  # A pre-existing venv can still contain the original RPi.GPIO extension,
+  # shadowing the correct apt package. Both packages expose the same import.
+  # Repair the interpreter actually used by cocktailbot.service, after all
+  # dependencies have been installed. Import verification never claims a GPIO.
+  log "Prüfe und repariere Pi-5-GPIO-Treiber in der CocktailBot-Pythonumgebung"
+  "$VENV_DIR/bin/python" -m pip uninstall -y RPi.GPIO
+  "$VENV_DIR/bin/python" -c 'import lgpio; print("Nativer GPIO-Treiber:", lgpio.__file__)'
+  "$VENV_DIR/bin/python" -m pip install --no-cache-dir --disable-pip-version-check \
+    --force-reinstall --no-deps 'rpi-lgpio>=0.6,<1'
+  "$VENV_DIR/bin/python" - <<'PY_CHECK_GPIO'
+import importlib.machinery
+import RPi.GPIO as GPIO
+
+path = str(getattr(GPIO, "__file__", ""))
+if not path or any(path.endswith(suffix) for suffix in importlib.machinery.EXTENSION_SUFFIXES):
+    raise SystemExit(f"Falscher GPIO-Treiber in der App-Umgebung: {path}. rpi-lgpio wird benötigt.")
+print(f"GPIO-Treiber: {path} (rpi-lgpio)")
+PY_CHECK_GPIO
+
   cat > /etc/udev/rules.d/70-cocktailbot-pio.rules <<'PIO_RULE'
 SUBSYSTEM=="*-pio", GROUP="gpio", MODE="0660"
 PIO_RULE
@@ -773,8 +795,12 @@ start_services() {
       log "CocktailBot-API ist erreichbar"
       if grep -q '"picoConnected":true' <<<"$api_status"; then
         log "Pico-2-LED-Controller ist über USB-Serial verbunden"
-      else
+      elif grep -q '"ledController":"Pico2-USB-Serial"' <<<"$api_status"; then
         warn "Pico-2-LED-Controller wurde noch nicht erkannt. Pumpensteuerung bleibt verfügbar; prüfe USB-Kabel und /dev/ttyACM*."
+      elif grep -q '"ledConnected":true' <<<"$api_status"; then
+        log "LED-Ansteuerung über die Platine ist bereit"
+      else
+        warn "LED-Ansteuerung über die Platine ist nicht bereit. Prüfe ledLastError unter /api/status."
       fi
       return 0
     fi

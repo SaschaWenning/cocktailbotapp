@@ -1,4 +1,4 @@
-"""24 WS2812B LEDs on Cocktailbot V2: BCM9, physical header pin 21.
+"""24 or 240 WS2812B LEDs on Cocktailbot V2: BCM9, physical header pin 21.
 
 Pi 5 uses RP1 PIO, not software bit-banging or the SPI MOSI pin (BCM10).
 The hardware dependency is imported only when the ring is selected.
@@ -11,7 +11,10 @@ from pathlib import Path
 
 
 class RingLedController:
-    def __init__(self) -> None:
+    def __init__(self, led_count: int = 24) -> None:
+        if led_count not in (24, 240):
+            raise ValueError("Die Platinenansteuerung unterstützt 24 oder 240 LEDs")
+        self.led_count = led_count
         self._lock = threading.RLock()
         self._stop = threading.Event()
         self._thread = None
@@ -38,20 +41,18 @@ class RingLedController:
             self._write = lambda pin, data: None
         else:
             if not Path("/dev/pio0").exists():
-                raise RuntimeError("24-LED-Ring benötigt Raspberry Pi 5 mit /dev/pio0; Raspberry Pi OS aktualisieren und neu starten.")
+                raise RuntimeError("LED-Ansteuerung über die Platine benötigt Raspberry Pi 5 mit /dev/pio0; Raspberry Pi OS aktualisieren und neu starten.")
             import board
             from adafruit_raspberry_pi5_neopixel_write import neopixel_write, free_pio
             self._pin = board.D9
             self._free = free_pio
             self._write = neopixel_write
         try:
-            self._write(self._pin, bytes(24 * 3))
+            self._write(self._pin, bytes(self.led_count * 3))
         except Exception:
             self._write = None
-            if self._free is not None:
-                self._free()
             raise
-        self._thread = threading.Thread(target=self._animate, name="cocktailbot-ring24", daemon=True)
+        self._thread = threading.Thread(target=self._animate, name=f"cocktailbot-led{self.led_count}", daemon=True)
         self._thread.start()
 
     @staticmethod
@@ -66,12 +67,12 @@ class RingLedController:
         return 0, pos * 3, 255 - pos * 3
 
     def _frame(self, elapsed):
-        colors = [self._color] * 24
+        colors = [self._color] * self.led_count
         factor = self._brightness
         if self._mode == "OFF":
             factor = 0
         elif self._mode == "RAINBOW":
-            colors = [self._wheel(i * 256 // 24 + int(elapsed / .018)) for i in range(24)]
+            colors = [self._wheel(i * 256 // self.led_count + int(elapsed / .018)) for i in range(self.led_count)]
         elif self._mode == "PULSE":
             factor *= 1 - abs((elapsed % 2) - 1)
         elif self._mode in {"BLINK", "BUSY", "ERROR"}:
@@ -129,19 +130,22 @@ class RingLedController:
     def connected(self) -> bool:
         return self._write is not None and not self._stop.is_set() and not self.last_error
 
-    def close(self):
+    def close(self, *, release_pio=False):
         self._stop.set()
         if self._thread is not None:
             self._thread.join(timeout=2)
         with self._lock:
             try:
                 if self._write is not None:
-                    self._write(self._pin, bytes(24 * 3))
+                    self._write(self._pin, bytes(self.led_count * 3))
             except Exception:
                 pass
             finally:
-                if self._free is not None:
+                # Adafruit's PIO writer is process-global. Changing LED setup
+                # must not free resources already used by its replacement.
+                if release_pio and self._free is not None:
                     try:
+                        time.sleep(.01)  # Finish the final all-off frame (up to 240 LEDs).
                         self._free()
                     except Exception:
                         pass

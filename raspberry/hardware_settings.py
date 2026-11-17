@@ -14,7 +14,7 @@ def validate_hardware(value: dict) -> dict[str, str]:
     led = value.get("ledDriver")
     if pump not in ("relay", "mosfet"):
         raise ValueError("Unbekannte Pumpensteuerung")
-    if led not in ("pico", "ring24"):
+    if led not in ("pico", "ring24", "board240"):
         raise ValueError("Unbekannter LED-Aufbau")
     return {"pumpDriver": pump, "ledDriver": led}
 

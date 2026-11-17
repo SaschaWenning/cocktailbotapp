@@ -98,6 +98,35 @@ class HardwareTests(unittest.TestCase):
         self.assertEqual(self.command(ledDriver="pico", powerDisconnected=True).status_code, 200)
         self.assertEqual(hardware_settings.load_hardware(), {"pumpDriver": "mosfet", "ledDriver": "pico"})
 
+    def test_240_board_leds_persist_and_switch_without_changing_pumps(self):
+        self.controller.configure_hardware({"pumpDriver": "mosfet"})
+        response = self.command(ledDriver="board240", powerDisconnected=True)
+        self.assertEqual(response.status_code, 200, response.json)
+        status = self.app.get("/api/status").json
+        self.assertEqual(status["ledController"], "Board240-GPIO9")
+        self.assertEqual(status["ledCount"], 240)
+        self.assertFalse(status["picoConnected"])
+        self.assertEqual(self.controller.pico.led_count, 240)
+        self.controller.close()
+        self.controller = server.PumpController()
+        self.assertEqual(self.controller.hardware, {"pumpDriver": "mosfet", "ledDriver": "board240"})
+        self.assertEqual(self.controller.pico.led_count, 240)
+        for choice in ("ring24", "board240", "pico"):
+            self.controller.configure_hardware({"ledDriver": choice})
+            self.assertEqual(self.controller.hardware["pumpDriver"], "mosfet")
+
+    def test_changing_board_count_does_not_free_replacement_pio(self):
+        from unittest.mock import Mock
+        self.controller.configure_hardware({"ledDriver": "ring24"})
+        free_old = Mock()
+        self.controller.pico._free = free_old
+        self.controller.configure_hardware({"ledDriver": "board240"})
+        free_old.assert_not_called()
+        free_final = Mock()
+        self.controller.pico._free = free_final
+        self.controller.close()
+        free_final.assert_called_once()
+
     def test_missing_pio_does_not_persist_ring_or_break_pumps(self):
         with patch.dict(os.environ, {"COCKTAILBOT_GPIO_MOCK": "0"}), patch("led_ring.Path.exists", return_value=False):
             response = self.command(pumpDriver="mosfet", ledDriver="ring24", powerDisconnected=True)
@@ -165,6 +194,21 @@ class PumpPolarityTests(unittest.TestCase):
 
 
 class RingTests(unittest.TestCase):
+    def test_240_frame_includes_last_pixel_and_full_rainbow(self):
+        ring = RingLedController(240)
+        try:
+            self.assertTrue(ring.send("BRIGHT 255"))
+            self.assertTrue(ring.send("COLOR 255 0 0"))
+            self.assertEqual(ring._frame(0), bytes([0, 255, 0]) * 240)
+            self.assertEqual(len(ring._frame(0)), 720)
+            self.assertTrue(ring.send("RAINBOW"))
+            frame = ring._frame(0)
+            self.assertNotEqual(frame[:3], frame[120 * 3:121 * 3])
+            self.assertTrue(ring.send("OFF"))
+            self.assertEqual(ring._frame(0), bytes(720))
+        finally:
+            ring.close()
+
     def test_grb_brightness_and_animation_frames(self):
         ring = RingLedController()
         self.assertTrue(ring.send("BRIGHT 255"))

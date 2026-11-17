@@ -1568,7 +1568,9 @@ class PumpController:
 
     @staticmethod
     def _make_led_controller(driver: str):
-        return RingLedController() if driver == "ring24" else PicoLedController()
+        if driver in {"ring24", "board240"}:
+            return RingLedController(led_count=240 if driver == "board240" else 24)
+        return PicoLedController()
 
     def _pump_environment(self) -> dict[str, str]:
         environment = os.environ.copy()
@@ -1593,10 +1595,10 @@ class PumpController:
                 replacement = self._make_led_controller(hardware["ledDriver"])
                 # Validate the local ring driver before persisting the selection.
                 # An unplugged legacy Pico remains optional, as before.
-                if hardware["ledDriver"] == "ring24" and not replacement.send("OFF"):
+                if hardware["ledDriver"] != "pico" and not replacement.send("OFF"):
                     error = replacement.last_error
                     replacement.close()
-                    raise ValidationError(f"24-LED-Ring nicht verfügbar: {error}")
+                    raise ValidationError(f"LED-Ansteuerung über die Platine nicht verfügbar: {error}")
             try:
                 save_hardware(hardware)
             except Exception:
@@ -1919,7 +1921,8 @@ class PumpController:
                     "b": self.led_settings["b"],
                 },
                 "hardware": dict(self.hardware),
-                "ledController": "Ring24-GPIO9" if self.hardware["ledDriver"] == "ring24" else "Pico2-USB-Serial",
+                "ledController": {"ring24": "Ring24-GPIO9", "board240": "Board240-GPIO9", "pico": "Pico2-USB-Serial"}[self.hardware["ledDriver"]],
+                "ledCount": 24 if self.hardware["ledDriver"] == "ring24" else 240,
                 "ledConnected": self.pico.connected,
                 "ledLastError": self.pico.last_error,
                 "picoConnected": self.hardware["ledDriver"] == "pico" and self.pico.connected,
@@ -1936,7 +1939,10 @@ class PumpController:
             self._closed = True
             self._generation += 1
             self.all_off()
-        self.pico.close()
+        if isinstance(self.pico, RingLedController):
+            self.pico.close(release_pio=True)
+        else:
+            self.pico.close()
 
 
 def as_int(value: Any, field: str) -> int:

@@ -13364,7 +13364,7 @@ class _HardwareDriverCardState extends State<HardwareDriverCard> {
             const SizedBox(height: 12),
             T(widget.pump
                 ? 'Wähle Relais oder deine MOSFET-Platine. Standard: bisherige Relaissteuerung.'
-                : 'Wähle den 24-LED-Ring über die Platine oder die bisherige Beleuchtung über Pico 2.'),
+                : 'Wähle 24 oder 240 LEDs über die Platine oder die bisherige Beleuchtung über Pico 2.'),
             const SizedBox(height: 16),
             DropdownButtonFormField<String>(
               key: ValueKey('$field-$selected'),
@@ -13377,9 +13377,15 @@ class _HardwareDriverCardState extends State<HardwareDriverCard> {
               ] : const [
                 DropdownMenuItem(value: 'pico', child: Text('Pico 2 – bisherige 240 LEDs')),
                 DropdownMenuItem(value: 'ring24', child: Text('24-LED-Ring – über die Platine')),
+                DropdownMenuItem(value: 'board240', child: Text('240 LEDs – über die Platine')),
               ],
               onChanged: enabled ? (value) => setState(() => selected = value) : null,
             ),
+            if (!widget.pump && selected == 'board240') ...[
+              const SizedBox(height: 12),
+              const T('240 LEDs über eine ausreichend dimensionierte externe 5-V-Versorgung speisen. '
+                  'DATA und GND mit der Platine verbinden; den +5-V-Pin am LED-Anschluss der Platine frei lassen.'),
+            ],
             if (error != null) ...[
               const SizedBox(height: 12),
               Text(error!, style: const TextStyle(color: Colors.orange)),

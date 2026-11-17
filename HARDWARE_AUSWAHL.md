@@ -31,10 +31,34 @@ abgewiesen; die GitHub-Aktion muss zuerst erfolgreich sein.
 
 ## Hardwareauswahl
 
+### Pumpenfehler „Cannot determine SOC peripheral base address“
+
+Diese Meldung entsteht durch die ursprüngliche, zum Pi 5 inkompatible Bibliothek
+`RPi.GPIO`. Eine alte Kopie in `/opt/cocktailbot/venv` kann das korrekte Systempaket
+verdecken. Der Installer ersetzt sie jetzt ausdrücklich in der App-Umgebung und
+prüft den geladenen Treiber, ohne einen Ausgang anzusteuern.
+
+Eine vorhandene Installation kann ohne erneuten Web-Build repariert werden:
+
+```bash
+sudo systemctl stop cocktailbot.service
+sudo apt-get update
+sudo apt-get install -y python3-lgpio python3-rpi-lgpio
+sudo /usr/bin/python3 -m venv --system-site-packages /opt/cocktailbot/venv
+sudo /opt/cocktailbot/venv/bin/python -m pip uninstall -y RPi.GPIO
+sudo /opt/cocktailbot/venv/bin/python -m pip install --no-cache-dir --force-reinstall --no-deps 'rpi-lgpio>=0.6,<1'
+/opt/cocktailbot/venv/bin/python -c 'import RPi.GPIO as GPIO, lgpio; print(GPIO.__file__); print(lgpio.__file__)'
+sudo systemctl start cocktailbot.service
+```
+
+Falls die Paketinstallation fehlschlägt, zuerst deren Fehlermeldung prüfen, bevor
+die Pumpe erneut getestet wird. Nach erfolgreicher Reparatur den Fünf-Sekunden-
+Test für Pumpe 1 wiederholen. Die MOSFET-Auswahl bleibt gespeichert.
+
 Es gibt zwei unabhängige Auswahlen an den passenden Stellen:
 
 - Oben unter **Einstellungen → Kalibrierung**: **Relais – bisheriger Aufbau** oder **MOSFET-Platine – Cocktailbot V2**.
-- Unter **Einstellungen → LED-Beleuchtung**: **Pico 2 – bisherige 240 LEDs** oder **24-LED-Ring – über die Platine**.
+- Unter **Einstellungen → LED-Beleuchtung**: **Pico 2 – bisherige 240 LEDs**, **24-LED-Ring – über die Platine** oder **240 LEDs – über die Platine**.
 
 Ohne gespeicherte Auswahl bleiben Relais und Pico der Standard.
 Die Auswahl wird auf dem Raspberry Pi in `/var/lib/cocktailbot/hardware.json`
@@ -64,9 +88,9 @@ sind und die 12-V-Versorgung getrennt ist. Danach Versorgung anschließen und
 zunächst einen Ausgang testen. Eine Umstellung bei laufenden Pumpen wird
 abgewiesen. Hardware nur vollständig stromlos umstecken, einschließlich Pi.
 
-## 24-LED-Ring an der V2-Platine
+## 24 oder 240 LEDs an der V2-Platine
 
-- WS2812B-Ring mit 24 LEDs, Daten über **BCM9 / physischen Pin 21**.
+- WS2812B mit wahlweise 24 oder 240 LEDs, Daten über **BCM9 / physischen Pin 21**.
 - Anschluss gemäß Platinenbeschriftung: **+5 V, GND, DATA**. Die 5-V-Versorgung
   kommt vom Step-down-Modul, der Raspberry Pi bleibt separat versorgt.
 - Raspberry Pi 5, 64-Bit-Raspberry-Pi-OS und verfügbares `/dev/pio0` erforderlich.
@@ -78,7 +102,15 @@ abgewiesen. Hardware nur vollständig stromlos umstecken, einschließlich Pi.
 - Der Treiber nutzt PIO, **nicht SPI auf GPIO10**. Ein Umverdrahten der Platine
   ist dafür nicht vorgesehen.
 
-Für beide LED-Aufbauten stehen Farbe, Helligkeit, Rainbow, Atmen, Blinken und Aus
+Bei **240 LEDs über die Platine** eine ausreichend dimensionierte externe
+5-V-Versorgung für die LEDs verwenden. LED-Plus kommt direkt an diese Versorgung;
+DATA und GND werden mit der Platine verbunden. Der +5-V-Pin der LED-Buchse auf
+der Platine bleibt dabei frei. Die Stromtragfähigkeit des kleinen Step-downs und
+des Platinenanschlusses ist für 240 LEDs nicht nachgewiesen. Ein zusätzlicher
+5-V-Step-down kann aus derselben 12-V-Hauptversorgung gespeist werden, sofern
+deren Gesamtleistung ausreicht.
+
+Für alle drei LED-Aufbauten stehen Farbe, Helligkeit, Rainbow, Atmen, Blinken und Aus
 zur Verfügung. Bei der Zubereitung blinkt die Beleuchtung rot; nach Abschluss
 leuchtet sie fünf Sekunden grün. Es ist jeweils ein LED-Aufbau aktiv.
 
