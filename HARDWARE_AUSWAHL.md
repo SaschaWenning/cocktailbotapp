@@ -1,10 +1,9 @@
-# Auswählbare Pumpensteuerung und Beleuchtung
+# CocktailBot 2.6 – Pumpensteuerung und Beleuchtung
 
-Unter **Einstellungen → LED-Beleuchtung → Hardware-Aufbau** gibt es zwei
-unabhängige Auswahlen:
+Es gibt zwei unabhängige Auswahlen an den passenden Stellen:
 
-- Pumpensteuerung: **Relais – bisheriger Aufbau** oder **Cocktailbot V2 – MOSFET-Platine**.
-- LED-Aufbau: **Pico per USB – bisherige 240 LEDs** oder **24-LED-Ring – Anschluss auf V2-Platine**.
+- Oben unter **Einstellungen → Kalibrierung**: **Relais – bisheriger Aufbau** oder **MOSFET-Platine – Cocktailbot V2**.
+- Unter **Einstellungen → LED-Beleuchtung**: **Pico 2 – bisherige 240 LEDs** oder **24-LED-Ring – über die Platine**.
 
 Ohne gespeicherte Auswahl bleiben Relais und Pico der Standard.
 Die Auswahl wird auf dem Raspberry Pi in `/var/lib/cocktailbot/hardware.json`
@@ -27,8 +26,9 @@ Dieser Befehl übernimmt die entpackten Änderungen und baut die neue Oberfläch
 Er benötigt Internet und ein 64-Bit-Raspberry-Pi-OS. Er lädt den Quellcode bei
 dieser Installation nicht erneut von GitHub.
 
-Anschließend die gewünschte Hardware in der App auswählen und **Hardware
-übernehmen** drücken. Die Nachfrage erst bestätigen, nachdem alle Pumpen gestoppt
+Anschließend die gewünschte Hardware auf der jeweiligen Einstellungsseite auswählen
+und **Pumpensteuerung übernehmen** bzw. **LED-Aufbau übernehmen** drücken.
+Die Nachfrage erst bestätigen, nachdem alle Pumpen gestoppt
 sind und die 12-V-Versorgung getrennt ist. Danach Versorgung anschließen und
 zunächst einen Ausgang testen. Eine Umstellung bei laufenden Pumpen wird
 abgewiesen. Hardware nur vollständig stromlos umstecken, einschließlich Pi.

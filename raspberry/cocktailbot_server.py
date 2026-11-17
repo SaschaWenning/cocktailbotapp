@@ -1575,11 +1575,14 @@ class PumpController:
         return environment
 
     def configure_hardware(self, value: dict) -> dict[str, str]:
-        try:
-            hardware = validate_hardware(value)
-        except ValueError as exc:
-            raise ValidationError(str(exc)) from exc
         with self._lock:
+            updates = {key: value[key] for key in ("pumpDriver", "ledDriver") if key in value}
+            if not updates:
+                raise ValidationError("Keine Hardwareauswahl angegeben")
+            try:
+                hardware = validate_hardware({**self.hardware, **updates})
+            except ValueError as exc:
+                raise ValidationError(str(exc)) from exc
             if self._closed or self._job is not None or self._active_pumps:
                 raise ValidationError("Hardware kann nur bei gestoppten Pumpen geändert werden")
             if hardware == self.hardware:

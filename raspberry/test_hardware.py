@@ -74,10 +74,18 @@ class HardwareTests(unittest.TestCase):
         self.assertFalse(self.path.exists())
 
     def test_invalid_or_incomplete_settings_are_not_saved(self):
-        for data in ({"pumpDriver": "anything", "ledDriver": "pico"}, {"ledDriver": "ring24"}):
+        for data in ({"pumpDriver": "anything", "ledDriver": "pico"}, {}):
             response = self.command(**data, powerDisconnected=True)
             self.assertEqual(response.status_code, 400)
         self.assertFalse(self.path.exists())
+
+    def test_separate_pages_retain_the_other_hardware_selection(self):
+        self.assertEqual(self.command(ledDriver="ring24", powerDisconnected=True).status_code, 200)
+        self.assertEqual(self.controller.hardware, {"pumpDriver": "relay", "ledDriver": "ring24"})
+        self.assertEqual(self.command(pumpDriver="mosfet", powerDisconnected=True).status_code, 200)
+        self.assertEqual(self.controller.hardware, {"pumpDriver": "mosfet", "ledDriver": "ring24"})
+        self.assertEqual(self.command(ledDriver="pico", powerDisconnected=True).status_code, 200)
+        self.assertEqual(hardware_settings.load_hardware(), {"pumpDriver": "mosfet", "ledDriver": "pico"})
 
     def test_missing_pio_does_not_persist_ring_or_break_pumps(self):
         with patch.dict(os.environ, {"COCKTAILBOT_GPIO_MOCK": "0"}), patch("led_ring.Path.exists", return_value=False):

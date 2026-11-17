@@ -813,7 +813,8 @@ Installationsort: $INSTALL_ROOT
 Kioskbenutzer:    $TARGET_USER
 Kioskstart:       nach $KIOSK_DELAY Sekunden
 Web/API:          http://127.0.0.1:8080
-Pumpen/LEDs:      auswählbar unter Einstellungen → LED-Beleuchtung → Hardware-Aufbau
+Pumpen:          auswählbar oben unter Einstellungen → Kalibrierung
+LEDs:            auswählbar unter Einstellungen → LED-Beleuchtung
 Standard:        LOW-aktive Relais und bisherige Pico-Beleuchtung
 GPIO-Lifecycle:   wie alte Software: eigener pump_control.py Prozess je Pumpenlauf
 Pumpen-Bootschutz: kein permanentes OUTPUT-HIGH; V33-Block wird beim Update entfernt
