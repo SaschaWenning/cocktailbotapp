@@ -87,17 +87,10 @@ fi
 
 mkdir -p "$PROFILE"
 
-# Flutter-Web/Service-Worker und Chromium-Cache dürfen nach einem Update keine
-# alte 500-Seite oder einen alten Web-Build festhalten. Local Storage bleibt
-# erhalten, damit CocktailBot-Einstellungen nicht verloren gehen.
+# Old service workers must not intercept update checks. Ordinary HTTP/image and
+# shader caches stay available; the backend revalidates static files by ETag.
 clear_web_cache() {
-  rm -rf \
-    "$PROFILE/Default/Cache" \
-    "$PROFILE/Default/Code Cache" \
-    "$PROFILE/Default/GPUCache" \
-    "$PROFILE/Default/Service Worker" \
-    "$PROFILE/ShaderCache" \
-    "$PROFILE/GrShaderCache" \
+  rm -rf -- "$PROFILE/Default/Service Worker" \
     2>/dev/null || true
 }
 
@@ -117,8 +110,7 @@ while [[ ! -f "$STOP_FILE" ]]; do
     --disable-component-update \
     --disable-sync \
     --disable-pinch \
-    --disable-cache \
-    --disk-cache-size=1 \
+    --disk-cache-size=67108864 \
     --overscroll-history-navigation=0 \
     --touch-events=enabled \
     --autoplay-policy=no-user-gesture-required \

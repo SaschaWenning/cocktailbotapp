@@ -2,6 +2,9 @@
 // spellchecker:disable
 import 'dart:async';
 import 'home_tabs.dart';
+import 'coalesced_save.dart';
+import 'image_bytes_cache.dart';
+import 'job_result.dart';
 import 'dart:convert';
 import 'dart:math' as math;
 import 'dart:typed_data';
@@ -3188,29 +3191,32 @@ class T extends StatelessWidget {
 }
 
 
+final _imageBytesCache = ImageBytesCache();
+
 Widget cocktailImage(
   String image, {
   required String fallbackAsset,
   BoxFit fit = BoxFit.cover,
+  int decodeWidth = 768,
 }) {
-  Widget fallback() => Image.asset(fallbackAsset, fit: fit);
+  Widget fallback() => Image.asset(fallbackAsset, fit: fit, cacheWidth: decodeWidth);
 
   if (image.startsWith('assets/')) {
     return Image.asset(
       image,
       fit: fit,
+      cacheWidth: decodeWidth,
       errorBuilder: (_, __, ___) => fallback(),
     );
   }
 
   if (image.startsWith('data:image/')) {
     try {
-      final comma = image.indexOf(',');
-      if (comma < 0) return fallback();
-      final bytes = base64Decode(image.substring(comma + 1));
+      final bytes = _imageBytesCache.decode(image);
       return Image.memory(
         bytes,
         fit: fit,
+        cacheWidth: decodeWidth,
         errorBuilder: (_, __, ___) => fallback(),
       );
     } catch (_) {
@@ -3221,6 +3227,7 @@ Widget cocktailImage(
   return Image.network(
     image,
     fit: fit,
+    cacheWidth: decodeWidth,
     errorBuilder: (_, __, ___) => fallback(),
   );
 }
@@ -3745,6 +3752,26 @@ class PaymentStatusResult {
 }
 
 class MachineStore extends ChangeNotifier {
+  MachineStore({http.Client? client}) : _client = client ?? http.Client();
+  final http.Client _client;
+  String? _lastSubmittedJobId;
+  Map<String, String> _lastSyncedFields = {};
+  bool _sharedSyncFailed = false;
+  late final _localSaves = CoalescedSaveQueue(_writeLocalSnapshot);
+  late final _sharedSaves = CoalescedSaveQueue(_postSharedSnapshot,
+      delay: const Duration(milliseconds: 150));
+
+  Future<void> flushSaves() async {
+    await _localSaves.flush();
+    try { await _sharedSaves.flush(); } catch (_) { _sharedSyncFailed = true; }
+  }
+
+  @override
+  void dispose() {
+    unawaited(flushSaves().whenComplete(_client.close));
+    super.dispose();
+  }
+
   static const int defaultCatalogVersion = 2;
   final ingredients = <Ingredient>[
     Ingredient(id: 'dark-rum', name: 'Brauner Rum', kind: IngredientKind.alcoholic, alcoholPercent: 40),
@@ -5090,23 +5117,30 @@ class MachineStore extends ChangeNotifier {
   }
 
   Future<void> _syncAppStateToController() async {
-    if (!connected || connectionMode == ConnectionMode.bluetooth) {
-      return;
+    try { await _sharedSaves.request(); } catch (_) { _sharedSyncFailed = true; }
+  }
+
+  Future<void> _postSharedSnapshot() async {
+    if (!connected || connectionMode == ConnectionMode.bluetooth ||
+        (isRemoteBrowser && !remoteAdminAccessGranted)) return;
+    final current = _sharedAppStateForController()..remove('sharedAt');
+    final encoded = current.map((key, value) => MapEntry(key, jsonEncode(value)));
+    final baseline = _sharedSyncFailed ? <String, String>{} : _lastSyncedFields;
+    final changes = <String, dynamic>{
+      for (final entry in current.entries)
+        if (baseline[entry.key] != encoded[entry.key]) entry.key: entry.value,
+    };
+    final removed = _lastSyncedFields.keys.where((key) => !current.containsKey(key)).toList();
+    if (changes.isEmpty && removed.isEmpty) return;
+    final response = await _client.post(
+      _apiUri('/api/app-state/patch'), headers: _apiHeaders(json: true),
+      body: jsonEncode({'changes': changes, 'removed': removed}),
+    ).timeout(const Duration(seconds: 5));
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw Exception('App-Synchronisation fehlgeschlagen (HTTP ${response.statusCode})');
     }
-    if (isRemoteBrowser && !remoteAdminAccessGranted) {
-      return;
-    }
-    try {
-      await http
-          .post(
-            _apiUri('/api/app-state'),
-            headers: _apiHeaders(json: true),
-            body: jsonEncode({'state': _sharedAppStateForController()}),
-          )
-          .timeout(const Duration(seconds: 5));
-    } catch (_) {
-      // LAN-Snapshot ist Komfortfunktion. Lokales Speichern darf nie scheitern.
-    }
+    _lastSyncedFields = encoded;
+    _sharedSyncFailed = false;
   }
 
   Future<bool> _loadSharedAppStateFromController() async {
@@ -5114,7 +5148,9 @@ class MachineStore extends ChangeNotifier {
       return false;
     }
     try {
-      final response = await http
+      await flushSaves();
+      if (_sharedSyncFailed) return false;
+      final response = await _client
           .get(_apiUri('/api/app-state'), headers: _apiHeaders())
           .timeout(const Duration(seconds: 5));
       if (response.statusCode < 200 || response.statusCode >= 300) return false;
@@ -5130,17 +5166,23 @@ class MachineStore extends ChangeNotifier {
       final p = await SharedPreferences.getInstance();
       await p.setString('machine_state', jsonEncode(state));
       await load(skipConnect: true);
+      _lastSyncedFields = (_sharedAppStateForController()..remove('sharedAt'))
+          .map((key, value) => MapEntry(key, jsonEncode(value)));
       return true;
     } catch (_) {
       return false;
     }
   }
 
-  Future<void> save() async {
+  Future<void> save() {
     notifyListeners();
-    final state = _persistentStateJson();
+    return _localSaves.request();
+  }
+
+  Future<void> _writeLocalSnapshot() async {
+    final payload = jsonEncode(_persistentStateJson());
     final p = await SharedPreferences.getInstance();
-    await p.setString('machine_state', jsonEncode(state));
+    await p.setString('machine_state', payload);
     if (connected && remoteAdminAccessGranted) {
       unawaited(_syncAppStateToController());
     }
@@ -7054,7 +7096,7 @@ class MachineStore extends ChangeNotifier {
       throw Exception('Bluetooth ist in der Raspberry-Kiosk-Version deaktiviert');
     }
 
-    final response = await http
+    final response = await _client
         .post(
           _apiUri('/api/command'),
           headers: _apiHeaders(json: true),
@@ -7081,7 +7123,10 @@ class MachineStore extends ChangeNotifier {
 
     if (responseBody.trim().isEmpty) return {'ok': true};
     final decoded = jsonDecode(responseBody);
-    if (decoded is Map<String, dynamic>) return decoded;
+    if (decoded is Map<String, dynamic>) {
+      if (decoded['accepted'] == true) _lastSubmittedJobId = decoded['jobId']?.toString();
+      return decoded;
+    }
     return {'ok': true, 'response': decoded};
   }
 
@@ -7179,7 +7224,7 @@ class MachineStore extends ChangeNotifier {
     }
   }
 
-  Future<Map<String, dynamic>> fetchMachineStatus() async {
+  Future<Map<String, dynamic>> fetchMachineStatus({bool compact = false, String? jobId}) async {
     if (connectionMode == ConnectionMode.bluetooth) {
       return {
         'ok': true,
@@ -7189,8 +7234,11 @@ class MachineStore extends ChangeNotifier {
       };
     }
 
-    final response = await http
-        .get(_apiUri('/api/status'))
+    final uri = jobId == null
+        ? _apiUri('/api/status').replace(queryParameters: compact ? {'compact': '1'} : null)
+        : _apiUri('/api/jobs/${Uri.encodeComponent(jobId)}');
+    final response = await _client
+        .get(uri)
         .timeout(const Duration(seconds: 5));
     final responseBody = response.body;
 
@@ -7205,29 +7253,35 @@ class MachineStore extends ChangeNotifier {
       throw Exception('Ungültige Statusantwort der Raspberry-Steuerung');
     }
 
-    connected = true;
-    status = 'Raspberry-Pi-Steuerung verbunden';
-    notifyListeners();
+    if (!connected || status != 'Raspberry-Pi-Steuerung verbunden') {
+      connected = true;
+      status = 'Raspberry-Pi-Steuerung verbunden';
+      notifyListeners();
+    }
     return decoded;
   }
 
   Future<void> waitUntilMachineIdle({
+    String? jobId,
     Duration timeout = const Duration(minutes: 10),
-    Duration pollInterval = const Duration(milliseconds: 200),
+    Duration pollInterval = const Duration(milliseconds: 300),
     void Function(Map<String, dynamic> status)? onStatus,
   }) async {
     if (!connected || connectionMode == ConnectionMode.bluetooth) {
-      return;
+      throw Exception('Keine bestätigte Verbindung zur Pumpensteuerung');
     }
 
+    final submittedId = jobId ?? _lastSubmittedJobId;
+    if (submittedId == null || submittedId.isEmpty) {
+      throw Exception('Keine Auftragsnummer erhalten. Bitte auch das Raspberry-Backend auf Version 2.8 aktualisieren.');
+    }
     final started = DateTime.now();
 
     while (DateTime.now().difference(started) < timeout) {
-      final statusData = await fetchMachineStatus();
+      final statusData = await fetchMachineStatus(compact: true, jobId: submittedId);
       onStatus?.call(statusData);
 
-      final busy = statusData['busy'] == true;
-      if (!busy) {
+      if (jobCompletedSuccessfully(statusData, submittedId)) {
         return;
       }
 
@@ -7413,7 +7467,7 @@ class MachineStore extends ChangeNotifier {
     });
 
     await waitUntilMachineIdle(
-      pollInterval: const Duration(milliseconds: 180),
+      pollInterval: const Duration(milliseconds: 300),
       onStatus: onStatus,
     );
 
@@ -9346,6 +9400,7 @@ class _RecipeDetailPageState extends State<RecipeDetailPage> {
                                   child: cocktailImage(
                                     image,
                                     fallbackAsset: widget.fallbackAsset,
+                                    decodeWidth: 1280,
                                     fit: BoxFit.contain,
                                   ),
                                 ),
@@ -9384,6 +9439,7 @@ class _RecipeDetailPageState extends State<RecipeDetailPage> {
                           child: cocktailImage(
                             image,
                             fallbackAsset: widget.fallbackAsset,
+                            decodeWidth: 1280,
                             fit: BoxFit.contain,
                           ),
                         ),
@@ -14760,6 +14816,7 @@ class _PumpCalibrationCardState extends State<PumpCalibrationCard> {
                         'pump': widget.pump.number,
                         'durationMs': (seconds * 1000).round(),
                       });
+                      await widget.store.waitUntilMachineIdle();
                     } catch (e) {
                       if (!mounted) return;
                       messenger.showSnackBar(SnackBar(content: Text('$e')));
@@ -15932,33 +15989,18 @@ class _SequencePageState extends State<SequencePage> {
     }
   }
 
-  Future<void> _waitUntilIdle({
-    bool updateMainProgress = true,
-  }) async {
-    for (var attempt = 0; attempt < 1800; attempt++) {
-      await Future.delayed(const Duration(milliseconds: 400));
-      if (!mounted) return;
-
-      final machineStatus = await widget.store.fetchMachineStatus();
-      if (!mounted) return;
-
-      final busy = machineStatus['busy'] == true;
-      final pump =
-          (machineStatus['currentPump'] as num?)?.toInt() ?? 0;
-      final value =
-          (machineStatus['progress'] as num?)?.toDouble() ?? 0;
-
-      if (updateMainProgress) {
+  Future<void> _waitUntilIdle({bool updateMainProgress = true}) async {
+    await widget.store.waitUntilMachineIdle(
+      pollInterval: const Duration(milliseconds: 400),
+      onStatus: (machineStatus) {
+        if (!mounted || !updateMainProgress) return;
+        final active = machineStatus['activePumps'] as List? ?? [];
         setState(() {
-          currentPump = pump;
-          progress = value.clamp(0, 1).toDouble();
+          currentPump = active.isEmpty ? 0 : (active.first as num).toInt();
+          progress = ((machineStatus['progress'] as num?)?.toDouble() ?? 0).clamp(0, 1).toDouble();
         });
-      }
-
-      if (!busy) return;
-    }
-
-    throw Exception('Zeitüberschreitung beim Warten auf die Raspberry-Steuerung');
+      },
+    );
   }
 
   Future<void> _cancelCurrentJob() async {

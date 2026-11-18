@@ -1,4 +1,4 @@
-# CocktailBot 2.7 – Hauptseiten-Tabs, Pumpensteuerung und Beleuchtung
+# CocktailBot 2.8 – Hauptseiten-Tabs, Pumpensteuerung und Beleuchtung
 
 ## Reparatur nach fehlgeschlagenem Update / vollem Datenträger
 

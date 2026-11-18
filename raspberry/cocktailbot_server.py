@@ -33,6 +33,7 @@ import sqlite3
 import subprocess
 import sys
 import threading
+import tempfile
 import time
 import uuid
 from dataclasses import dataclass
@@ -56,7 +57,7 @@ except ImportError:  # installed by requirements; keep a clear runtime error
     Image = None  # type: ignore[assignment]
     ImageOps = None  # type: ignore[assignment]
 
-from flask import Flask, jsonify, request, send_file, send_from_directory
+from flask import Flask, g, jsonify, request, send_file, send_from_directory
 
 try:
     import serial
@@ -1548,6 +1549,8 @@ class PumpController:
         self._active_pumps: set[int] = set()
         self._pump_processes: dict[int, subprocess.Popen[str]] = {}
         self._job: PumpJob | None = None
+        self._job_id: str | None = None
+        self._job_results: dict[str, dict[str, Any]] = {}
         self._job_started_at = 0.0
         self._completed_steps = 0
         self._generation = 0
@@ -1758,8 +1761,9 @@ class PumpController:
                 self._stop_pump_process_locked(pump, process)
 
     def stop(self, reason: str = "Not-Aus") -> None:
-        del reason
         with self._lock:
+            if self._job is not None and self._job_id in self._job_results:
+                self._job_results[self._job_id].update(jobState="cancelled", jobError=reason)
             self._generation += 1
             self.all_off()
             self._job = None
@@ -1800,14 +1804,19 @@ class PumpController:
         self.pico.send("ERROR")
         self._restore_idle_after(generation, 5.0)
 
-    def start(self, job: PumpJob) -> bool:
+    def start(self, job: PumpJob) -> str | None:
         with self._lock:
             if self._job is not None or self._closed:
-                return False
+                return None
             self._generation += 1
             generation = self._generation
             self.all_off()
             self._job = job
+            job_id = uuid.uuid4().hex
+            self._job_id = job_id
+            self._job_results[job_id] = {"jobId": job_id, "jobState": "running", "jobError": "", "stepCount": len(job.steps)}
+            while len(self._job_results) > 64:
+                del self._job_results[next(iter(self._job_results))]
             self._job_started_at = time.monotonic()
             self._completed_steps = 0
 
@@ -1815,19 +1824,26 @@ class PumpController:
 
         thread = threading.Thread(
             target=self._run_job,
-            args=(job, generation),
+            args=(job, generation, job_id),
             name=f"cocktailbot-{job.action}",
             daemon=True,
         )
-        thread.start()
-        return True
+        try:
+            thread.start()
+        except Exception as exc:
+            with self._lock:
+                self._job_results[job_id].update(jobState="failed", jobError=f"Pumpenauftrag konnte nicht gestartet werden: {exc}")
+                self._job = None
+                self._job_started_at = 0.0
+        return job_id
 
-    def _run_job(self, job: PumpJob, generation: int) -> None:
+    def _run_job(self, job: PumpJob, generation: int, job_id: str) -> None:
         started: set[int] = set()
         finished: set[int] = set()
         step_processes: dict[int, subprocess.Popen[str]] = {}
         success = False
         failed = False
+        error = ""
 
         try:
             while True:
@@ -1859,9 +1875,6 @@ class PumpController:
                         self._completed_steps = len(finished)
 
                     if len(finished) >= len(job.steps):
-                        self._job = None
-                        self._job_started_at = 0.0
-                        self._completed_steps = 0
                         success = True
                         break
 
@@ -1869,21 +1882,38 @@ class PumpController:
 
         except Exception as exc:
             failed = True
+            error = str(exc)
             print(f"Pumpenjob fehlgeschlagen: {exc}", file=sys.stderr)
         finally:
             with self._lock:
                 if generation == self._generation:
                     self.all_off()
+                    self._job_results[job_id].update(
+                        jobState="succeeded" if success else "failed",
+                        jobError=error or ("" if success else "Pumpenlauf nicht abgeschlossen"),
+                        completedSteps=len(finished),
+                    )
                     self._job = None
                     self._job_started_at = 0.0
                     self._completed_steps = 0
 
-            if success:
+            if success and generation == self._generation:
                 self._show_ready_then_idle(generation)
             elif failed and generation == self._generation:
                 self._show_error_then_idle(generation)
 
-    def status(self) -> dict[str, Any]:
+    def job_status(self, job_id: str) -> dict[str, Any] | None:
+        with self._lock:
+            result = self._job_results.get(job_id)
+            if result is None:
+                return None
+            active = result["jobState"] == "running" and self._job_id == job_id
+            current = self.status(compact=True) if active else {}
+            return {"ok": True, **result, "busy": active,
+                    "activePumps": current.get("activePumps", []),
+                    "progress": current.get("progress", 1.0 if result["jobState"] == "succeeded" else 0.0)}
+
+    def status(self, compact: bool = False) -> dict[str, Any]:
         with self._lock:
             job = self._job
             active = sorted(self._active_pumps)
@@ -1895,11 +1925,12 @@ class PumpController:
                 )
                 progress = min(1.0, elapsed_ms / job.total_duration_ms)
 
-            return {
+            result = {
                 "ok": True,
                 "device": "CocktailBot-RaspberryPi",
                 "gpioNumbering": "BCM",
                 "busy": job is not None,
+                **self._job_results.get(self._job_id, {}),
                 "action": job.action if job else "idle",
                 "currentPump": active[0] if active else 0,
                 "runningPumpCount": len(active),
@@ -1931,14 +1962,17 @@ class PumpController:
                 "picoLastResponse": self.pico.last_response,
                 "picoLastError": self.pico.last_error,
             }
+            if compact:
+                result.pop("machineState", None)
+                result.pop("pumpPins", None)
+            return result
 
     def close(self) -> None:
         with self._lock:
             if self._closed:
                 return
             self._closed = True
-            self._generation += 1
-            self.all_off()
+            self.stop("Programmdienst beendet")
         if isinstance(self.pico, RingLedController):
             self.pico.close(release_pio=True)
         else:
@@ -2020,6 +2054,9 @@ def build_recipe_job(payload: dict[str, Any]) -> PumpJob:
 
 
 
+APP_STATE_LOCK = threading.RLock()
+
+
 def load_app_state() -> dict[str, Any]:
     try:
         data = json.loads(APP_STATE_FILE.read_text(encoding="utf-8"))
@@ -2029,15 +2066,16 @@ def load_app_state() -> dict[str, Any]:
 
 
 def save_app_state(state: dict[str, Any]) -> None:
-    APP_STATE_FILE.parent.mkdir(parents=True, exist_ok=True)
-    temp = APP_STATE_FILE.with_suffix(".tmp")
-    temp.write_text(
-        json.dumps(state, ensure_ascii=False, separators=(",", ":")),
-        encoding="utf-8",
-    )
-    os.chmod(temp, 0o600)
-    temp.replace(APP_STATE_FILE)
-    os.chmod(APP_STATE_FILE, 0o600)
+    with APP_STATE_LOCK:
+        APP_STATE_FILE.parent.mkdir(parents=True, exist_ok=True)
+        descriptor, temporary = tempfile.mkstemp(dir=APP_STATE_FILE.parent, prefix=".app-state-")
+        try:
+            with os.fdopen(descriptor, "w", encoding="utf-8") as stream:
+                json.dump(state, stream, ensure_ascii=False, separators=(",", ":"))
+            os.replace(temporary, APP_STATE_FILE)
+        finally:
+            if os.path.exists(temporary):
+                os.unlink(temporary)
 
 
 def _read_json_object(path: Path) -> dict[str, Any] | None:
@@ -2310,7 +2348,7 @@ def create_app(controller: PumpController, web_root: Path) -> Flask:
             path.startswith(prefix) for prefix in protected_prefixes
         )
 
-        if path == "/api/app-state" and request.method == "POST":
+        if path in {"/api/app-state", "/api/app-state/patch"} and request.method == "POST":
             needs_admin = True
 
         if path == "/api/command" and request.method == "POST":
@@ -2340,15 +2378,37 @@ def create_app(controller: PumpController, web_root: Path) -> Flask:
             ), 401
         return None
 
+    @app.before_request
+    def serialize_state_writes():
+        if request.method == "POST" and request.path in {
+            "/api/app-state", "/api/app-state/patch", "/api/usage/record",
+            "/api/command", "/api/backup/restore",
+        }:
+            APP_STATE_LOCK.acquire()
+            g.app_state_locked = True
+
+    @app.teardown_request
+    def release_state_write_lock(_error):
+        if getattr(g, "app_state_locked", False):
+            g.app_state_locked = False
+            APP_STATE_LOCK.release()
+
     @app.after_request
     def add_cors_headers(response):  # type: ignore[no-untyped-def]
         response.headers["Access-Control-Allow-Origin"] = "*"
         response.headers["Access-Control-Allow-Methods"] = "GET,POST,OPTIONS"
         response.headers["Access-Control-Allow-Headers"] = "Content-Type, X-CocktailBot-Admin-Token"
-        # Lokaler Kiosk: keine alten Flutter-/500-Seiten nach einem Update cachen.
-        response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
-        response.headers["Pragma"] = "no-cache"
-        response.headers["Expires"] = "0"
+        # Keep API, HTML and bootstrap fresh. Static files may be stored but must
+        # validate their ETag before reuse, so updates never reuse stale JS.
+        if (request.endpoint == "static_or_spa" and response.status_code in {200, 304}
+                and request.path.rsplit("/", 1)[-1] not in {
+                    "index.html", "flutter_bootstrap.js", "flutter.js", "flutter_service_worker.js", "version.json"
+                } and not response.mimetype == "text/html"):
+            response.headers["Cache-Control"] = "public, no-cache, must-revalidate"
+        else:
+            response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+            response.headers["Pragma"] = "no-cache"
+            response.headers["Expires"] = "0"
         return response
 
     @app.get("/api/backup/server-state")
@@ -2583,6 +2643,25 @@ def create_app(controller: PumpController, web_root: Path) -> Flask:
             state["_lanUsageEventIds"] = internal_usage_ids[-1000:]
         save_app_state(state)
         return jsonify(ok=True, bytes=len(json.dumps(state, ensure_ascii=False)))
+
+    @app.post("/api/app-state/patch")
+    def api_app_state_patch():
+        payload = request.get_json(silent=True)
+        changes = payload.get("changes") if isinstance(payload, dict) else None
+        removed = payload.get("removed", []) if isinstance(payload, dict) else None
+        if not isinstance(changes, dict) or not isinstance(removed, list):
+            return jsonify(ok=False, error="Ungültige Statusänderungen"), 400
+        keys = [*changes, *removed]
+        if any(not isinstance(key, str) or key.startswith("_") or key in {
+            "settingsPassword", "rentalServicePin", "commercialLicenseCode"
+        } for key in keys):
+            return jsonify(ok=False, error="Ungültiger Statusschlüssel"), 400
+        state = load_app_state()
+        state.update(changes)
+        for key in removed:
+            state.pop(key, None)
+        save_app_state(state)
+        return jsonify(ok=True)
 
     @app.route("/api/usage/record", methods=["POST", "OPTIONS"])
     def api_usage_record():
@@ -2830,7 +2909,14 @@ def create_app(controller: PumpController, web_root: Path) -> Flask:
 
     @app.get("/api/status")
     def api_status():
-        return jsonify(controller.status())
+        return jsonify(controller.status(compact=request.args.get("compact") == "1"))
+
+    @app.get("/api/jobs/<job_id>")
+    def api_job_status(job_id):
+        result = controller.job_status(job_id)
+        if result is None:
+            return jsonify(ok=False, error="Pumpenauftrag unbekannt; sein Abschluss kann nicht bestätigt werden"), 404
+        return jsonify(result)
 
     @app.post("/api/images/optimize")
     def api_optimize_uploaded_image():
@@ -3320,13 +3406,15 @@ def create_app(controller: PumpController, web_root: Path) -> Flask:
             else:
                 raise ValidationError(f"Unbekannte action: {action}")
 
-            if not controller.start(job):
+            job_id = controller.start(job)
+            if not job_id:
                 return jsonify(ok=False, error="Auftrag konnte nicht gestartet werden"), 409
 
             return (
                 jsonify(
                     ok=True,
                     accepted=True,
+                    jobId=job_id,
                     action=job.action,
                     stepCount=len(job.steps),
                     totalDurationMs=job.total_duration_ms,

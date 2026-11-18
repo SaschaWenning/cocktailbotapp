@@ -17,6 +17,8 @@ class RingLedController:
         self.led_count = led_count
         self._lock = threading.RLock()
         self._stop = threading.Event()
+        self._wake = threading.Event()
+        self._last_frame = None
         self._thread = None
         self._write = None
         self._free = None
@@ -48,7 +50,8 @@ class RingLedController:
             self._free = free_pio
             self._write = neopixel_write
         try:
-            self._write(self._pin, bytes(self.led_count * 3))
+            self._last_frame = bytes(self.led_count * 3)
+            self._write(self._pin, self._last_frame)
         except Exception:
             self._write = None
             raise
@@ -81,13 +84,25 @@ class RingLedController:
         return bytes(int(c * factor) for r, g, b in colors for c in (g, r, b))
 
     def _animate(self):
-        while not self._stop.wait(.02):
+        while not self._stop.is_set():
             with self._lock:
+                if self._stop.is_set():
+                    return
                 try:
-                    self._write(self._pin, self._frame(time.monotonic() - self._started))
+                    self._render()
                 except Exception as exc:
                     self.last_error = str(exc)
                     self._stop.set()
+                    return
+                delay = .02 if self._mode in {"RAINBOW", "PULSE"} else .3 if self._mode in {"BLINK", "BUSY", "ERROR"} else None
+            self._wake.wait(delay)
+            self._wake.clear()
+
+    def _render(self):
+        frame = self._frame(time.monotonic() - self._started)
+        if frame != self._last_frame:
+            self._write(self._pin, frame)
+            self._last_frame = frame
 
     def send(self, command: str) -> bool:
         with self._lock:
@@ -110,7 +125,8 @@ class RingLedController:
                         raise ValueError("Unbekannter Ring-Befehl")
                     self._mode = "COLOR" if action == "READY" else action
                     self._started = time.monotonic()
-                self._write(self._pin, self._frame(time.monotonic() - self._started))
+                self._render()
+                self._wake.set()
                 self.last_command = command
                 self.last_response = "OK"
                 self.last_error = ""
@@ -132,6 +148,7 @@ class RingLedController:
 
     def close(self, *, release_pio=False):
         self._stop.set()
+        self._wake.set()
         if self._thread is not None:
             self._thread.join(timeout=2)
         with self._lock:

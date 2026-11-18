@@ -148,10 +148,18 @@ void main() {
           tester.widget<RecipeOverview>(find.byType(RecipeOverview)).category,
           DrinkCategory.shot,
         );
-        await store.setHomeTabs(['fill', 'mocktails', 'cocktails']);
+        final firstSave = store.setHomeTabs(['fill', 'mocktails', 'cocktails']);
+        await tester.pump(const Duration(milliseconds: 100));
+        await firstSave;
         await tester.pumpAndSettle();
         expect(find.byType(FillLevelsPage), findsOneWidget);
-        await store.setHomeTabs(['cocktails', 'mocktails', 'fill']);
+        final secondSave = store.setHomeTabs([
+          'cocktails',
+          'mocktails',
+          'fill',
+        ]);
+        await tester.pump(const Duration(milliseconds: 100));
+        await secondSave;
         await tester.pumpAndSettle();
         expect(find.byType(FillLevelsPage), findsOneWidget);
       },
