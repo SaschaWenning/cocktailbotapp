@@ -1,3 +1,4 @@
+import 'drink_previews.dart';
 //noinspection SpellCheckingInspection
 // spellchecker:disable
 import 'dart:async';
@@ -3198,12 +3199,17 @@ Widget cocktailImage(
   required String fallbackAsset,
   BoxFit fit = BoxFit.cover,
   int decodeWidth = 768,
+  bool preview = false,
 }) {
-  Widget fallback() => Image.asset(fallbackAsset, fit: fit, cacheWidth: decodeWidth);
+  final displayImage = preview ? drinkPreviews[image] ?? image : image;
+  final displayFallback = preview
+      ? drinkPreviews[fallbackAsset] ?? fallbackAsset
+      : fallbackAsset;
+  Widget fallback() => Image.asset(displayFallback, fit: fit, cacheWidth: decodeWidth);
 
   if (image.startsWith('assets/')) {
     return Image.asset(
-      image,
+      displayImage,
       fit: fit,
       cacheWidth: decodeWidth,
       errorBuilder: (_, __, ___) => fallback(),
@@ -8587,6 +8593,18 @@ class RecipeOverview extends StatefulWidget {
 
 class _RecipeOverviewState extends State<RecipeOverview> {
   int pageIndex = 0;
+  final _scrollController = ScrollController();
+
+  void _changePage(int page) {
+    setState(() => pageIndex = page);
+    if (_scrollController.hasClients) _scrollController.jumpTo(0);
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -8609,6 +8627,7 @@ class _RecipeOverviewState extends State<RecipeOverview> {
 
     return SafeArea(
       child: CustomScrollView(
+        controller: _scrollController,
         slivers: [
           SliverPadding(
             padding: EdgeInsets.fromLTRB(
@@ -8642,10 +8661,10 @@ class _RecipeOverviewState extends State<RecipeOverview> {
                   visibleStart: start + 1,
                   visibleEnd: end,
                   onPrevious: safePageIndex > 0
-                      ? () => setState(() => pageIndex--)
+                      ? () => _changePage(safePageIndex - 1)
                       : null,
                   onNext: safePageIndex < pageCount - 1
-                      ? () => setState(() => pageIndex++)
+                      ? () => _changePage(safePageIndex + 1)
                       : null,
                 ),
               ),
@@ -8690,6 +8709,32 @@ class _RecipeOverviewState extends State<RecipeOverview> {
                 },
               ),
             ),
+          if (data.isNotEmpty)
+            SliverPadding(
+              padding: EdgeInsets.fromLTRB(
+                CocktailBotResponsive.of(context).horizontalPadding,
+                0,
+                CocktailBotResponsive.of(context).horizontalPadding,
+                12,
+              ),
+              sliver: SliverToBoxAdapter(
+                child: _RecipePageControls(
+                  key: const ValueKey("recipe-pages-bottom"),
+                  store: store,
+                  currentPage: safePageIndex,
+                  pageCount: pageCount,
+                  totalCount: data.length,
+                  visibleStart: start + 1,
+                  visibleEnd: end,
+                  onPrevious: safePageIndex > 0
+                      ? () => _changePage(safePageIndex - 1)
+                      : null,
+                  onNext: safePageIndex < pageCount - 1
+                      ? () => _changePage(safePageIndex + 1)
+                      : null,
+                ),
+              ),
+            ),
         ],
       ),
     );
@@ -8698,6 +8743,7 @@ class _RecipeOverviewState extends State<RecipeOverview> {
 
 class _RecipePageControls extends StatelessWidget {
   const _RecipePageControls({
+    super.key,
     required this.store,
     required this.currentPage,
     required this.pageCount,
@@ -8795,7 +8841,6 @@ class RecipeCard extends StatelessWidget {
 
     return Material(
       color: store.appColors.cardColor,
-      borderRadius: BorderRadius.circular(10),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(10),
         side: BorderSide(
@@ -8815,6 +8860,8 @@ class RecipeCard extends StatelessWidget {
               child: cocktailImage(
                 image,
                 fallbackAsset: drinkAssets[index % drinkAssets.length],
+                decodeWidth: 400,
+                preview: true,
               ),
             ),
             const Positioned.fill(
